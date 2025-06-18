@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>LLM Chat Interface</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-window" id="chat-window">
+            <!-- Messages will appear here -->
+        </div>
+        <div class="input-area">
+            <input type="text" id="user-input" placeholder="Type your message...">
+            <div class="button-row">
+                <button id="send-button">Send</button>
+                <button id="mic-button">🎤</button> 
+                <button id="settings-button">☰</button> 
+            </div>
+        </div>
+    </div>
+    <div id="settings-panel-container">
+        <!-- User settings will be loaded here -->
+    </div>
+    <script src="js/imageService.js"></script>
+    <script src="js/llmService.js"></script>
+    <script src="js/voiceService.js"></script> 
+    <script src="js/main.js"></script>
+</body>
+</html>

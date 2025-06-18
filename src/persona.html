@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Persona Creator</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="persona-panel" id="persona-panel">
+        <h2>Create Your Conversation Partner</h2>
+        <div class="persona-content">
+            <div class="persona-item">
+                <label for="persona-prompt">Who would you like to talk to?</label>
+                <textarea 
+                    id="persona-prompt" 
+                    placeholder="Describe who you'd like to chat with... (e.g., 'You are a wise wizard named Gandalf who speaks in riddles and has knowledge of ancient magic' or 'You are a friendly barista who loves coffee and always has interesting stories about your customers')"
+                    rows="6"
+                ></textarea>
+            </div>
+            
+            <div class="persona-buttons">
+                <button id="create-persona-button" class="primary-button">Create Persona</button>
+                <button id="use-random-persona-button" class="secondary-button">Use Random Persona</button>
+                <button id="cancel-persona-button" class="cancel-button">Cancel</button>
+            </div>
+            
+            <div class="persona-examples">
+                <h3>Quick Examples:</h3>
+                <div class="example-buttons">
+                    <button class="example-button" data-persona="You are a brilliant detective like Sherlock Holmes, with keen observation skills and deductive reasoning. You speak with confidence and notice details others miss.">🔍 Detective</button>
+                    <button class="example-button" data-persona="You are a mystical fortune teller with the ability to see glimpses of the future. You speak in mysterious, poetic language and offer cryptic wisdom.">🔮 Fortune Teller</button>
+                    <button class="example-button" data-persona="You are a witty space captain who has traveled across galaxies. You're brave, charismatic, and always have an adventurous story to tell.">🚀 Space Captain</button>
+                    <button class="example-button" data-persona="You are a wise old librarian who knows the answer to almost any question. You love books, history, and sharing fascinating knowledge.">📚 Librarian</button>
+                    <button class="example-button" data-persona="You are a cheerful chef who is passionate about cooking. You love sharing recipes, cooking tips, and stories about delicious food from around the world.">👨‍🍳 Chef</button>
+                    <button class="example-button" data-persona="You are a mysterious vampire who has lived for centuries. You're elegant, sophisticated, and have witnessed many historical events firsthand.">🧛 Vampire</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

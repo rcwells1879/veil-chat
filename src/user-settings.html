@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>User Settings</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="settings-panel" id="settings-panel">
+        <h2>Settings</h2>
+        <div class="settings-content">
+            <div class="setting-item">
+                <label for="toggle-dark-mode">Dark Mode</label>
+                <label class="switch">
+                    <input type="checkbox" id="toggle-dark-mode" checked>
+                    <span class="slider round"></span>
+                </label>
+            </div>
+            <div class="setting-item">
+                <label for="select-tts-voice">TTS Voice</label>
+                <select id="select-tts-voice">
+                    <option value="AUTO">Auto (Default)</option>
+                    <option value="Ava">Ava (US)</option>
+                    <option value="Emily">Emily (UK)</option>
+                    <option value="Libby">Libby (UK)</option>
+                    <option value="Sonia" selected>Sonia (UK)</option>
+                    <option value="Jenny">Jenny (US)</option>
+                </select>
+            </div>
+            <div class="setting-item">
+                <label for="slider-font-size">Font Size</label>
+                <input type="range" id="slider-font-size" min="10" max="24" value="16">
+                <span id="font-size-value">16px</span>
+            </div>
+            <div class="setting-item">
+                <label for="toggle-notifications">Enable Notifications</label>
+                <label class="switch">
+                    <input type="checkbox" id="toggle-notifications">
+                    <span class="slider round"></span>
+                </label>
+            </div>
+            <div class="setting-item">
+                <label for="slider-tts-volume">Text-to-Speech Volume</label>
+                <input type="range" id="slider-tts-volume" min="0" max="1" step="0.1" value="1">
+                <span id="tts-volume-value">100%</span>
+            </div>
+             <div class="setting-item">
+                <label for="mic-auto-send-delay">Mic Auto-Send Delay (ms)</label>
+                <input type="number" id="mic-auto-send-delay" min="500" max="10000" step="100" value="1000">
+            </div>
+
+            <div class="setting-item">
+                <label for="llm-provider">LLM Provider</label>
+                <select id="llm-provider">
+                    <option value="litellm">LiteLLM (OpenAI Compatible)</option>
+                    <option value="lmstudio">LMStudio (OpenAI Compatible)</option>
+                    <option value="ollama">Ollama (Direct - OpenAI Compatible)</option>
+                </select>
+            </div>
+
+            <div class="setting-item">
+                <label for="llm-api-url">LLM API Base URL</label>
+                <input type="text" id="llm-api-url" placeholder="e.g., http://localhost:4000">
+            </div>
+            <div class="setting-item" id="model-identifier-item">
+                <label for="llm-model-identifier">LLM Model Identifier</label>
+                <select id="llm-model-identifier">
+                    <option value="gemma3">gemma3</option>
+                    <option value="gpt-4.1-mini">gpt-4.1-mini</option>
+                    <option value="gpt-4.1">gpt-4.1</option>
+                    <option value="gpt-4.5">gpt-4.5</option>
+                    <option value="o3-pro">o3-pro</option>
+                    <option value="cydonia">cydonia</option>
+                    <option value="cydonia3">cydonia3</option>
+                    <option value="claude3.7">claude3.7</option>
+                    <option value="claude4">claude4</option>
+                </select>
+            </div>
+            <div class="setting-item" id="api-key-item"> <!-- New item for API Key -->
+                <label for="llm-api-key">LLM API Key </label>
+                <input type="password" id="llm-api-key" placeholder="Enter API Key if required">
+            </div>
+            <div class="setting-item">
+                <label for="image-provider">Image Provider</label>
+                <select id="image-provider">
+                    <option value="a1111">Local A1111</option>
+                    <option value="openai">OpenAI (GPT-image-1)</option>
+                </select>
+            </div>
+
+            <div class="setting-item" id="image-api-url-item">
+                <label for="image-api-url">A1111 API URL</label>
+                <input type="text" id="image-api-url" placeholder="e.g., http://localhost:7860">
+            </div>
+
+            <div class="setting-item" id="openai-api-key-item" style="display: none;">
+                <label for="openai-image-api-key">OpenAI API Key</label>
+                <input type="password" id="openai-image-api-key" placeholder="Enter OpenAI API Key">
+            </div>
+
+            <!-- Add this new section after the existing setting items and before the buttons -->
+            <div class="setting-item collapsible-header" id="image-controls-header">
+                <label>Image Generation Settings</label>
+                <span class="expand-arrow">▼</span>
+            </div>
+            <div class="collapsible-content" id="image-controls-content">
+                <div class="setting-item" id="image-size-item">
+                    <label for="image-size">Image Size</label>
+                    <select id="image-size">
+                        <option value="1024x1024" selected>1024x1024</option>
+                        <option value="1792x1024">1792x1024</option>
+                        <option value="1024x1792">1024x1792</option>
+                    </select>
+                </div>
+                
+                <!-- A1111-specific settings (shown when A1111 is selected) -->
+                <div class="a1111-settings">
+                    <div class="setting-item">
+                        <label for="image-width">Width (px)</label>
+                        <input type="number" id="image-width" min="256" max="2048" step="64" value="1024">
+                    </div>
+                    <div class="setting-item">
+                        <label for="image-height">Height (px)</label>
+                        <input type="number" id="image-height" min="256" max="2048" step="64" value="1536">
+                    </div>
+                    <div class="setting-item">
+                        <label for="image-steps">Steps</label>
+                        <input type="number" id="image-steps" min="1" max="100" step="1" value="20">
+                    </div>
+                    <div class="setting-item">
+                        <label for="image-cfg-scale">CFG Scale</label>
+                        <input type="number" id="image-cfg-scale" min="1" max="20" step="0.1" value="1.4">
+                    </div>
+                    <div class="setting-item">
+                        <label for="image-sampler">Sampler</label>
+                        <select id="image-sampler">
+                            <option value="Euler a" selected>Euler a</option>
+                            <option value="DPM++ 2M">DPM++ 2M</option>
+                            <option value="LCM">LCM</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

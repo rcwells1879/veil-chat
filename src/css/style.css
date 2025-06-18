@@ -1,0 +1,1099 @@
+body {
+    font-family: sans-serif;
+    margin: 0;
+    background-color: #121212;
+    color: #e0e0e0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+}
+
+.chat-container {
+    width: 80%;
+    max-width: 600px;
+    height: 90vh;
+    background-color: #1e1e1e;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.chat-window {
+    flex-grow: 1;
+    padding: 20px;
+    overflow-y: auto;
+    /*border-bottom: 1px solid #333;*/
+}
+
+.message {
+    margin-bottom: 15px;
+    padding: 10px;
+    border-radius: 5px;
+    line-height: 1.4;
+}
+
+.user-message {
+    background-color: #007bff;
+    color: white;
+    align-self: flex-end;
+    margin-left: auto;
+    max-width: 70%;
+    text-align: right;
+}
+
+.llm-message {
+    background-color: #333;
+    color: #e0e0e0;
+    align-self: flex-start;
+    max-width: 70%;
+}
+
+.message img {
+    max-width: 100%;
+    border-radius: 5px;
+    margin-top: 10px;
+}
+
+/* Ensure .input-area and .button-row are flex containers for desktop */
+.input-area {
+    display: flex;
+    align-items: center; /* Vertically align items within input-area */
+    /* border-top: 1px solid #333; */ /* Existing commented out */
+}
+
+.button-row { /* Added for desktop button layout */
+    display: flex;
+    align-items: center; /* Vertically align buttons within the row */
+}
+
+#user-input {
+    border: none;
+    /* padding: 15px; Adjusted for fixed height */
+    font-size: 19px; /* Can keep this if desired for input field */
+    background-color: #333;
+    color: #e0e0e0;
+    outline: none;
+    flex-grow: 1;
+    border-radius: 8px 0 0 8px;
+    height: 50px; /* Fixed height */
+    box-sizing: border-box; /* Include padding in height calculation */
+    padding: 0 15px; /* Vertical padding controlled by height + flex, horizontal set here */
+}
+
+#send-button {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    /* padding: 18px; Adjusted for fixed height */
+    font-size: 16px; /* Standardized font size for consistent text height */
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    border-radius: 0; 
+    height: 50px; /* Fixed height */
+    box-sizing: border-box;
+    display: flex; /* For centering content within the button */
+    align-items: center;
+    justify-content: center;
+    padding: 0 18px; /* Horizontal padding */
+}
+
+#send-button:hover {
+    background-color: #0056b3;
+}
+
+#mic-button {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    /* padding: 15px; Adjusted for fixed height */
+    font-size: 16px; /* Standardized font size */
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    margin-left: 5px;
+    border-radius: 0; 
+    height: 50px; /* Fixed height */
+    box-sizing: border-box;
+    display: flex; /* For centering content within the button */
+    align-items: center;
+    justify-content: center;
+    padding: 0 15px; /* Horizontal padding */
+}
+
+#mic-button:hover {
+    background-color: #0056b3;
+}
+
+#mic-button.listening {
+    background-color: #dc3545; /* Red when listening */
+}
+
+#settings-button {
+    background-color: #6c757d; 
+    color: white;
+    border: none;
+    /* padding: 15px; Adjusted for fixed height */
+    font-size: 16px; /* Standardized font size */
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    margin-left: 5px;
+    border-radius: 0 8px 8px 0; 
+    height: 50px; /* Fixed height */
+    box-sizing: border-box;
+    display: flex; /* For centering content within the button */
+    align-items: center;
+    justify-content: center;
+    padding: 0 15px; /* Horizontal padding */
+}
+
+#settings-button:hover {
+    background-color: #5a6268;
+}
+
+/* Scrollbar styling for webkit browsers */
+.chat-window::-webkit-scrollbar {
+    width: 8px;
+}
+
+.chat-window::-webkit-scrollbar-track {
+    background: #1e1e1e;
+}
+
+.chat-window::-webkit-scrollbar-thumb {
+    background-color: #555;
+    border-radius: 4px;
+    border: 2px solid #1e1e1e;
+}
+
+/* Fullscreen Image Viewer Styles */
+#fullscreen-image-viewer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.9);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    cursor: pointer;
+}
+
+#fullscreen-image {
+    max-width: 95%;
+    max-height: 95%;
+    object-fit: contain;
+}
+
+/* Settings Panel Styles */
+#settings-panel-container {
+    position: fixed;
+    bottom: -100%; /* Start off-screen */
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.3); /* Semi-transparent overlay for context */
+    display: flex;
+    justify-content: center;
+    align-items: flex-end; /* Align panel to the bottom */
+    z-index: 900; /* Below fullscreen image viewer, but above chat */
+    transition: bottom 0.5s ease-in-out;
+    pointer-events: none; /* Allow clicks through overlay when panel is hidden */
+}
+
+#settings-panel-container.visible {
+    bottom: 0; /* Slide in */
+    pointer-events: auto; /* Enable interaction when visible */
+}
+
+.settings-panel {
+    background-color: #2a2a2a; /* Darker than chat window */
+    color: #e0e0e0;
+    width: 100%;
+    max-width: 600px; /* Match chat container max-width */
+    height: 75vh; /* Adjust as needed */
+    border-top-left-radius: 15px;
+    border-top-right-radius: 15px;
+    box-shadow: 0 -5px 15px rgba(0, 0, 0, 0.3);
+    padding: 20px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+}
+
+.settings-panel h2 {
+    text-align: center;
+    margin-top: 0;
+    margin-bottom: 20px;
+    color: #007bff;
+}
+
+.settings-content {
+    flex-grow: 1;
+}
+
+.setting-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding: 10px;
+    background-color: #333;
+    border-radius: 5px;
+}
+
+.setting-item label {
+    margin-right: 10px;
+}
+
+/* Basic Toggle Switch CSS */
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 50px; /* Adjusted width */
+    height: 28px; /* Adjusted height */
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: .4s;
+    border-radius: 28px; /* Adjusted for height */
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 20px; /* Adjusted size */
+    width: 20px;  /* Adjusted size */
+    left: 4px;    /* Adjusted position */
+    bottom: 4px;  /* Adjusted position */
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+
+input:checked + .slider {
+    background-color: #007bff;
+}
+
+input:focus + .slider {
+    box-shadow: 0 0 1px #007bff;
+}
+
+input:checked + .slider:before {
+    transform: translateX(22px); /* Adjusted translation */
+}
+
+/* Basic Slider CSS */
+.setting-item input[type="range"] {
+    flex-grow: 1;
+    margin: 0 10px;
+    cursor: pointer;
+}
+.setting-item input[type="number"] {
+    width: 70px;
+    padding: 5px;
+    background-color: #444;
+    color: #e0e0e0;
+    border: 1px solid #555;
+    border-radius: 3px;
+}
+
+/* Add styles for specific dropdowns in the main settings panel */
+.settings-panel .setting-item #llm-provider,
+.settings-panel .setting-item #select-tts-voice {
+    padding: 8px 12px; 
+    background-color: #444; 
+    color: #e0e0e0; 
+    border: 1px solid #555; 
+    border-radius: 4px; 
+    font-size: 14px; 
+    width: auto; /* Allow width to fit content */
+    /* flex-grow: 1; Removed to prevent taking full width */
+    /* min-width: 120px; Removed or adjust if a minimum is still desired */
+    box-sizing: border-box; 
+    margin-left: auto; /* Pushes the dropdown to the right if label takes less space */
+}
+
+.settings-panel .setting-item #llm-provider:focus,
+.settings-panel .setting-item #select-tts-voice:focus {
+    border-color: #007bff; /* Match sampler dropdown focus border */
+    outline: none; /* Remove default outline */
+    box-shadow: 0 0 3px rgba(0, 123, 255, 0.3); /* Match sampler dropdown focus shadow */
+}
+
+/* Add this with your other dropdown styles for settings panel */
+.settings-panel .setting-item #llm-model-identifier {
+    padding: 8px 12px;
+    background-color: #444;
+    color: #e0e0e0;
+    border: 1px solid #555;
+    border-radius: 4px;
+    font-size: 14px;
+    width: auto;
+    box-sizing: border-box;
+    margin-left: auto;
+}
+
+.settings-panel .setting-item #llm-model-identifier:focus {
+    border-color: #007bff;
+    outline: none;
+    box-shadow: 0 0 3px rgba(0, 123, 255, 0.3);
+}
+
+/* Style for text input fields in settings panel */
+.settings-panel .setting-item input[type="text"],
+.settings-panel .setting-item input[type="password"] {
+    padding: 8px 12px;
+    background-color: #444;
+    color: #e0e0e0;
+    border: 1px solid #555;
+    border-radius: 4px;
+    font-size: 14px;
+    width: 207px; /* Fixed width that fits most content but not too wide */
+    box-sizing: border-box;
+    margin-left: auto; /* Pushes the input to the right */
+}
+
+/* Style for input fields focus state */
+.settings-panel .setting-item input[type="text"]:focus,
+.settings-panel .setting-item input[type="password"]:focus {
+    border-color: #007bff;
+    outline: none;
+    box-shadow: 0 0 3px rgba(0, 123, 255, 0.3);
+}
+
+/* Mobile adjustments for text inputs */
+@media (max-width: 480px) {
+    .settings-panel .setting-item input[type="text"],
+    .settings-panel .setting-item input[type="password"] {
+        width: 150px;
+        padding: 6px 10px;
+        font-size: 13px;
+    }
+}
+
+/* Welcome message styles - centered in chat */
+.welcome-message {
+    background: linear-gradient(135deg, #000000 0%, #000000 100%);
+    color: white;
+    text-align: center;
+    font-size: 28px;
+    font-weight: bold;
+    padding: 8px 20px;
+    margin: 10px auto;
+    border-radius: 15px;
+    box-shadow: 
+        0 20px 40px rgba(0, 0, 0, 0.4),
+        0 10px 20px rgba(0, 0, 0, 0.3),
+        0 5px 10px rgba(0, 0, 0, 0.2);
+    max-width: 50%;
+    align-self: center;
+    position: relative;
+    overflow: hidden;
+    transform: translateY(-5px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Add hover effect for more floating feel */
+.welcome-message:hover {
+    transform: translateY(-8px);
+    box-shadow: 
+        0 25px 50px rgba(0, 0, 0, 0.5),
+        0 15px 30px rgba(0, 0, 0, 0.4),
+        0 8px 15px rgba(0, 0, 0, 0.3);
+    transition: all 0.3s ease;
+}
+
+/* Add dark glow effect behind the box */
+.welcome-message::after {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    background: linear-gradient(135deg, #333333, #111111);
+    border-radius: 17px;
+    z-index: -1;
+    filter: blur(8px);
+    opacity: 0.6;
+}
+
+/* Update mobile styles to maintain floating effect */
+@media (max-width: 768px) {
+    .welcome-message {
+        font-size: 24px;
+        padding: 25px 15px;
+        margin: 15px auto;
+        transform: translateY(-3px);
+        box-shadow: 
+            0 15px 30px rgba(0, 0, 0, 0.35),
+            0 8px 15px rgba(0, 0, 0, 0.25),
+            0 4px 8px rgba(0, 0, 0, 0.15);
+    }
+    
+    .welcome-message:hover {
+        transform: translateY(-5px);
+    }
+}
+
+@media (max-width: 480px) {
+    .welcome-message {
+        font-size: 20px;
+        padding: 20px 12px;
+        margin: 10px auto;
+        transform: translateY(-2px);
+        box-shadow: 
+            0 12px 25px rgba(0, 0, 0, 0.3),
+            0 6px 12px rgba(0, 0, 0, 0.2),
+            0 3px 6px rgba(0, 0, 0, 0.1);
+    }
+    
+    .welcome-message:hover {
+        transform: translateY(-4px);
+    }
+}
+
+/* Mobile adjustments for welcome message */
+@media (max-width: 768px) {
+    .welcome-message {
+        font-size: 24px;
+        padding: 25px 15px;
+        margin: 15px auto;
+    }
+}
+
+@media (max-width: 480px) {
+    .welcome-message {
+        font-size: 20px;
+        padding: 20px 12px;
+        margin: 10px auto;
+    }
+    
+    .animated-letter {
+        animation-duration: 3.5s;
+    }
+    
+    @keyframes colorWaveJiggle {
+        0%, 100% {
+            transform: translateX(0) translateY(0) scale(1);
+        }
+        25% {
+            transform: translateX(-1px) translateY(-1px) scale(1.02);
+        }
+        50% {
+            transform: translateX(1px) translateY(1px) scale(0.98);
+        }
+        75% {
+            transform: translateX(-1px) translateY(1px) scale(1.01);
+        }
+    }
+}
+
+/* Mobile-first responsive design */
+@media (max-width: 768px) {
+    body {
+        height: 100vh;
+        height: 100dvh; /* Dynamic viewport height for mobile browsers */
+        padding: 0;
+        margin: 0;
+    }
+
+    .chat-container {
+        width: 100%;
+        max-width: none;
+        height: 100vh;
+        height: 100dvh; /* Dynamic viewport height */
+        border-radius: 0;
+        box-shadow: none;
+    }
+
+    .input-area {
+        /* display: flex; is inherited */
+        /* align-items: center; is inherited */
+        flex-wrap: nowrap; 
+        padding: 10px;
+        gap: 5px;
+    }
+    
+    .button-row {
+        /* display: flex; is inherited */
+        /* align-items: center; is inherited */
+        gap: 5px; /* Mobile specific gap if different from desktop */
+    }
+
+    #user-input {
+        flex: 1; /* Takes up available space before buttons */
+        min-width: 0; 
+        font-size: 16px; 
+        border-radius: 4px !important; /* Keep if needed for specificity */
+        height: 44px; /* Mobile height */
+        padding: 0 10px; /* Mobile horizontal padding */
+        /* box-sizing: border-box; is inherited */
+    }
+
+    /* Consolidated rule for mobile buttons */
+    #send-button,
+    #mic-button,
+    #settings-button { /* Settings button is part of this row at this breakpoint */
+        flex-shrink: 0;
+        min-width: 44px; 
+        border-radius: 4px !important; /* Keep if needed */
+        height: 44px; /* Mobile height */
+        font-size: 16px; 
+        padding: 0 12px; /* Mobile horizontal padding */
+        /* display: flex, align-items, justify-content, box-sizing are inherited */
+        margin-left: 0; /* Override desktop margin for consistent gap */
+    }
+    /* Ensure settings button doesn't have fixed position here */
+    #settings-button {
+        position: static; /* Ensure it's in flow for 768px view */
+    }
+}
+
+/* Very small screens - custom layout (max-width: 480px) */
+@media (max-width: 480px) {
+    .input-area {
+        flex-direction: row; 
+        align-items: center; 
+        gap: 8px; 
+        padding: 8px; 
+    }
+
+    #user-input {
+        flex-grow: 1;   /* Let user input grow to take available space */
+        flex-shrink: 1; /* Allow it to shrink if needed */
+        min-width: 0; /* Allow shrinking below content size */
+        /* width: auto; This is fine */
+        margin-bottom: 0; 
+        height: 44px; 
+        padding: 0 10px;
+        border-radius: 4px !important;
+    }
+
+    .button-row {
+        display: flex; 
+        align-items: center;
+        gap: 5px; 
+        /* width: auto; This is fine */
+    }
+
+    #send-button {
+        flex-grow: 1; 
+        flex-basis: 0;
+        flex-shrink: 1;
+        margin-left: 0; 
+        height: 44px;
+        font-size: 16px;
+        padding: 0 10px; 
+        min-width: auto; 
+    }
+
+    #mic-button {
+        flex-grow: 1; 
+        flex-basis: 0;
+        flex-shrink: 1;
+        margin-left: 0; 
+        height: 44px;
+        font-size: 16px;
+        padding: 0 10px; 
+        min-width: auto;
+    }
+
+    #settings-button {
+        position: fixed; 
+        top: 10px;       
+        left: 10px;      
+        z-index: 1100;   
+        flex-grow: 0;
+        flex-shrink: 0;
+        flex-basis: auto;
+        width: 44px;  
+        height: 44px;
+        padding: 0; 
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%; 
+        background-color: #6c757d; 
+        color: white;
+        margin-left: 0; 
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2); 
+        font-size: 20px; 
+    }
+}
+
+/* Add these styles for the image provider dropdown */
+.settings-panel .setting-item #image-provider,
+.settings-panel .setting-item #image-size {
+    padding: 8px 12px;
+    background-color: #444;
+    color: #e0e0e0;
+    border: 1px solid #555;
+    border-radius: 4px;
+    font-size: 14px;
+    width: auto;
+    box-sizing: border-box;
+    margin-left: auto;
+}
+
+.settings-panel .setting-item #image-provider:focus,
+.settings-panel .setting-item #image-size:focus {
+    border-color: #007bff;
+    outline: none;
+    box-shadow: 0 0 3px rgba(0, 123, 255, 0.3);
+}
+
+/* Mobile adjustments for new dropdowns */
+@media (max-width: 480px) {
+    .settings-panel .setting-item #image-provider,
+    .settings-panel .setting-item #image-size {
+        width: 140px;
+        min-width: 0;
+        padding: 8px 10px;
+        font-size: 14px;
+    }
+}
+
+/* Collapsible Image Controls */
+.collapsible-header {
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    user-select: none;
+    position: relative;
+}
+
+.collapsible-header:hover {
+    background-color: #404040;
+}
+
+.collapsible-header .expand-arrow {
+    font-size: 14px;
+    transition: transform 0.3s ease;
+    color: #007bff;
+    font-weight: bold;
+}
+
+.collapsible-header.expanded .expand-arrow {
+    transform: rotate(180deg);
+}
+
+.collapsible-content {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease-out;
+    background-color: #2a2a2a;
+    border-radius: 0 0 5px 5px;
+    margin-top: -5px;
+}
+
+.collapsible-content.expanded {
+    max-height: 500px; /* Adjust based on content */
+    padding-top: 10px;
+}
+
+.collapsible-content .setting-item {
+    margin-bottom: 15px;
+    background-color: #3a3a3a;
+    border-radius: 3px;
+}
+
+.collapsible-content .setting-item:last-child {
+    margin-bottom: 0;
+}
+
+/* Enhanced input styling for image controls */
+.collapsible-content input[type="number"] {
+    width: 80px;
+    padding: 8px;
+    background-color: #444;
+    color: #e0e0e0;
+    border: 1px solid #555;
+    border-radius: 4px;
+    font-size: 14px;
+    text-align: center;
+}
+
+.collapsible-content input[type="number"]:focus {
+    border-color: #007bff;
+    outline: none;
+    box-shadow: 0 0 3px rgba(0, 123, 255, 0.3);
+}
+
+.collapsible-content select {
+    padding: 8px 12px;
+    background-color: #444;
+    color: #e0e0e0;
+    border: 1px solid #555;
+    border-radius: 4px;
+    font-size: 14px;
+    min-width: 120px;
+}
+
+.collapsible-content select:focus {
+    border-color: #007bff;
+    outline: none;
+    box-shadow: 0 0 3px rgba(0, 123, 255, 0.3);
+}
+
+/* Mobile responsive adjustments */
+@media (max-width: 480px) {
+    .collapsible-content input[type="number"] {
+        width: 70px;
+        padding: 6px;
+        font-size: 13px;
+    }
+    
+    .collapsible-content select {
+        padding: 6px 8px;
+        font-size: 10px;
+        min-width: 100px;
+    }
+
+    .settings-panel .setting-item #llm-provider,
+    .settings-panel .setting-item #select-tts-voice,
+    .settings-panel .setting-item #image-sampler {
+        width: 140px; /* Reduce width for mobile */
+        min-width: 0; /* Remove any minimum width constraints */
+        padding: 8px 10px; /* Slightly reduce padding */
+        font-size: 14px; /* Keep text readable */
+    }
+}
+
+/* Add these CSS rules for the animated letters after your .welcome-message styles */
+
+.animated-letter {
+    display: inline-block;
+    animation: colorWaveJiggle 4s ease-in-out infinite;
+    animation-fill-mode: both;
+    opacity: 1;
+    transform: translateY(0);
+}
+
+@keyframes colorWaveJiggle {
+    0% {
+        opacity: 1;
+        transform: translateX(0) translateY(0) scale(1);
+        color: #ff6b6b;
+        text-shadow: 0 0 15px #ff6b6b;
+    }
+    10% {
+        transform: translateX(-2px) translateY(-1px) scale(1.05);
+        color: #4ecdc4;
+        text-shadow: 0 0 20px #4ecdc4;
+    }
+    20% {
+        transform: translateX(2px) translateY(1px) scale(0.95);
+        color: #45b7d1;
+        text-shadow: 0 0 25px #45b7d1;
+    }
+    30% {
+        transform: translateX(-1px) translateY(-2px) scale(1.02);
+        color: #f9ca24;
+        text-shadow: 0 0 20px #f9ca24;
+    }
+    40% {
+        transform: translateX(1px) translateY(2px) scale(0.98);
+        color: #f0932b;
+        text-shadow: 0 0 15px #f0932b;
+    }
+    50% {
+        transform: translateX(-2px) translateY(1px) scale(1.03);
+        color: #eb4d4b;
+        text-shadow: 0 0 10px #eb4d4b;
+    }
+    60% {
+        transform: translateX(2px) translateY(-1px) scale(0.97);
+        color: #e056fd;
+        text-shadow: 0 0 20px #e056fd;
+    }
+    70% {
+        transform: translateX(-1px) translateY(2px) scale(1.01);
+        color: #ff6b6b;
+        text-shadow: 0 0 15px #ff6b6b;
+    }
+    80% {
+        transform: translateX(1px) translateY(-2px) scale(0.99);
+        color: #4ecdc4;
+        text-shadow: 0 0 20px #4ecdc4;
+    }
+    90% {
+        transform: translateX(-2px) translateY(1px) scale(1.02);
+        color: #45b7d1;
+        text-shadow: 0 0 25px #45b7d1;
+    }
+    100% {
+        opacity: 1;
+        transform: translateX(0) translateY(0) scale(1);
+        color: #e056fd;
+        text-shadow: 0 0 20px #e056fd;
+    }
+}
+
+/* Add shimmer effect */
+.welcome-message::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    animation: shimmer 3s infinite;
+    z-index: 1;
+}
+
+@keyframes shimmer {
+    0% {
+        left: -100%;
+    }
+    100% {
+        left: 100%;
+    }
+}
+
+/* Ensure letters appear above shimmer */
+.welcome-message .animated-letter {
+    position: relative;
+    z-index: 2;
+}
+
+/* Add these styles after your existing welcome message styles */
+
+/* Make welcome message clickable */
+.welcome-message {
+    /* ...existing styles... */
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.welcome-message:hover {
+    /* ...existing hover styles... */
+    /* Add a subtle scale effect to indicate clickability */
+    transform: translateY(-8px) scale(1.02);
+}
+
+/* Persona Panel Styles */
+#persona-panel-container {
+    position: fixed;
+    top: -100%; /* Start off-screen */
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.4); /* Semi-transparent overlay */
+    display: flex;
+    justify-content: center;
+    align-items: flex-start; /* Align panel to the top */
+    z-index: 950; /* Above settings panel */
+    transition: top 0.5s ease-in-out;
+    pointer-events: none; /* Allow clicks through overlay when panel is hidden */
+    padding-top: 20px;
+}
+
+#persona-panel-container.visible {
+    top: 0; /* Slide in */
+    pointer-events: auto; /* Enable interaction when visible */
+}
+
+.persona-panel {
+    background-color: #2a2a2a; /* Match settings panel */
+    color: #e0e0e0;
+    width: 90%;
+    max-width: 600px; /* Match chat container max-width */
+    max-height: 85vh; /* Don't take full height */
+    border-radius: 15px;
+    box-shadow: 0 5px 25px rgba(0, 0, 0, 0.4);
+    padding: 25px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+}
+
+.persona-panel h2 {
+    text-align: center;
+    margin-top: 0;
+    margin-bottom: 25px;
+    color: #007bff;
+    font-size: 24px;
+}
+
+.persona-content {
+    flex-grow: 1;
+}
+
+.persona-item {
+    margin-bottom: 25px;
+}
+
+.persona-item label {
+    display: block;
+    margin-bottom: 10px;
+    font-weight: bold;
+    color: #e0e0e0;
+    font-size: 16px;
+}
+
+#persona-prompt {
+    width: 100%;
+    padding: 15px;
+    background-color: #333;
+    color: #e0e0e0;
+    border: 1px solid #555;
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: inherit;
+    resize: vertical;
+    min-height: 120px;
+    box-sizing: border-box;
+}
+
+#persona-prompt:focus {
+    border-color: #007bff;
+    outline: none;
+    box-shadow: 0 0 5px rgba(0, 123, 255, 0.3);
+}
+
+.persona-buttons {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 25px;
+    flex-wrap: wrap;
+}
+
+.primary-button {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: bold;
+    transition: background-color 0.3s ease;
+    flex: 1;
+    min-width: 120px;
+}
+
+.primary-button:hover {
+    background-color: #0056b3;
+}
+
+.secondary-button {
+    background-color: #6c757d;
+    color: white;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.3s ease;
+    flex: 1;
+    min-width: 120px;
+}
+
+.secondary-button:hover {
+    background-color: #5a6268;
+}
+
+.cancel-button {
+    background-color: #dc3545;
+    color: white;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.3s ease;
+    flex: 1;
+    min-width: 120px;
+}
+
+.cancel-button:hover {
+    background-color: #c82333;
+}
+
+.persona-examples {
+    margin-top: 20px;
+}
+
+.persona-examples h3 {
+    margin-bottom: 15px;
+    color: #007bff;
+    font-size: 16px;
+}
+
+.example-buttons {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 10px;
+}
+
+.example-button {
+    background-color: #444;
+    color: #e0e0e0;
+    border: 1px solid #555;
+    padding: 10px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.3s ease;
+    text-align: center;
+}
+
+.example-button:hover {
+    background-color: #007bff;
+    border-color: #007bff;
+    transform: translateY(-2px);
+}
+
+/* Mobile adjustments */
+@media (max-width: 480px) {
+    .persona-panel {
+        width: 95%;
+        padding: 20px;
+        max-height: 90vh;
+    }
+    
+    .persona-panel h2 {
+        font-size: 20px;
+        margin-bottom: 20px;
+    }
+    
+    .persona-buttons {
+        flex-direction: column;
+    }
+    
+    .primary-button,
+    .secondary-button,
+    .cancel-button {
+        flex: none;
+        width: 100%;
+    }
+    
+    .example-buttons {
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    }
+    
+    .example-button {
+        font-size: 11px;
+        padding: 8px 6px;
+    }
+}
