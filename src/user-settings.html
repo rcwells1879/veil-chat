@@ -75,6 +75,7 @@
                     <option value="cydonia3">cydonia3</option>
                     <option value="claude3.7">claude3.7</option>
                     <option value="claude4">claude4</option>
+                    <option value="gemini2.5-flash">gemini2.5-flash</option>
                 </select>
             </div>
             <div class="setting-item" id="api-key-item"> <!-- New item for API Key -->
@@ -108,10 +109,40 @@
                 <div class="setting-item" id="image-size-item">
                     <label for="image-size">Image Size</label>
                     <select id="image-size">
-                        <option value="1024x1024" selected>1024x1024</option>
-                        <option value="1792x1024">1792x1024</option>
-                        <option value="1024x1792">1024x1792</option>
+                        <option value="auto" selected>Auto</option>
+                        <option value="1024x1024">Square (1024x1024)</option>
+                        <option value="1536x1024">Landscape (1536x1024)</option>
+                        <option value="1024x1536">Portrait (1024x1536)</option>
                     </select>
+                </div>
+
+                <!-- OpenAI-specific settings (shown when OpenAI is selected) -->
+                <div class="openai-settings" style="display: none;">
+                    <div class="setting-item">
+                        <label for="openai-quality">Quality</label>
+                        <select id="openai-quality">
+                            <option value="auto" selected>Auto</option>
+                            <option value="high">High</option>
+                            <option value="medium">Medium</option>
+                            <option value="low">Low</option>
+                        </select>
+                    </div>
+                    <div class="setting-item">
+                        <label for="openai-output-format">Output Format</label>
+                        <select id="openai-output-format">
+                            <option value="png" selected>PNG</option>
+                            <option value="jpeg">JPEG</option>
+                            <option value="webp">WebP</option>
+                        </select>
+                    </div>
+                    <div class="setting-item">
+                        <label for="openai-background">Background</label>
+                        <select id="openai-background">
+                            <option value="auto" selected>Auto</option>
+                            <option value="opaque">Opaque</option>
+                            <option value="transparent">Transparent</option>
+                        </select>
+                    </div>
                 </div>
                 
                 <!-- A1111-specific settings (shown when A1111 is selected) -->

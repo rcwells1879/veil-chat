@@ -12,7 +12,10 @@ class ImageService {
         this.sampler_name = "Euler a";
         
         // Set default settings for OpenAI
-        this.size = "1024x1024"; // OpenAI format
+        this.size = "auto"; // OpenAI format
+        this.quality = "auto";
+        this.output_format = "png";
+        this.background = "auto";
         
         console.log(`ImageService initialized. Provider: ${this.provider}`);
     }
@@ -27,6 +30,9 @@ class ImageService {
         
         // OpenAI settings
         if (settings.size !== undefined) this.size = settings.size;
+        if (settings.quality !== undefined) this.quality = settings.quality;
+        if (settings.output_format !== undefined) this.output_format = settings.output_format;
+        if (settings.background !== undefined) this.background = settings.background;
         
         // Provider settings
         if (settings.provider !== undefined) {
@@ -62,19 +68,24 @@ class ImageService {
         const openaiEndpoint = 'https://api.openai.com/v1/images/generations';
         
         try {
+            const payload = {
+                model: "gpt-image-1",
+                prompt: prompt.trim(),
+                n: 1,
+                size: this.size || "auto",
+                quality: this.quality || "auto",
+                output_format: this.output_format || "png",
+                background: this.background || "auto",
+                moderation: "low" // Set moderation level to low as requested
+            };
+
             const response = await fetch(openaiEndpoint, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${this.openaiApiKey}`
                 },
-                body: JSON.stringify({
-                    model: "gpt-image-1",
-                    prompt: prompt.trim(),
-                    n: 1,
-                    size: this.size || "1024x1024"
-                    // Removed response_format parameter
-                }),
+                body: JSON.stringify(payload),
             });
 
             if (!response.ok) {
@@ -85,35 +96,15 @@ class ImageService {
 
             const data = await response.json();
 
-            // Check for both b64_json and url formats in the response
+            // gpt-image-1 always returns base64-encoded images
             if (data.data && data.data.length > 0) {
                 const imageData = data.data[0];
                 
                 if (imageData.b64_json) {
-                    // If base64 data is provided
                     console.log('Received base64 image data from OpenAI.');
-                    return `data:image/png;base64,${imageData.b64_json}`;
-                } else if (imageData.url) {
-                    // If URL is provided, fetch the image and convert to base64
-                    console.log('Received image URL from OpenAI, converting to base64...');
-                    try {
-                        const imageResponse = await fetch(imageData.url);
-                        if (!imageResponse.ok) {
-                            throw new Error(`Failed to fetch image from URL: ${imageResponse.status}`);
-                        }
-                        const imageBlob = await imageResponse.blob();
-                        return new Promise((resolve, reject) => {
-                            const reader = new FileReader();
-                            reader.onload = () => resolve(reader.result);
-                            reader.onerror = reject;
-                            reader.readAsDataURL(imageBlob);
-                        });
-                    } catch (urlError) {
-                        console.error('Error fetching image from URL:', urlError);
-                        throw new Error(`Failed to fetch image from OpenAI URL: ${urlError.message}`);
-                    }
+                    return `data:image/${this.output_format || 'png'};base64,${imageData.b64_json}`;
                 } else {
-                    console.error('No image data or URL received from OpenAI:', data);
+                    console.error('No base64 image data received from OpenAI:', data);
                     throw new Error('No image data received from OpenAI API');
                 }
             } else {

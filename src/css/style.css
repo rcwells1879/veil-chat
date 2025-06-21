@@ -1097,3 +1097,29 @@ input:checked + .slider:before {
         padding: 8px 6px;
     }
 }
+
+/* Add these styles for the OpenAI-specific settings */
+.openai-settings .setting-item select {
+    padding: 8px 12px;
+    background-color: #444;
+    color: #e0e0e0;
+    border: 1px solid #555;
+    border-radius: 4px;
+    font-size: 14px;
+    min-width: 120px;
+}
+
+.openai-settings .setting-item select:focus {
+    border-color: #007bff;
+    outline: none;
+    box-shadow: 0 0 3px rgba(0, 123, 255, 0.3);
+}
+
+/* Mobile responsive adjustments for OpenAI settings */
+@media (max-width: 480px) {
+    .openai-settings .setting-item select {
+        padding: 6px 8px;
+        font-size: 13px;
+        min-width: 100px;
+    }
+}

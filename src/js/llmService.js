@@ -8,18 +8,18 @@ class LLMService {
         // --- Easily Modifiable LLM Parameters ---
         // For Normal Chat
         this.chatTemperature = 0.9;
-        this.chatMaxTokens = 300;
+        this.chatMaxTokens = 600;
         this.chatPresencePenalty = 0.5;
         this.chatFrequencyPenalty = 0.5;
         this.chatTopP = null;
 
         // For "Show Me" Image Prompt Generation
         this.imagePromptTemperature = 0.5;
-        this.imagePromptMaxTokens = 150;
+        this.imagePromptMaxTokens = 200;
         
         // For Character Generation
         this.characterGenTemperature = 0.8;
-        this.characterGenMaxTokens = 200;
+        this.characterGenMaxTokens = 1200; // Even higher for very detailed profiles
         // --- End of Modifiable Parameters ---
 
         // Initialize conversation history with default system prompt
@@ -36,9 +36,23 @@ class LLMService {
         this.loadConversationHistory();
         
         console.log(`LLMService initialized. Provider: ${this.providerType}, Base URL: ${this.apiBaseUrl}, Model ID: ${this.modelIdentifier}`);
-        console.log(`Normal Chat Params: temp=${this.chatTemperature}, max_tokens=${this.chatMaxTokens}`);
-        console.log(`Image Prompt Params: temp=${this.imagePromptTemperature}, max_tokens=${this.imagePromptMaxTokens}`);
-        console.log(`Character Gen Params: temp=${this.characterGenTemperature}, max_tokens=${this.characterGenMaxTokens}`);
+    }
+
+    static hasSavedConversation() {
+        try {
+            const savedData = localStorage.getItem('llmConversationHistory');
+            if (!savedData) return false;
+
+            const historyData = JSON.parse(savedData);
+            const maxAge = 24 * 60 * 60 * 1000; // 24 hours
+            const isRecent = (Date.now() - (historyData.timestamp || 0)) < maxAge;
+            
+            // A conversation exists if it's recent and has more than the initial system prompt.
+            return isRecent && historyData.conversationHistory && historyData.conversationHistory.length > 1;
+        } catch (error) {
+            console.error('Error checking saved conversation history:', error);
+            return false;
+        }
     }
 
     saveConversationHistory() {
@@ -49,7 +63,6 @@ class LLMService {
                 timestamp: Date.now()
             };
             localStorage.setItem('llmConversationHistory', JSON.stringify(historyData));
-            console.log('Conversation history saved to localStorage');
         } catch (error) {
             console.error('Error saving conversation history:', error);
         }
@@ -61,18 +74,19 @@ class LLMService {
             if (savedData) {
                 const historyData = JSON.parse(savedData);
                 
-                // Check if the saved data is recent (within 24 hours) to avoid loading very old conversations
+                // Check if the saved data is recent (within 24 hours)
                 const maxAge = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
                 const isRecent = (Date.now() - historyData.timestamp) < maxAge;
                 
                 if (isRecent && historyData.conversationHistory && Array.isArray(historyData.conversationHistory)) {
                     this.conversationHistory = historyData.conversationHistory;
                     this.characterInitialized = historyData.characterInitialized || false;
-                    console.log('Loaded conversation history from localStorage:', this.conversationHistory.length, 'messages');
                 } else {
                     console.log('Saved conversation history is too old or invalid, starting fresh');
                     this.clearConversationHistory();
                 }
+            } else {
+                console.log('No saved conversation history found');
             }
         } catch (error) {
             console.error('Error loading conversation history:', error);
@@ -106,41 +120,70 @@ class LLMService {
         }
 
         // Check if there's already a custom persona set
-        const hasCustomPersona = this.conversationHistory.some(msg => 
+        const customPersonaMessage = this.conversationHistory.find(msg => 
             msg.content && msg.content.includes('[CUSTOM PERSONA')
         );
         
-        if (hasCustomPersona) {
-            console.log("Custom persona already set, skipping auto-generation.");
+        // Check if there's already a character profile (to avoid duplicates)
+        const hasCharacterProfile = this.conversationHistory.some(msg => 
+            msg.content && msg.content.includes('[INTERNAL CHARACTER PROFILE')
+        );
+        
+        if (hasCharacterProfile) {
+            console.log("Character profile already exists, marking as initialized.");
             this.characterInitialized = true;
-            this.saveConversationHistory(); // Save the state
+            this.saveConversationHistory();
             return;
         }
-
+        
         const endpoint = `${this.apiBaseUrl}/v1/chat/completions`;
         
         // Create a separate message array for character generation
-        const characterGenMessages = [
-            ...this.conversationHistory, // Include the system prompt
-            {
-                role: "user",
-                content: "Please create your character now. Respond with a detailed internal character profile that includes: your name, age, physical appearance (hair color, eye color, height, build, style), personality traits, magical abilities/powers, backstory, and current circumstances. This will be used as internal reference and should be written in third person as a character description. Be creative and unique."
-            }
-        ];
+        let characterGenMessages;
+        
+        if (customPersonaMessage) {
+            console.log("Custom persona detected, generating character profile based on custom persona...");
+            
+            // Extract the actual custom persona text
+            const customPersonaText = customPersonaMessage.content.replace('[CUSTOM PERSONA - INTERNAL REFERENCE] ', '');
+            
+            characterGenMessages = [
+                {
+                    role: "system",
+                    content: "You are a character creation assistant. You will be given custom persona instructions and must create a detailed character profile that follows those instructions exactly."
+                },
+                {
+                    role: "user",
+                    content: `Create a detailed internal character profile based on these specific persona instructions: "${customPersonaText}"
+
+Please create a character that follows these instructions and include: 
+- Your name, age, physical appearance (hair color, eye color, height, build, style)
+- Personality traits that match the persona description
+- Any special abilities or background mentioned
+- Backstory and current circumstances that align with the persona
+- Any other details that fit the persona requirements
+
+Make sure the character you create embodies and follows the persona instructions provided. Write this as a third-person character description for internal reference.`
+                }
+            ];
+        } else {
+            console.log("No custom persona, generating random character profile...");
+            characterGenMessages = [
+                {
+                    role: "system",
+                    content: `You are a creative character generator. Create a unique roleplay character over the age of 18. Be creative and detailed.`
+                },
+                {
+                    role: "user",
+                    content: "Create a detailed character profile that includes: your name, age, gender, physical appearance (hair color, eye color, height, build, style), personality traits, any special abilities, backstory, and current circumstances. Write this as a third-person character description for internal reference. Be creative and unique. Make it comprehensive but concise - aim for 150-200 words."
+                }
+            ];
+        }
 
         console.log("Generating character profile...");
 
         try {
-            const payload = {
-                messages: characterGenMessages,
-                temperature: this.characterGenTemperature,
-                max_tokens: this.characterGenMaxTokens,
-                stream: false,
-            };
-
-            if (this.modelIdentifier) {
-                payload.model = this.modelIdentifier;
-            }
+            const payload = this.createCompatiblePayload(characterGenMessages, this.characterGenTemperature, this.characterGenMaxTokens, false);
 
             const headers = {
                 'Content-Type': 'application/json',
@@ -149,6 +192,8 @@ class LLMService {
             if (this.apiKey) {
                 headers['Authorization'] = `Bearer ${this.apiKey}`;
             }
+
+            console.log('Sending character generation request:', JSON.stringify(payload, null, 2));
 
             const response = await fetch(endpoint, {
                 method: 'POST',
@@ -159,13 +204,20 @@ class LLMService {
             if (!response.ok) {
                 const errorData = await response.json().catch(() => response.text());
                 console.error('Character Generation API Error:', errorData);
-                throw new Error(`Character generation failed with status ${response.status}`);
+                console.error('Request payload that failed:', JSON.stringify(payload, null, 2));
+                console.error('Request headers:', headers);
+                throw new Error(`Character generation failed with status ${response.status}: ${JSON.stringify(errorData)}`);
             }
 
             const data = await response.json();
+            console.log('Raw API response data:', data);
+            
+            // Since reasoning is disabled, content should be in the standard location
             const characterProfile = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content
                 ? data.choices[0].message.content.trim()
                 : "";
+
+            console.log('Extracted character profile:', characterProfile); // Add this debug line
 
             if (characterProfile) {
                 // Add the character profile to conversation history as a hidden system message
@@ -183,6 +235,7 @@ class LLMService {
                 return characterProfile;
             } else {
                 console.warn("Empty character profile received from LLM");
+                console.log('Full API response for debugging:', JSON.stringify(data, null, 2)); // Add this debug line
                 this.characterInitialized = true;
                 this.saveConversationHistory(); // Save the state
                 return null;
@@ -225,22 +278,13 @@ class LLMService {
                 },
                 {
                     role: "user",
-                    content: `Based on the user's most recent request in the conversation history (which is "${message}"), generate ONLY a comma-separated list of at least 20 descriptive words and phrases suitable for an image generation model. Do not include any other conversational text, pleasantries, or any prefix. Do not include any names. always include hair color, eye color, skin tone, clothing, and any other relevant details that would help in generating a contextually accurate image. Use the character profile information to ensure accurate physical description.`
+                    content: `Based on the user's most recent request in the conversation history (which is "${message}"), generate ONLY a comma-separated list of at least 20 descriptive words and phrases suitable for an image generation model. Do not include any other conversational text, pleasantries, or any prefix. Do not include any names. always include gender,hair color, eye color, skin tone, clothing, and any other relevant details that would help in generating a contextually accurate image. Use the character profile information to ensure accurate physical description.`
                 }
             ];
 
             console.log("Sending request for dedicated image prompt with context:", JSON.stringify(imageGenMessagesForApiCall, null, 2));
             
-            const payload = {
-                messages: imageGenMessagesForApiCall,
-                temperature: this.imagePromptTemperature,
-                max_tokens: this.imagePromptMaxTokens,
-                stream: false,
-            };
-
-            if (this.modelIdentifier) {
-                payload.model = this.modelIdentifier;
-            }
+            const payload = this.createCompatiblePayload(imageGenMessagesForApiCall, this.imagePromptTemperature, this.imagePromptMaxTokens, false);
 
             const headers = {
                 'Content-Type': 'application/json',
@@ -249,6 +293,8 @@ class LLMService {
             if (this.apiKey) {
                 headers['Authorization'] = `Bearer ${this.apiKey}`;
             }
+
+            console.log('Sending image prompt request:', JSON.stringify(payload, null, 2));
 
             const response = await fetch(endpoint, {
                 method: 'POST',
@@ -259,10 +305,12 @@ class LLMService {
             if (!response.ok) {
                 const errorData = await response.json().catch(() => response.text());
                 console.error('LLM API Error (Image Prompt Request):', errorData);
-                throw new Error(`LLM API request for image prompt failed with status ${response.status}: ${errorData.error?.message || response.statusText}`);
+                console.error('Request payload that failed:', JSON.stringify(payload, null, 2));
+                throw new Error(`LLM API request for image prompt failed with status ${response.status}: ${JSON.stringify(errorData)}`);
             }
 
             const data = await response.json();
+            
             const rawReply = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content
                 ? data.choices[0].message.content.trim()
                 : "";
@@ -281,69 +329,49 @@ class LLMService {
             console.log(`Sending to LLM (normal chat) via ${this.providerType}: ${message}`);
             this.conversationHistory.push({ role: "user", content: message });
 
+            // Add this line to save after adding user message:
+            this.saveConversationHistory();
+
             console.log("Current conversation history being sent to LLM:", JSON.stringify(this.conversationHistory, null, 2));
 
             try {
-                const payload = {
-                    messages: this.conversationHistory,
-                    temperature: this.chatTemperature,
-                    max_tokens: this.chatMaxTokens,
-                    stream: false,
-                    stop: ["Human:", "User:", "###", "\n\nUser:"]  // Add stop sequences
-                };
+                const payload = this.createCompatiblePayload(this.conversationHistory, this.chatTemperature, this.chatMaxTokens, true);
 
-                // Conditionally add parameters not universally supported
-                if (!(this.providerType === 'ollama' || (this.providerType === 'litellm' && this.modelIdentifier && this.modelIdentifier.startsWith('ollama/')))) {
-                    // Add these only if not targeting Ollama directly or via LiteLLM
-                    if (this.chatPresencePenalty !== null) { // Check if it's set
-                        payload.presence_penalty = this.chatPresencePenalty;
-                    }
-                    if (this.chatFrequencyPenalty !== null) { // Check if it's set
-                        payload.frequency_penalty = this.chatFrequencyPenalty;
-                    }
-                }
-
-                if (this.chatTopP !== null) { // Assuming this.chatTopP is defined in constructor
-                    payload.top_p = this.chatTopP;
-                }
-
-                // ALWAYS send the model identifier when talking to LiteLLM (or any OpenAI-compatible proxy)
-                if (this.modelIdentifier) {
-                    payload.model = this.modelIdentifier;
-                } else {
-                    // Fallback or error if no model identifier is provided when it's expected
-                    console.error("No modelIdentifier set for LiteLLM/proxy request!");
-                    // Potentially throw an error or return an error message
-                }
-
-                const headers = { // Define headers object for normal chat
+                const headers = {
                     'Content-Type': 'application/json',
                 };
 
-                if (this.apiKey) { // Add Authorization header if apiKey is present
+                if (this.apiKey) {
                     headers['Authorization'] = `Bearer ${this.apiKey}`;
                 }
 
+                console.log('Sending normal chat request:', JSON.stringify(payload, null, 2));
+
                 const response = await fetch(endpoint, {
                     method: 'POST',
-                    headers: headers, // Use the headers object for normal chat
+                    headers: headers,
                     body: JSON.stringify(payload),
                 });
 
                 if (!response.ok) {
                     const errorData = await response.json().catch(() => response.text());
                     console.error('LLM API Error (Normal Chat):', errorData);
+                    console.error('Request payload that failed:', JSON.stringify(payload, null, 2));
                     this.conversationHistory.pop(); 
-                    throw new Error(`LLM API request failed with status ${response.status}: ${errorData.error?.message || response.statusText}`);
+                    throw new Error(`LLM API request failed with status ${response.status}: ${JSON.stringify(errorData)}`);
                 }
 
                 const data = await response.json();
+                
                 const rawReply = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content
                     ? data.choices[0].message.content.trim()
                     : "Sorry, I couldn't understand that.";
 
                 this.conversationHistory.push({ role: "assistant", content: rawReply });
                 console.log(`Received from LLM (Normal Chat - raw): ${rawReply}`);
+
+                // Add this line to save after each exchange:
+                this.saveConversationHistory();
 
                 return { type: 'text', content: rawReply };
 
@@ -376,12 +404,27 @@ class LLMService {
         return profileMessage ? profileMessage.content : null;
     }
 
-    setCustomPersona(customPersonaPrompt) {
-        // Remove any existing character profiles from history
-        this.conversationHistory = this.conversationHistory.filter(msg => 
-            !msg.content.includes('[INTERNAL CHARACTER PROFILE') && 
-            !msg.content.includes('[CUSTOM PERSONA')
-        );
+    setCustomPersona(customPersonaPrompt, preserveHistory = false) {
+        if (!preserveHistory) {
+            // Only remove existing personas/profiles if we're not preserving history
+            this.conversationHistory = this.conversationHistory.filter(msg => 
+                !msg.content.includes('[INTERNAL CHARACTER PROFILE') && 
+                !msg.content.includes('[CUSTOM PERSONA')
+            );
+        } else {
+            // When preserving history, only remove if there's already a custom persona 
+            // (to avoid duplicates), but keep the conversation history
+            const hasExistingPersona = this.conversationHistory.some(msg => 
+                msg.content && msg.content.includes('[CUSTOM PERSONA')
+            );
+            
+            if (hasExistingPersona) {
+                // Remove only the existing custom persona, keep everything else
+                this.conversationHistory = this.conversationHistory.filter(msg => 
+                    !msg.content.includes('[CUSTOM PERSONA')
+                );
+            }
+        }
         
         // Add the custom persona to conversation history
         this.conversationHistory.push({
@@ -390,8 +433,9 @@ class LLMService {
             hidden: true
         });
         
-        // Mark character as initialized to skip auto-generation
-        this.characterInitialized = true;
+        // DON'T mark character as initialized yet - we still need to generate the character profile
+        // The character profile generation will happen in createPersona() or generateCharacterProfile()
+        this.characterInitialized = false;
         
         // Save the updated conversation history
         this.saveConversationHistory();
@@ -408,5 +452,208 @@ class LLMService {
             !msg.content.includes('[CUSTOM PERSONA')
         );
         console.log("Persona reset. Will use default character generation on next message.");
+    }
+
+    async generateInitialPersonaContent() {
+        console.log("Generating initial persona image and greeting...");
+        
+        try {
+            // Use the character profile context for image generation
+            const imageGenMessages = [
+                ...this.conversationHistory, // This includes the character profile
+                {
+                    role: "user",
+                    content: "show me what you look like"
+                },
+                {
+                    role: "system",
+                    content: "Generate a comma-separated list of image prompt keywords based on the character profile. Output ONLY the comma-separated list."
+                },
+                {
+                    role: "user",
+                    content: "Based on the character profile above, create a comma-separated list of visual keywords for image generation. Include the character's physical appearance details: gender, hair color and style, eye color, skin tone, height, build, clothing style, age. Output ONLY the comma-separated keywords."
+                }
+            ];
+            
+            const imagePayload = this.createCompatiblePayload(imageGenMessages, this.imagePromptTemperature, this.imagePromptMaxTokens, false);
+
+            const imageHeaders = {
+                'Content-Type': 'application/json',
+            };
+
+            if (this.apiKey) {
+                imageHeaders['Authorization'] = `Bearer ${this.apiKey}`;
+            }
+
+            console.log('Sending initial image generation request:', JSON.stringify(imagePayload, null, 2));
+
+            const response = await fetch(`${this.apiBaseUrl}/v1/chat/completions`, {
+                method: 'POST',
+                headers: imageHeaders,
+                body: JSON.stringify(imagePayload),
+            });
+
+            let imagePrompt = null;
+            if (response.ok) {
+                const imageData = await response.json();
+                console.log('Raw image generation response:', imageData);
+                
+                const rawImageReply = imageData.choices && imageData.choices[0] && imageData.choices[0].message && imageData.choices[0].message.content
+                    ? imageData.choices[0].message.content.trim()
+                    : null;
+                
+                console.log('Extracted image reply:', rawImageReply);
+                
+                if (rawImageReply) {
+                    imagePrompt = rawImageReply;
+                    console.log("Generated image prompt:", imagePrompt);
+                } else {
+                    console.log('No image prompt generated - full response:', JSON.stringify(imageData, null, 2));
+                }
+            } else {
+                console.error('Image generation request failed:', response.status, response.statusText);
+                const errorText = await response.text();
+                console.error('Error response:', errorText);
+            }
+            
+            // Then, get a greeting using temporary messages
+            const greetingMessages = [
+                ...this.conversationHistory,
+                {
+                    role: "user",
+                    content: "hello"
+                }
+            ];
+            
+            const greetingPayload = this.createCompatiblePayload(greetingMessages, this.chatTemperature, this.chatMaxTokens, true);
+
+            const greetingHeaders = {
+                'Content-Type': 'application/json',
+            };
+
+            if (this.apiKey) {
+                greetingHeaders['Authorization'] = `Bearer ${this.apiKey}`;
+            }
+
+            console.log('Sending initial greeting request:', JSON.stringify(greetingPayload, null, 2));
+
+            const greetingResponse = await fetch(`${this.apiBaseUrl}/v1/chat/completions`, {
+                method: 'POST',
+                headers: greetingHeaders,
+                body: JSON.stringify(greetingPayload),
+            });
+
+            let greeting = "Hello there! What's your name?";
+            if (greetingResponse.ok) {
+                const greetingData = await greetingResponse.json();
+                const rawGreetingReply = greetingData.choices && greetingData.choices[0] && greetingData.choices[0].message && greetingData.choices[0].message.content
+                    ? greetingData.choices[0].message.content.trim()
+                    : null;
+                
+                if (rawGreetingReply) {
+                    greeting = rawGreetingReply;
+                } else {
+                    console.log('No greeting generated - full response:', JSON.stringify(greetingData, null, 2));
+                }
+            }
+            
+            // Add the initial interaction to conversation history
+            console.log('Adding initial greeting exchange to conversation history');
+            this.conversationHistory.push({ 
+                role: "user", 
+                content: "hello" 
+            });
+            this.conversationHistory.push({ 
+                role: "assistant", 
+                content: greeting 
+            });
+
+            console.log('Updated conversation history:', this.conversationHistory);
+
+            return {
+                imagePrompt: imagePrompt,
+                greeting: greeting
+            };
+            
+        } catch (error) {
+            console.error('Error generating initial persona content:', error);
+            return {
+                imagePrompt: null,
+                greeting: "Hello there!"
+            };
+        }
+    }
+
+    createCompatiblePayload(messages, temperature, maxTokens, includeStop = true) {
+        const isGemini = this.modelIdentifier && this.modelIdentifier.toLowerCase().includes('gemini');
+        const isOllama = this.providerType === 'ollama' || (this.providerType === 'litellm' && this.modelIdentifier && this.modelIdentifier.startsWith('ollama/'));
+        
+        const payload = {
+            messages: messages,
+            temperature: temperature,
+            max_tokens: maxTokens,
+            stream: false,
+        };
+
+        if (this.modelIdentifier) {
+            payload.model = this.modelIdentifier;
+        }
+
+        // Handle Gemini parameters - disable thinking and set safety settings for ALL Gemini models
+        if (isGemini) {
+            console.log(`Applying Gemini-specific settings for model: ${this.modelIdentifier}`);
+            
+            // Disable thinking by setting thinkingBudget to 0 (works for all Gemini 2.5 models)
+            payload.thinkingBudget = 0;
+            payload.thinkingConfig = {
+                thinkingBudget: 0
+            };
+            payload.reasoning_effort = "low";
+            
+            // Set safety settings to BLOCK_NONE for all categories to prevent content filtering
+            payload.safetySettings = [
+                {
+                    category: "HARM_CATEGORY_HARASSMENT",
+                    threshold: "BLOCK_NONE"
+                },
+                {
+                    category: "HARM_CATEGORY_HATE_SPEECH", 
+                    threshold: "BLOCK_NONE"
+                },
+                {
+                    category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                    threshold: "BLOCK_NONE"
+                },
+                {
+                    category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+                    threshold: "BLOCK_NONE"
+                },
+                {
+                    category: "HARM_CATEGORY_CIVIC_INTEGRITY",
+                    threshold: "BLOCK_NONE"
+                }
+            ];
+        }
+
+        // Add optional parameters only for compatible models
+        if (!isOllama && !isGemini) {
+            if (this.chatPresencePenalty !== null) {
+                payload.presence_penalty = this.chatPresencePenalty;
+            }
+            if (this.chatFrequencyPenalty !== null) {
+                payload.frequency_penalty = this.chatFrequencyPenalty;
+            }
+        }
+
+        if (!isGemini && this.chatTopP !== null) {
+            payload.top_p = this.chatTopP;
+        }
+
+        // Only add stop sequences if requested AND the model supports them (not Gemini)
+        if (includeStop && !isGemini) {
+            payload.stop = ["Human:", "User:", "###", "\n\nUser:"];
+        }
+
+        return payload;
     }
 }
