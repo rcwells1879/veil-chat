@@ -191,7 +191,7 @@ class ContextService {
 
     clearAllDocuments() {
         this.attachedDocuments = [];
-    }
+    } 
 
     getAttachedDocuments() {
         return [...this.attachedDocuments];

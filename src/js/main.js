@@ -45,13 +45,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         openaiBackground: localStorage.getItem('openaiBackground') || 'auto',
         // Voice & UI
         ttsVoice: localStorage.getItem('ttsVoice') || 'Sonia',
-        micAutoSendDelay: localStorage.getItem('micAutoSendDelay') || '1000',
     };
 
     // --- Service Initialization ---
     let llmService = new LLMService(SETTINGS.customLlmApiUrl, SETTINGS.customLlmProvider, SETTINGS.customLlmModelIdentifier, SETTINGS.customLlmApiKey);
     let imageService = new ImageService(SETTINGS.customImageApiUrl, SETTINGS.customImageProvider, SETTINGS.customOpenAIImageApiKey);
     let voiceService = new VoiceService(handleSttResult, handleSttError, handleSttListeningState, handleSttAutoSend);
+    
+    // Hardcode mic auto-send delay to 500ms
+    if (voiceService) {
+        voiceService.finalAutoSendDelay = 500;
+    }
 
     // --- Core Functions ---
     async function addMessage(message, sender) {
@@ -257,8 +261,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         openaiQuality: 'openai-quality',
         openaiOutputFormat: 'openai-output-format',
         openaiBackground: 'openai-background',
-        ttsVoice: 'select-tts-voice',
-        micAutoSendDelay: 'mic-auto-send-delay'
+        ttsVoice: 'select-tts-voice'
     };
 
     function saveAllSettings() {
