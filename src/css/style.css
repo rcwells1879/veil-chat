@@ -1123,3 +1123,82 @@ input:checked + .slider:before {
         min-width: 100px;
     }
 }
+
+/* Add these styles at the end of your existing CSS */
+
+/* Conversation Controls */
+.conversation-controls {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 25px;
+    padding: 15px;
+    background-color: rgba(0, 123, 255, 0.1);
+    border-radius: 10px;
+    border: 1px solid rgba(0, 123, 255, 0.3);
+}
+
+.conversation-button {
+    flex: 1;
+    padding: 12px 20px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.save-button {
+    background: linear-gradient(135deg, #28a745, #20c997);
+    color: white;
+}
+
+.save-button:hover {
+    background: linear-gradient(135deg, #218838, #1c7d6e);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.4);
+}
+
+.load-button {
+    background: linear-gradient(135deg, #007bff, #6610f2);
+    color: white;
+}
+
+.load-button:hover {
+    background: linear-gradient(135deg, #0056b3, #520dc2);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 123, 255, 0.4);
+}
+
+.conversation-button:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* Mobile adjustments for conversation controls */
+@media (max-width: 480px) {
+    .conversation-controls {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .conversation-button {
+        padding: 14px 16px;
+        font-size: 13px;
+    }
+}
+
+@media (max-width: 320px) {
+    .conversation-controls {
+        gap: 8px;
+        padding: 12px;
+    }
+    
+    .conversation-button {
+        padding: 12px 14px;
+        font-size: 12px;
+    }
+}

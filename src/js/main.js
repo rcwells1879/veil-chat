@@ -125,6 +125,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // --- Persona Management ---
     async function createPersona(customPrompt) {
+        // Only clear conversation and reset state when actually creating a new persona
         chatWindow.innerHTML = '';
         currentPersonaPrompt = customPrompt;
         personaCreated = true;
@@ -136,6 +137,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             localStorage.removeItem('currentPersonaPrompt');
         }
 
+        // Clear conversation history and create new LLM service
         llmService = new LLMService(SETTINGS.customLlmApiUrl, SETTINGS.customLlmProvider, SETTINGS.customLlmModelIdentifier, SETTINGS.customLlmApiKey);
         llmService.clearConversationHistory();
         
@@ -189,20 +191,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         welcomeElement.innerHTML = "Welcome to Veil".split('').map((char, i) => `<span class="animated-letter" style="animation-delay: ${i * 0.1}s">${char}</span>`).join('');
         
         welcomeElement.addEventListener('click', async () => {
-            personaCreated = false;
-            currentPersonaPrompt = null;
-            localStorage.removeItem('currentPersonaPrompt');
-            localStorage.removeItem('draftPersonaPrompt');
-            
-            // When clicking welcome to create new persona, clear everything
-            if (llmService) {
-                llmService.clearConversationHistory();
-            }
-            llmService = new LLMService(SETTINGS.customLlmApiUrl, SETTINGS.customLlmProvider, SETTINGS.customLlmModelIdentifier, SETTINGS.customLlmApiKey);
-            
-            chatWindow.innerHTML = '';
-            chatWindow.appendChild(welcomeElement);
-            
+            // DON'T clear anything here - just show the persona panel
             if (!personaPanelContainer.querySelector('.persona-panel')) {
                 await loadPersonaPanel();
             }
@@ -342,11 +331,32 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
             });
             
-            // Setup listeners
+            // Setup listeners for settings
             settingsPanelContainer.querySelectorAll('input, select').forEach(el => {
                 el.addEventListener('input', saveAllSettings);
                 el.addEventListener('change', saveAllSettings);
             });
+            
+            // ADD CONVERSATION EVENT LISTENERS HERE - AFTER THE HTML IS LOADED
+            const saveButton = settingsPanelContainer.querySelector('#save-conversation-button');
+            const loadButton = settingsPanelContainer.querySelector('#load-conversation-button');
+            const loadInput = settingsPanelContainer.querySelector('#load-conversation-input');
+            
+            if (saveButton) {
+                saveButton.addEventListener('click', saveConversationToFile);
+            }
+            
+            if (loadButton) {
+                loadButton.addEventListener('click', () => {
+                    if (loadInput) {
+                        loadInput.click();
+                    }
+                });
+            }
+            
+            if (loadInput) {
+                loadInput.addEventListener('change', loadConversationFromFile);
+            }
             
             settingsPanelContainer.addEventListener('click', (e) => e.target === settingsPanelContainer && hideSettingsPanel());
             settingsPanelContainer.querySelector('.settings-panel').addEventListener('click', (e) => e.stopPropagation());
@@ -487,5 +497,107 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (LLMService.hasSavedConversation()) {
         addMessage('(Previous conversation restored - context preserved)', 'llm');
         console.log('Full conversation history loaded:', llmService.conversationHistory.length, 'messages');
+    }
+
+    // --- Conversation save/load functions ---
+    function saveConversationToFile() {
+        const conversationState = {
+            version: "1.0",
+            savedAt: new Date().toISOString(),
+            personaPrompt: currentPersonaPrompt,
+            llmServiceState: {
+                conversationHistory: llmService.conversationHistory,
+                characterInitialized: llmService.characterInitialized
+            }
+        };
+
+        const jsonString = JSON.stringify(conversationState, null, 2);
+        const blob = new Blob([jsonString], { type: 'application/json' });
+
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const date = new Date().toISOString().slice(0, 10);
+        a.download = `veil-conversation-${date}.json`;
+        document.body.appendChild(a);
+        a.click();
+
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        console.log("Conversation saved to file.");
+    }
+
+    function loadConversationFromFile(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const loadedState = JSON.parse(e.target.result);
+
+                if (!loadedState.llmServiceState || !loadedState.llmServiceState.conversationHistory) {
+                    throw new Error("Invalid conversation file format.");
+                }
+
+                // Restore application state
+                currentPersonaPrompt = loadedState.personaPrompt || null;
+                llmService.conversationHistory = loadedState.llmServiceState.conversationHistory;
+                llmService.characterInitialized = loadedState.llmServiceState.characterInitialized;
+
+                // Update localStorage
+                llmService.saveConversationHistory();
+                if (currentPersonaPrompt) {
+                    localStorage.setItem('currentPersonaPrompt', currentPersonaPrompt);
+                } else {
+                    localStorage.removeItem('currentPersonaPrompt');
+                }
+
+                // Clear the chat window first
+                chatWindow.innerHTML = '';
+                
+                // Use the existing addWelcomeMessage function (which has the safe click handler)
+                addWelcomeMessage();
+                
+                // Then render conversation history
+                renderConversation(llmService.conversationHistory);
+                
+                hideSettingsPanel();
+                addMessage("(Conversation loaded successfully)", 'llm');
+
+            } catch (error) {
+                console.error("Failed to load or parse conversation file:", error);
+                addMessage(`(Error: Could not load file. ${error.message})`, 'llm');
+            }
+        };
+        reader.readAsText(file);
+        event.target.value = null;
+    }
+
+    function renderConversation(history) {
+        // DON'T clear chatWindow here - let the caller decide
+        // chatWindow.innerHTML = '';
+        
+        history.forEach(message => {
+            // Don't display system messages or messages explicitly marked as hidden
+            if (message.role === 'system' || message.hidden) {
+                return;
+            }
+            
+            const sender = message.role === 'user' ? 'user' : 'llm';
+            
+            // Handle image messages which might be JSON strings
+            if (typeof message.content === 'string' && message.content.startsWith('{')) {
+                try {
+                    const contentObj = JSON.parse(message.content);
+                    if (contentObj.type === 'image') {
+                        addMessage(contentObj, sender);
+                        return;
+                    }
+                } catch (e) { /* Not a JSON object, treat as string */ }
+            }
+            
+            addMessage(message.content, sender);
+        });
     }
 });
