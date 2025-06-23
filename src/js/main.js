@@ -10,6 +10,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     personaPanelContainer.id = 'persona-panel-container';
     document.body.appendChild(personaPanelContainer);
     
+    // Get the existing attach button from HTML
+    const attachButton = document.getElementById('attach-button');
+    attachButton.title = 'Attach Documents';
+    
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.id = 'file-input';
+    fileInput.multiple = true;
+    fileInput.style.display = 'none';
+    fileInput.accept = '.txt,.js,.py,.json,.pdf,.docx,.html,.css,.md,.xml,.yaml,.yml,.log,.cpp,.h,.cs';
+    
+    const attachedDocsContainer = document.createElement('div');
+    attachedDocsContainer.id = 'attached-docs-container';
+    
+    document.body.appendChild(fileInput);
+    
     const fullScreenImageViewer = document.createElement('div');
     fullScreenImageViewer.id = 'fullscreen-image-viewer';
     const fullScreenImage = document.createElement('img');
@@ -51,6 +67,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     let llmService = new LLMService(SETTINGS.customLlmApiUrl, SETTINGS.customLlmProvider, SETTINGS.customLlmModelIdentifier, SETTINGS.customLlmApiKey);
     let imageService = new ImageService(SETTINGS.customImageApiUrl, SETTINGS.customImageProvider, SETTINGS.customOpenAIImageApiKey);
     let voiceService = new VoiceService(handleSttResult, handleSttError, handleSttListeningState, handleSttAutoSend);
+    // Initialize ContextService
+    const contextService = new ContextService();
     
     // Hardcode mic auto-send delay to 500ms
     if (voiceService) {
@@ -92,38 +110,35 @@ document.addEventListener('DOMContentLoaded', async () => {
                 console.error("TTS Error:", error);
             }
         }
-    }
+    }    async function handleUserInput() {
+        const message = userInput.value.trim();
+        if (!message) return;
 
-    async function handleUserInput() {
-        const messageText = userInput.value.trim();
-        if (!messageText) return;
-
-        addMessage(messageText, 'user');
         userInput.value = '';
+        addMessage(message, 'user');
 
-        try {
-            const llmResponse = await llmService.sendMessage(messageText);
+        // Get document context if available
+        const documentContext = contextService.getDocumentContext();
 
-            if (llmResponse.type === 'image_request' && llmResponse.prompt) {
-                try {
-                    const imageUrl = await imageService.generateImage(llmResponse.prompt);
-                    if (imageUrl) {
-                        addMessage({ type: 'image', url: imageUrl, alt: llmResponse.prompt }, 'llm');
-                    } else {
-                        addMessage({ text: "(Image generation failed)", type: 'error' }, 'llm');
-                    }
-                } catch (imageError) {
-                    addMessage({ text: `(Image Error: ${imageError.message})`, type: 'error' }, 'llm');
+        // Send to LLM with document context
+        const response = await llmService.sendMessage(message, documentContext);
+          if (response.type === 'image_request') {
+            console.log("Image request detected, generating image...");
+            try {
+                const imageDataUrl = await imageService.generateImage(response.prompt);
+                if (imageDataUrl) {
+                    await addMessage({ type: 'image', url: imageDataUrl, alt: "Generated Image" }, 'llm');
+                } else {
+                    await addMessage("I tried to create an image for you, but the generation failed.", 'llm');
                 }
-            } else if (llmResponse.type === 'text' && llmResponse.content) {
-                addMessage(llmResponse.content, 'llm');
-            } else if (llmResponse.type === 'error') {
-                addMessage({ text: llmResponse.content, type: 'error' }, 'llm');
-            } else {
-                addMessage({ text: "(Received an unexpected response from the LLM)", type: 'error' }, 'llm');
+            } catch (error) {
+                console.error('Image generation failed:', error);
+                await addMessage(`I tried to create an image for you, but something went wrong: ${error.message}`, 'llm');
             }
-        } catch (error) {
-            addMessage({ text: `Error: Could not connect to the LLM. ${error.message}`, type: 'error' }, 'llm');
+        } else if (response.type === 'text') {
+            await addMessage(response.content, 'llm');
+        } else if (response.type === 'error') {
+            await addMessage(response.content, 'llm');
         }
     }
 
@@ -139,11 +154,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             localStorage.setItem('currentPersonaPrompt', customPrompt);
         } else {
             localStorage.removeItem('currentPersonaPrompt');
-        }
-
-        // Clear conversation history and create new LLM service
+        }        // Clear conversation history and create new LLM service
         llmService = new LLMService(SETTINGS.customLlmApiUrl, SETTINGS.customLlmProvider, SETTINGS.customLlmModelIdentifier, SETTINGS.customLlmApiKey);
         llmService.clearConversationHistory();
+        
+        // Clear attached documents when creating new persona
+        contextService.clearAllDocuments();
+        updateAttachedDocsDisplay();
         
         if (currentPersonaPrompt) {
             llmService.setCustomPersona(currentPersonaPrompt);
@@ -414,21 +431,105 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     async function handleSttAutoSend(text) {
         userInput.value = text;
-        if (userInput.value.trim()) {
-            const wasContinuous = isContinuousConversationActive;
-            isContinuousConversationActive = false;
-            await handleUserInput();
-            isContinuousConversationActive = wasContinuous;
-            if (isContinuousConversationActive) setTimeout(() => voiceService.startRecognition(), 750);
-        } else if (isContinuousConversationActive) {
-            setTimeout(() => voiceService.startRecognition(), 100);
-        }
+        await handleUserInput();
     }
+
+    // --- Document Attachment Functions ---
+    async function handleFileAttachment(event) {
+        const files = Array.from(event.target.files);
+        if (files.length === 0) return;
+
+        console.log('Files selected:', files.map(f => f.name));
+
+        try {
+            const results = await contextService.processFiles(files);
+            
+            let successCount = 0;
+            let errorMessages = [];
+
+            results.forEach(result => {
+                if (result.success) {
+                    successCount++;
+                } else {
+                    errorMessages.push(`${result.fileName}: ${result.error}`);
+                }
+            });
+
+            // Update attached documents display
+            updateAttachedDocsDisplay();
+
+            // Show success message
+            if (successCount > 0) {
+                const successMessage = `📎 Attached ${successCount} document(s): ${contextService.getDocumentSummary()}`;
+                await addMessage(successMessage, 'system');
+                console.log('Successfully attached documents:', contextService.getAttachedDocuments());
+            }
+
+            // Show error messages if any
+            if (errorMessages.length > 0) {
+                const errorMessage = `❌ Failed to attach some documents:\n${errorMessages.join('\n')}`;
+                await addMessage(errorMessage, 'system');
+            }
+
+        } catch (error) {
+            console.error('File attachment error:', error);
+            await addMessage(`❌ Error processing files: ${error.message}`, 'system');
+        }
+
+        // Clear the file input
+        fileInput.value = '';
+    }
+
+    function updateAttachedDocsDisplay() {
+        const docs = contextService.getAttachedDocuments();
+        
+        if (docs.length === 0) {
+            attachedDocsContainer.style.display = 'none';
+            return;
+        }
+
+        attachedDocsContainer.style.display = 'block';
+        attachedDocsContainer.innerHTML = `
+            <div class="attached-docs-header">
+                <span>📎 ${docs.length} document(s) attached</span>
+                <button class="clear-docs-btn" onclick="clearAllDocuments()">Clear All</button>
+            </div>
+            <div class="attached-docs-list">
+                ${docs.map(doc => `
+                    <div class="attached-doc-item">
+                        <span class="doc-name" title="${doc.name}">${doc.name}</span>
+                        <button class="remove-doc-btn" onclick="removeDocument('${doc.id}')" title="Remove">×</button>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+
+    function removeDocument(documentId) {
+        contextService.removeDocument(documentId);
+        updateAttachedDocsDisplay();
+    }
+
+    function clearAllDocuments() {
+        contextService.clearAllDocuments();
+        updateAttachedDocsDisplay();
+    }
+
+    // Make functions globally available for onclick handlers
+    window.removeDocument = removeDocument;
+    window.clearAllDocuments = clearAllDocuments;
 
     // --- Initial Setup ---
     sendButton.addEventListener('click', handleUserInput);
     userInput.addEventListener('keypress', (e) => e.key === 'Enter' && handleUserInput());
     fullScreenImageViewer.addEventListener('click', () => fullScreenImageViewer.style.display = 'none');
+    
+    // Document attachment event listeners
+    attachButton.addEventListener('click', () => {
+        fileInput.click();
+    });
+
+    fileInput.addEventListener('change', handleFileAttachment);
     
     settingsButton.addEventListener('click', async () => {
         if (!settingsPanelContainer.classList.contains('visible')) {
@@ -507,11 +608,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         const conversationState = {
             version: "1.0",
             savedAt: new Date().toISOString(),
-            personaPrompt: currentPersonaPrompt,
-            llmServiceState: {
+            personaPrompt: currentPersonaPrompt,            llmServiceState: {
                 conversationHistory: llmService.conversationHistory,
                 characterInitialized: llmService.characterInitialized
-            }
+            },
+            documentContext: contextService.exportContext()
         };
 
         const jsonString = JSON.stringify(conversationState, null, 2);
@@ -541,12 +642,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 if (!loadedState.llmServiceState || !loadedState.llmServiceState.conversationHistory) {
                     throw new Error("Invalid conversation file format.");
-                }
-
-                // Restore application state
+                }                // Restore application state
                 currentPersonaPrompt = loadedState.personaPrompt || null;
                 llmService.conversationHistory = loadedState.llmServiceState.conversationHistory;
                 llmService.characterInitialized = loadedState.llmServiceState.characterInitialized;
+
+                // Restore document context if available
+                if (loadedState.documentContext) {
+                    const imported = contextService.importContext(loadedState.documentContext);
+                    if (imported) {
+                        updateAttachedDocsDisplay();
+                    }
+                }
 
                 // Update localStorage
                 llmService.saveConversationHistory();

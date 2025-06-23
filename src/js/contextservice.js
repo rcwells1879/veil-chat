@@ -2,6 +2,12 @@ class ContextService {
     constructor() {
         this.attachedDocuments = [];
         this.maxFileSize = 10 * 1024 * 1024; // 10MB limit
+        
+        // Configure PDF.js worker
+        if (typeof pdfjsLib !== 'undefined') {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        }
+        
         this.supportedTypes = {
             'text/plain': 'txt',
             'application/json': 'json',
@@ -114,6 +120,10 @@ class ContextService {
     }
 
     async extractPdfText(file) {
+        if (typeof pdfjsLib === 'undefined') {
+            throw new Error('PDF.js library not loaded. Cannot extract PDF text.');
+        }
+
         return new Promise((resolve, reject) => {
             const fileReader = new FileReader();
             fileReader.onload = async function() {
@@ -140,6 +150,10 @@ class ContextService {
     }
 
     async extractDocxText(file) {
+        if (typeof mammoth === 'undefined') {
+            throw new Error('Mammoth.js library not loaded. Cannot extract DOCX text.');
+        }
+
         return new Promise((resolve, reject) => {
             const fileReader = new FileReader();
             fileReader.onload = async function() {

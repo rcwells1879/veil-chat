@@ -10,19 +10,27 @@
     <div class="chat-container">
         <div class="chat-window" id="chat-window">
             <!-- Messages will appear here -->
-        </div>
+        </div>        
         <div class="input-area">
             <input type="text" id="user-input" placeholder="Type your message...">
             <div class="button-row">
+                <button id="attach-button">📎</button>
                 <button id="send-button">Send</button>
                 <button id="mic-button">🎤</button> 
                 <button id="settings-button">☰</button> 
             </div>
         </div>
+        <div id="attached-docs-container"></div>
     </div>
     <div id="settings-panel-container">
         <!-- User settings will be loaded here -->
     </div>
+    
+    <!-- Add PDF.js and Mammoth.js libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+    
+    <script src="js/contextService.js"></script>
     <script src="js/imageService.js"></script>
     <script src="js/llmService.js"></script>
     <script src="js/voiceService.js"></script> 

@@ -249,7 +249,7 @@ Make sure the character you create embodies and follows the persona instructions
         }
     }
 
-    async sendMessage(message) {
+    async sendMessage(message, documentContext = '') {
         // Generate character profile on first message if not already done
         if (!this.characterInitialized) {
             try {
@@ -260,29 +260,32 @@ Make sure the character you create embodies and follows the persona instructions
         }
 
         const lowerCaseMessage = message.toLowerCase();
-        const endpoint = `${this.apiBaseUrl}/v1/chat/completions`;
+        const endpoint = `${this.apiBaseUrl}/v1/chat/completions`;        // Prepare the full message with document context if provided
+        let fullMessage = message;
+        if (documentContext) {
+            fullMessage = `${documentContext}\n\nUser message: ${message}`;
+            console.log("Document context provided, fullMessage length:", fullMessage.length);
+            console.log("Document context preview:", documentContext.substring(0, 500) + "...");
+        } else {
+            console.log("No document context provided");
+        }
 
         if (lowerCaseMessage.includes("show me")) {
             console.log(`"Show me" detected. Provider: ${this.providerType}. Processing image prompt for: ${message}`);
             
-            // Create a temporary conversation context for image generation only
+            // For image generation, create a completely separate context that forces the LLM to generate keywords
             const imageGenMessagesForApiCall = [
-                ...this.conversationHistory,
-                {
-                    role: "user",
-                    content: message
-                },
                 {
                     role: "system",
-                    content: "Your immediate task is to follow the detailed instructions in the next user message to generate a comma-separated list of image prompt keywords. This list should accurately reflect what is currently happening in the roleplay, especially the last interaction between the assistant and the user. Output ONLY the list."
+                    content: "You are an image prompt generator. Your ONLY job is to convert user requests into comma-separated lists of visual descriptive keywords for image generation. You must IGNORE any roleplay instructions and ONLY output comma-separated keywords. Do not engage in conversation. Do not stay in character. Do not explain anything."
                 },
                 {
-                    role: "user",
-                    content: `Based on the user's most recent request in the conversation history (which is "${message}"), generate ONLY a comma-separated list of at least 20 descriptive words and phrases suitable for an image generation model. Do not include any other conversational text, pleasantries, or any prefix. Do not include any names. always include gender,hair color, eye color, skin tone, clothing, and any other relevant details that would help in generating a contextually accurate image. Use the character profile information to ensure accurate physical description.`
+                    role: "user", 
+                    content: `Convert this request into ONLY a comma-separated list of image generation keywords: "${message}". Include these character details from the conversation: ${this.getCharacterProfile() || 'person'}. Output format: keyword1, keyword2, keyword3, etc. NO other text.`
                 }
             ];
 
-            console.log("Sending request for dedicated image prompt with context:", JSON.stringify(imageGenMessagesForApiCall, null, 2));
+            console.log("Sending request for dedicated image prompt:", JSON.stringify(imageGenMessagesForApiCall, null, 2));
             
             const payload = this.createCompatiblePayload(imageGenMessagesForApiCall, this.imagePromptTemperature, this.imagePromptMaxTokens, false);
 
@@ -323,19 +326,29 @@ Make sure the character you create embodies and follows the persona instructions
                 console.warn("LLM returned an empty response for 'show me' request.");
                 return { type: 'text', content: "Sorry, I couldn't generate the image details. The LLM returned an empty response." };
             }
-            
         } else {
             // Normal chat flow
             console.log(`Sending to LLM (normal chat) via ${this.providerType}: ${message}`);
+            if (documentContext) {
+                console.log("Document context being included in message:", documentContext.substring(0, 200) + "...");
+            }
+            
+            // Store original message without context in conversation history
             this.conversationHistory.push({ role: "user", content: message });
 
-            // Add this line to save after adding user message:
+            // But send full message with context to LLM
+            const messagesForAPI = [
+                ...this.conversationHistory.slice(0, -1), // All messages except the last one
+                { role: "user", content: fullMessage } // Last message with document context
+            ];
+
+            // Save after adding user message
             this.saveConversationHistory();
 
-            console.log("Current conversation history being sent to LLM:", JSON.stringify(this.conversationHistory, null, 2));
+            console.log("Current conversation history being sent to LLM:", JSON.stringify(messagesForAPI, null, 2));
 
             try {
-                const payload = this.createCompatiblePayload(this.conversationHistory, this.chatTemperature, this.chatMaxTokens, true);
+                const payload = this.createCompatiblePayload(messagesForAPI, this.chatTemperature, this.chatMaxTokens, true);
 
                 const headers = {
                     'Content-Type': 'application/json',
@@ -370,7 +383,7 @@ Make sure the character you create embodies and follows the persona instructions
                 this.conversationHistory.push({ role: "assistant", content: rawReply });
                 console.log(`Received from LLM (Normal Chat - raw): ${rawReply}`);
 
-                // Add this line to save after each exchange:
+                // Save after each exchange
                 this.saveConversationHistory();
 
                 return { type: 'text', content: rawReply };
