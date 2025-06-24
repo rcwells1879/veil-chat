@@ -677,6 +677,114 @@ async function initializeApp() {
         micButton.style.display = 'none';
     }
 
+    // --- Input Expansion Functionality ---
+    function setupInputExpansion() {
+        const inputArea = document.querySelector('.input-area');
+        const userInput = document.getElementById('user-input');
+        
+        if (!inputArea || !userInput) return;
+        
+        // Expand on focus/click
+        userInput.addEventListener('focus', () => {
+            inputArea.classList.add('expanded');
+            userInput.classList.add('expanded');
+            console.log('Input expanded');
+        });
+        
+        userInput.addEventListener('click', () => {
+            if (!inputArea.classList.contains('expanded')) {
+                inputArea.classList.add('expanded');
+                userInput.classList.add('expanded');
+                userInput.focus();
+                console.log('Input expanded on click');
+            }
+        });
+        
+        // Contract when clicking outside or on specific conditions
+        document.addEventListener('click', (e) => {
+            // Don't contract if clicking on input, send button, or if input has content
+            if (e.target === userInput || 
+                e.target === document.getElementById('send-button') ||
+                userInput.value.trim() !== '') {
+                return;
+            }
+            
+            // Contract the input
+            inputArea.classList.remove('expanded');
+            userInput.classList.remove('expanded');
+            console.log('Input contracted');
+        });
+        
+        // Also contract on blur, but only if input is empty
+        userInput.addEventListener('blur', (e) => {
+            // Small delay to allow for send button click
+            setTimeout(() => {
+                if (userInput.value.trim() === '' && 
+                    document.activeElement !== userInput) {
+                    inputArea.classList.remove('expanded');
+                    userInput.classList.remove('expanded');
+                    console.log('Input contracted on blur');
+                }
+            }, 150);
+        });
+        
+        // Keep expanded while typing
+        userInput.addEventListener('input', () => {
+            if (userInput.value.trim() !== '') {
+                inputArea.classList.add('expanded');
+                userInput.classList.add('expanded');
+            }
+        });
+        
+        // Contract after sending message (modify existing handleUserInput function)
+        const originalHandleUserInput = handleUserInput;
+        handleUserInput = async function() {
+            await originalHandleUserInput();
+            
+            // Contract after sending
+            setTimeout(() => {
+                inputArea.classList.remove('expanded');
+                userInput.classList.remove('expanded');
+                console.log('Input contracted after sending');
+            }, 100);
+        };
+    }
+
+    // Call this function in your initializeApp function, after DOM elements are ready
+    // Add this line after line ~125 where you set up other event listeners:
+    setupInputExpansion();
+
+    // --- Mobile Touch Enhancement for Input Expansion ---
+    function setupMobileInputExpansion() {
+        const inputArea = document.querySelector('.input-area');
+        const userInput = document.getElementById('user-input');
+        
+        if (!inputArea || !userInput) return;
+        
+        // Handle touch events for better mobile experience
+        userInput.addEventListener('touchstart', (e) => {
+            if (!inputArea.classList.contains('expanded')) {
+                e.preventDefault(); // Prevent double-tap zoom
+                inputArea.classList.add('expanded');
+                userInput.classList.add('expanded');
+                userInput.focus();
+                console.log('Input expanded on touch');
+            }
+        }, { passive: false });
+        
+        // Handle orientation changes
+        window.addEventListener('orientationchange', () => {
+            setTimeout(() => {
+                if (inputArea.classList.contains('expanded')) {
+                    userInput.focus();
+                }
+            }, 500);
+        });
+    }
+
+    // Also call this in your initializeApp function:
+    setupMobileInputExpansion();
+
     // Load saved persona on startup
     currentPersonaPrompt = localStorage.getItem('currentPersonaPrompt');
     if (currentPersonaPrompt) {

@@ -633,254 +633,219 @@ input:checked + .slider:before {
     }
 }
 
-/* Add these styles for the image provider dropdown */
-.settings-panel .setting-item #image-provider,
-.settings-panel .setting-item #image-size {
-    padding: 8px 12px;
-    background-color: #444;
+/* Expandable input styles - Fixed version */
+.input-area {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    padding: 15px;
+    border-top: 1px solid #333;
+    background-color: #1e1e1e;
+    transition: all 0.3s ease;
+}
+
+.input-area.expanded {
+    padding: 12px 15px;
+}
+
+/* Base input styles */
+#user-input {
+    border: none;
+    font-size: 19px;
+    background-color: #333;
     color: #e0e0e0;
-    border: 1px solid #555;
-    border-radius: 4px;
-    font-size: 14px;
-    width: auto;
-    box-sizing: border-box;
-    margin-left: auto;
-}
-
-.settings-panel .setting-item #image-provider:focus,
-.settings-panel .setting-item #image-size:focus {
-    border-color: #007bff;
     outline: none;
-    box-shadow: 0 0 3px rgba(0, 123, 255, 0.3);
+    flex: 1;
+    border-radius: 8px;
+    height: 50px;
+    box-sizing: border-box;
+    padding: 0 15px;
+    margin-right: 8px;
+    transition: all 0.3s ease;
 }
 
-/* Mobile adjustments for new dropdowns */
-@media (max-width: 480px) {
-    .settings-panel .setting-item #image-provider,
-    .settings-panel .setting-item #image-size {
-        width: 140px;
-        min-width: 0;
-        padding: 8px 10px;
+/* Expanded input - takes much more space */
+#user-input.expanded {
+    flex: 4; /* Take 4 times as much space */
+    margin-right: 15px;
+    border-radius: 8px;
+}
+
+/* Base button styles with transitions */
+#attach-button {
+    background-color: #333;
+    color: #e0e0e0;
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+    border-radius: 5px;
+    height: 50px;
+    min-width: 44px;
+    padding: 0 12px;
+    margin-right: 5px;
+    transition: all 0.3s ease;
+    opacity: 1;
+    visibility: visible;
+    transform: scale(1);
+}
+
+#mic-button {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+    border-radius: 5px;
+    height: 50px;
+    min-width: 44px;
+    padding: 0 12px;
+    margin-right: 5px;
+    transition: all 0.3s ease;
+    opacity: 1;
+    visibility: visible;
+    transform: scale(1);
+}
+
+#settings-button {
+    background-color: #6c757d;
+    color: white;
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+    border-radius: 5px;
+    height: 50px;
+    min-width: 44px;
+    padding: 0 12px;
+    margin-right: 5px;
+    transition: all 0.3s ease;
+    opacity: 1;
+    visibility: visible;
+    transform: scale(1);
+}
+
+/* Hide buttons when expanded - smooth animation */
+.input-area.expanded #attach-button,
+.input-area.expanded #mic-button,
+.input-area.expanded #settings-button {
+    opacity: 0;
+    visibility: hidden;
+    transform: scale(0);
+    width: 0;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+}
+
+/* Send button - always visible, moves to the right */
+#send-button {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    font-size: 16px;
+    cursor: pointer;
+    border-radius: 8px;
+    height: 50px;
+    min-width: 60px;
+    padding: 0 18px;
+    transition: all 0.3s ease;
+    flex-shrink: 0;
+    margin-left: auto; /* Push to the right when expanded */
+}
+
+#send-button:hover {
+    background-color: #0056b3;
+}
+
+.input-area.expanded #send-button {
+    margin-left: 0; /* Reset margin when expanded, flex handles positioning */
+}
+
+/* Button row adjustments */
+.button-row {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    transition: all 0.3s ease;
+}
+
+.input-area.expanded .button-row {
+    gap: 0; /* Collapse gap when buttons are hidden */
+}
+
+/* Mobile adjustments for expandable input */
+@media (max-width: 768px) {
+    .input-area {
+        padding: 10px;
+    }
+    
+    .input-area.expanded {
+        padding: 10px;
+    }
+    
+    #user-input {
+        font-size: 16px;
+        height: 44px;
+        border-radius: 4px;
+        margin-right: 6px;
+    }
+    
+    #user-input.expanded {
+        flex: 5; /* Even more space on mobile */
+        margin-right: 10px;
+    }
+    
+    #send-button {
+        height: 44px;
+        font-size: 16px;
+        padding: 0 12px;
+        border-radius: 4px;
+        min-width: 50px;
+    }
+    
+    #attach-button,
+    #mic-button,
+    #settings-button {
+        height: 44px;
+        min-width: 44px;
+        margin-right: 4px;
         font-size: 14px;
     }
 }
 
-/* Collapsible Image Controls */
-.collapsible-header {
-    cursor: pointer;
-    transition: background-color 0.3s ease;
-    user-select: none;
-    position: relative;
-}
-
-.collapsible-header:hover {
-    background-color: #404040;
-}
-
-.collapsible-header .expand-arrow {
-    font-size: 14px;
-    transition: transform 0.3s ease;
-    color: #007bff;
-    font-weight: bold;
-}
-
-.collapsible-header.expanded .expand-arrow {
-    transform: rotate(180deg);
-}
-
-.collapsible-content {
-    max-height: 0;
-    overflow: hidden;
-    transition: max-height 0.3s ease-out;
-    background-color: #2a2a2a;
-    border-radius: 0 0 5px 5px;
-    margin-top: -5px;
-}
-
-.collapsible-content.expanded {
-    max-height: 500px; /* Adjust based on content */
-    padding-top: 10px;
-}
-
-.collapsible-content .setting-item {
-    margin-bottom: 15px;
-    background-color: #3a3a3a;
-    border-radius: 3px;
-}
-
-.collapsible-content .setting-item:last-child {
-    margin-bottom: 0;
-}
-
-/* Enhanced input styling for image controls */
-.collapsible-content input[type="number"] {
-    width: 80px;
-    padding: 8px;
-    background-color: #444;
-    color: #e0e0e0;
-    border: 1px solid #555;
-    border-radius: 4px;
-    font-size: 14px;
-    text-align: center;
-}
-
-.collapsible-content input[type="number"]:focus {
-    border-color: #007bff;
-    outline: none;
-    box-shadow: 0 0 3px rgba(0, 123, 255, 0.3);
-}
-
-.collapsible-content select {
-    padding: 8px 12px;
-    background-color: #444;
-    color: #e0e0e0;
-    border: 1px solid #555;
-    border-radius: 4px;
-    font-size: 14px;
-    min-width: 120px;
-}
-
-.collapsible-content select:focus {
-    border-color: #007bff;
-    outline: none;
-    box-shadow: 0 0 3px rgba(0, 123, 255, 0.3);
-}
-
-/* Mobile responsive adjustments */
+/* Very small screens */
 @media (max-width: 480px) {
-    .collapsible-content input[type="number"] {
-        width: 70px;
-        padding: 6px;
-        font-size: 13px;
+    .input-area {
+        padding: 8px;
     }
     
-    .collapsible-content select {
-        padding: 6px 8px;
-        font-size: 10px;
-        min-width: 100px;
+    #user-input.expanded {
+        flex: 6; /* Maximum space on very small screens */
+        margin-right: 8px;
     }
-
-    .settings-panel .setting-item #llm-provider,
-    .settings-panel .setting-item #select-tts-voice,
-    .settings-panel .setting-item #image-sampler {
-        width: 140px; /* Reduce width for mobile */
-        min-width: 0; /* Remove any minimum width constraints */
-        padding: 8px 10px; /* Slightly reduce padding */
-        font-size: 14px; /* Keep text readable */
+    
+    #send-button {
+        min-width: 50px;
+        padding: 0 10px;
     }
-}
-
-/* Add these CSS rules for the animated letters after your .welcome-message styles */
-
-.animated-letter {
-    display: inline-block;
-    animation: colorWaveJiggle 4s ease-in-out infinite;
-    animation-fill-mode: both;
-    opacity: 1;
-    transform: translateY(0);
-}
-
-@keyframes colorWaveJiggle {
-    0% {
+    
+    /* Keep settings button accessible on very small screens */
+    .input-area.expanded #settings-button {
+        position: fixed;
+        top: 10px;
+        left: 10px;
+        z-index: 1100;
         opacity: 1;
-        transform: translateX(0) translateY(0) scale(1);
-        color: #ff6b6b;
-        text-shadow: 0 0 15px #ff6b6b;
+        visibility: visible;
+        transform: scale(1);
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        margin: 0;
+        padding: 0;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        font-size: 20px;
     }
-    10% {
-        transform: translateX(-2px) translateY(-1px) scale(1.05);
-        color: #4ecdc4;
-        text-shadow: 0 0 20px #4ecdc4;
-    }
-    20% {
-        transform: translateX(2px) translateY(1px) scale(0.95);
-        color: #45b7d1;
-        text-shadow: 0 0 25px #45b7d1;
-    }
-    30% {
-        transform: translateX(-1px) translateY(-2px) scale(1.02);
-        color: #f9ca24;
-        text-shadow: 0 0 20px #f9ca24;
-    }
-    40% {
-        transform: translateX(1px) translateY(2px) scale(0.98);
-        color: #f0932b;
-        text-shadow: 0 0 15px #f0932b;
-    }
-    50% {
-        transform: translateX(-2px) translateY(1px) scale(1.03);
-        color: #eb4d4b;
-        text-shadow: 0 0 10px #eb4d4b;
-    }
-    60% {
-        transform: translateX(2px) translateY(-1px) scale(0.97);
-        color: #e056fd;
-        text-shadow: 0 0 20px #e056fd;
-    }
-    70% {
-        transform: translateX(-1px) translateY(2px) scale(1.01);
-        color: #ff6b6b;
-        text-shadow: 0 0 15px #ff6b6b;
-    }
-    80% {
-        transform: translateX(1px) translateY(-2px) scale(0.99);
-        color: #4ecdc4;
-        text-shadow: 0 0 20px #4ecdc4;
-    }
-    90% {
-        transform: translateX(-2px) translateY(1px) scale(1.02);
-        color: #45b7d1;
-        text-shadow: 0 0 25px #45b7d1;
-    }
-    100% {
-        opacity: 1;
-        transform: translateX(0) translateY(0) scale(1);
-        color: #e056fd;
-        text-shadow: 0 0 20px #e056fd;
-    }
-}
-
-/* Add shimmer effect */
-.welcome-message::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-    animation: shimmer 3s infinite;
-    z-index: 1;
-}
-
-@keyframes shimmer {
-    0% {
-        left: -100%;
-    }
-    100% {
-        left: 100%;
-    }
-}
-
-/* Ensure letters appear above shimmer */
-.welcome-message .animated-letter {
-    position: relative;
-    z-index: 2;
-}
-
-/* Add these styles after your existing welcome message styles */
-
-/* Make welcome message clickable */
-.welcome-message {
-    /* ...existing styles... */
-    cursor: pointer;
-    transition: all 0.3s ease;
-}
-
-.welcome-message:hover {
-    /* ...existing hover styles... */
-    /* Add a subtle scale effect to indicate clickability */
-    transform: translateY(-8px) scale(1.02);
 }
 
 /* Persona Panel Styles */
