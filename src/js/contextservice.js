@@ -1,7 +1,8 @@
-class ContextService {
-    constructor() {
-        this.attachedDocuments = [];
-        this.maxFileSize = 10 * 1024 * 1024; // 10MB limit
+if (typeof ContextService === 'undefined') {
+    window.ContextService = class ContextService {
+        constructor() {
+            this.attachedDocuments = [];
+            this.maxFileSize = 10 * 1024 * 1024; // 10MB limit
         
         // Configure PDF.js worker
         if (typeof pdfjsLib !== 'undefined') {
@@ -260,11 +261,11 @@ class ContextService {
         };
     }
 
-    importContext(contextData) {
-        if (contextData && contextData.documents && Array.isArray(contextData.documents)) {
+    importContext(contextData) {        if (contextData && contextData.documents && Array.isArray(contextData.documents)) {
             this.attachedDocuments = contextData.documents;
             return true;
         }
         return false;
     }
+}
 }

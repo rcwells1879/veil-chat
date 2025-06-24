@@ -1,4 +1,16 @@
-document.addEventListener('DOMContentLoaded', async () => {
+let isInitialized = false;
+
+// Use both DOMContentLoaded and window.onload for better mobile compatibility
+document.addEventListener('DOMContentLoaded', initializeApp);
+window.addEventListener('load', initializeApp);
+
+async function initializeApp() {
+    if (isInitialized) return;
+    isInitialized = true;
+
+    // Add a small delay for mobile browsers to fully render DOM
+    await new Promise(resolve => setTimeout(resolve, 100));
+
     // --- DOM Elements ---
     const chatWindow = document.getElementById('chat-window');
     const userInput = document.getElementById('user-input');
@@ -6,13 +18,33 @@ document.addEventListener('DOMContentLoaded', async () => {
     const micButton = document.getElementById('mic-button');
     const settingsButton = document.getElementById('settings-button');
     const settingsPanelContainer = document.getElementById('settings-panel-container');
+    
+    // Check if essential elements exist
+    if (!chatWindow || !userInput || !sendButton || !settingsButton) {
+        console.error('Critical DOM elements missing!', {
+            chatWindow: !!chatWindow,
+            userInput: !!userInput, 
+            sendButton: !!sendButton,
+            settingsButton: !!settingsButton
+        });
+        return;
+    }
+
+    // Mobile debugging - log more details
+    console.log('Mobile debug - User agent:', navigator.userAgent);
+    console.log('Mobile debug - Screen size:', window.screen.width + 'x' + window.screen.height);
+    console.log('Mobile debug - Viewport size:', window.innerWidth + 'x' + window.innerHeight);
+    console.log('Mobile debug - Touch support:', 'ontouchstart' in window);
+    
     const personaPanelContainer = document.createElement('div');
     personaPanelContainer.id = 'persona-panel-container';
     document.body.appendChild(personaPanelContainer);
     
     // Get the existing attach button from HTML
     const attachButton = document.getElementById('attach-button');
-    attachButton.title = 'Attach Documents';
+    if (attachButton) {
+        attachButton.title = 'Attach Documents';
+    }
     
     const fileInput = document.createElement('input');
     fileInput.type = 'file';
@@ -21,8 +53,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     fileInput.style.display = 'none';
     fileInput.accept = '.txt,.js,.py,.json,.pdf,.docx,.html,.css,.md,.xml,.yaml,.yml,.log,.cpp,.h,.cs';
     
-    const attachedDocsContainer = document.createElement('div');
-    attachedDocsContainer.id = 'attached-docs-container';
+    const attachedDocsContainer = document.getElementById('attached-docs-container') || document.createElement('div');
+    if (!document.getElementById('attached-docs-container')) {
+        attachedDocsContainer.id = 'attached-docs-container';
+        const inputArea = document.querySelector('.input-area');
+        if (inputArea && inputArea.parentNode) {
+            inputArea.parentNode.insertBefore(attachedDocsContainer, inputArea.nextSibling);
+        }
+    }
     
     document.body.appendChild(fileInput);
     
@@ -38,15 +76,45 @@ document.addEventListener('DOMContentLoaded', async () => {
     let personaCreated = false;
     let isContinuousConversationActive = false;
 
+    // --- Mobile Viewport Height Fix - Enhanced for real mobile browsers ---
+    function setChatContainerHeight() {
+        const chatContainer = document.querySelector('.chat-container');
+        if (chatContainer) {
+            // Use visual viewport API if available (modern mobile browsers)
+            if (window.visualViewport) {
+                chatContainer.style.height = `${window.visualViewport.height}px`;
+            } else {
+                // Fallback for older browsers
+                const vh = window.innerHeight * 0.01;
+                chatContainer.style.setProperty('--vh', `${vh}px`);
+                chatContainer.style.height = 'calc(var(--vh, 1vh) * 100)';
+            }
+        }
+    }
+
+    // Enhanced mobile event listeners
+    window.addEventListener('resize', setChatContainerHeight);
+    window.addEventListener('orientationchange', () => {
+        setTimeout(setChatContainerHeight, 100); // Delay for mobile orientation change
+    });
+    
+    // Visual viewport support for modern mobile browsers
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', setChatContainerHeight);
+    }
+
+    // Set initial height
+    setChatContainerHeight();
+
     // --- Settings Configuration ---
     const SETTINGS = {
         // LLM
         customLlmProvider: localStorage.getItem('customLlmProvider') || 'litellm',
-        customLlmApiUrl: (localStorage.getItem('customLlmApiUrl') || 'http://localhost:4000').replace(/\/$/, ""),
-        customLlmModelIdentifier: localStorage.getItem('customLlmModelIdentifier') || 'ollama/technobyte/Cydonia-24B-v2.1:latest',
+        customLlmApiUrl: (localStorage.getItem('customLlmApiUrl') || 'https://litellm-veil.veilstudio.io').replace(/\/$/, ""),
+        customLlmModelIdentifier: localStorage.getItem('customLlmModelIdentifier') || 'gemini2.5-flash',
         customLlmApiKey: localStorage.getItem('customLlmApiKey') || 'sk-DSHSfgTh65Fvd',
         // Image
-        customImageProvider: localStorage.getItem('customImageProvider') || 'a1111',
+        customImageProvider: localStorage.getItem('customImageProvider') || 'openai',
         customImageApiUrl: (localStorage.getItem('customImageApiUrl') || 'http://localhost:7860').replace(/\/$/, ""),
         customOpenAIImageApiKey: localStorage.getItem('customOpenAIImageApiKey') || '',
         imageSize: localStorage.getItem('imageSize') || 'auto',
@@ -66,11 +134,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     // --- Service Initialization ---
     let llmService = new LLMService(SETTINGS.customLlmApiUrl, SETTINGS.customLlmProvider, SETTINGS.customLlmModelIdentifier, SETTINGS.customLlmApiKey);
     let imageService = new ImageService(SETTINGS.customImageApiUrl, SETTINGS.customImageProvider, SETTINGS.customOpenAIImageApiKey);
-    let voiceService = new VoiceService(handleSttResult, handleSttError, handleSttListeningState, handleSttAutoSend);
-    // Initialize ContextService
+    let voiceService;
+    try {
+        voiceService = new VoiceService(handleSttResult, handleSttError, handleSttListeningState, handleSttAutoSend);
+    } catch (error) {
+        console.warn('VoiceService failed to initialize:', error);
+        voiceService = null;
+    }
+    
     const contextService = new ContextService();
     
-    // Hardcode mic auto-send delay to 500ms
     if (voiceService) {
         voiceService.finalAutoSendDelay = 500;
     }
@@ -103,26 +176,26 @@ document.addEventListener('DOMContentLoaded', async () => {
         chatWindow.appendChild(messageElement);
         chatWindow.scrollTop = chatWindow.scrollHeight;
 
-        if (textToSpeak && voiceService.isSynthesisSupported()) {
+        if (textToSpeak && voiceService && voiceService.isSynthesisSupported()) {
             try {
                 await voiceService.speak(textToSpeak, SETTINGS.ttsVoice);
             } catch (error) {
                 console.error("TTS Error:", error);
             }
         }
-    }    async function handleUserInput() {
+    }
+
+    async function handleUserInput() {
         const message = userInput.value.trim();
         if (!message) return;
 
         userInput.value = '';
         addMessage(message, 'user');
 
-        // Get document context if available
         const documentContext = contextService.getDocumentContext();
-
-        // Send to LLM with document context
         const response = await llmService.sendMessage(message, documentContext);
-          if (response.type === 'image_request') {
+        
+        if (response.type === 'image_request') {
             console.log("Image request detected, generating image...");
             try {
                 const imageDataUrl = await imageService.generateImage(response.prompt);
@@ -142,9 +215,24 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+    // --- Enhanced Mobile Event Handling ---
+    function addMobileCompatibleEvent(element, eventType, handler) {
+        if (!element) return;
+        
+        // Add both mouse and touch events
+        element.addEventListener(eventType, handler, { passive: false });
+        
+        // Add touch-specific events for mobile
+        if (eventType === 'click') {
+            element.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                handler(e);
+            }, { passive: false });
+        }
+    }
+
     // --- Persona Management ---
     async function createPersona(customPrompt) {
-        // Only clear conversation and reset state when actually creating a new persona
         chatWindow.innerHTML = '';
         currentPersonaPrompt = customPrompt;
         personaCreated = true;
@@ -154,11 +242,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             localStorage.setItem('currentPersonaPrompt', customPrompt);
         } else {
             localStorage.removeItem('currentPersonaPrompt');
-        }        // Clear conversation history and create new LLM service
+        }
+
         llmService = new LLMService(SETTINGS.customLlmApiUrl, SETTINGS.customLlmProvider, SETTINGS.customLlmModelIdentifier, SETTINGS.customLlmApiKey);
         llmService.clearConversationHistory();
         
-        // Clear attached documents when creating new persona
         contextService.clearAllDocuments();
         updateAttachedDocsDisplay();
         
@@ -172,18 +260,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         const successMessage = customPrompt ? 'Creating custom persona...' : 'Generating random persona...';
         addMessage(successMessage, 'llm');
 
-        // Generate the persona character profile FIRST, then get image and greeting
         try {
             console.log("Generating character profile for new persona...");
-            
-            // Force character generation now (this will create the character profile)
             await llmService.generateCharacterProfile();
             
             console.log("Generating initial persona image and greeting...");
             const result = await llmService.generateInitialPersonaContent();
             
             if (result.imagePrompt) {
-                // FIX: Use imageService.generateImage instead of just generateImage
                 try {
                     const imageUrl = await imageService.generateImage(result.imagePrompt);
                     if (imageUrl) {
@@ -194,10 +278,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
             }
             
-            // The greeting is already in conversation history, but we still need to display it
             if (result.greeting) {
                 console.log('Initial greeting generated and added to conversation history');
-                // Display the greeting in the chat UI
                 addMessage(result.greeting, 'llm');
             }
             
@@ -209,18 +291,29 @@ document.addEventListener('DOMContentLoaded', async () => {
     function addWelcomeMessage() {
         const welcomeElement = document.createElement('div');
         welcomeElement.classList.add('message', 'welcome-message');
-        welcomeElement.innerHTML = "Welcome to Veil".split('').map((char, i) => `<span class="animated-letter" style="animation-delay: ${i * 0.1}s">${char}</span>`).join('');
+        welcomeElement.innerHTML = "Welcome to Veil".split('').map((char, i) => 
+            `<span class="animated-letter" style="animation-delay: ${i * 0.1}s">${char}</span>`
+        ).join('');
         
-        welcomeElement.addEventListener('click', async () => {
-            // DON'T clear anything here - just show the persona panel
+        // Enhanced mobile event handling for welcome message
+        const handleWelcomeInteraction = async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('Welcome message clicked/touched');
+            
             if (!personaPanelContainer.querySelector('.persona-panel')) {
                 await loadPersonaPanel();
             }
             showPersonaPanel();
-        });
+        };
+        
+        // Add multiple event types for better mobile compatibility
+        addMobileCompatibleEvent(welcomeElement, 'click', handleWelcomeInteraction);
         
         chatWindow.appendChild(welcomeElement);
         chatWindow.scrollTop = chatWindow.scrollHeight;
+        
+        console.log('Welcome message added to chat window');
     }
 
     async function loadPersonaPanel() {
@@ -232,23 +325,36 @@ document.addEventListener('DOMContentLoaded', async () => {
             const panel = personaPanelContainer.querySelector('.persona-panel');
             const textarea = personaPanelContainer.querySelector('#persona-prompt');
             
-            textarea.value = localStorage.getItem('draftPersonaPrompt') || '';
-            textarea.addEventListener('input', () => localStorage.setItem('draftPersonaPrompt', textarea.value));
+            if (textarea) {
+                textarea.value = localStorage.getItem('draftPersonaPrompt') || '';
+                textarea.addEventListener('input', () => localStorage.setItem('draftPersonaPrompt', textarea.value));
+            }
 
-            personaPanelContainer.querySelector('#create-persona-button').addEventListener('click', () => createPersona(textarea.value));
-            personaPanelContainer.querySelector('#use-random-persona-button').addEventListener('click', () => createPersona(null));
-            personaPanelContainer.querySelector('#cancel-persona-button').addEventListener('click', hidePersonaPanel);
+            const createButton = personaPanelContainer.querySelector('#create-persona-button');
+            const randomButton = personaPanelContainer.querySelector('#use-random-persona-button');
+            const cancelButton = personaPanelContainer.querySelector('#cancel-persona-button');
+            
+            if (createButton) addMobileCompatibleEvent(createButton, 'click', () => createPersona(textarea.value));
+            if (randomButton) addMobileCompatibleEvent(randomButton, 'click', () => createPersona(null));
+            if (cancelButton) addMobileCompatibleEvent(cancelButton, 'click', hidePersonaPanel);
             
             personaPanelContainer.querySelectorAll('.example-button').forEach(button => {
-                button.addEventListener('click', () => {
+                addMobileCompatibleEvent(button, 'click', () => {
                     const personaText = button.getAttribute('data-persona');
-                    textarea.value = personaText;
-                    localStorage.setItem('draftPersonaPrompt', personaText);
+                    if (textarea) {
+                        textarea.value = personaText;
+                        localStorage.setItem('draftPersonaPrompt', personaText);
+                    }
                 });
             });
 
-            personaPanelContainer.addEventListener('click', (e) => e.target === personaPanelContainer && hidePersonaPanel());
-            panel.addEventListener('click', (e) => e.stopPropagation());
+            addMobileCompatibleEvent(personaPanelContainer, 'click', (e) => {
+                if (e.target === personaPanelContainer) hidePersonaPanel();
+            });
+            
+            if (panel) {
+                addMobileCompatibleEvent(panel, 'click', (e) => e.stopPropagation());
+            }
 
         } catch (error) {
             console.error('Error loading persona panel:', error);
@@ -256,8 +362,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
     
-    function showPersonaPanel() { personaPanelContainer.classList.add('visible'); }
-    function hidePersonaPanel() { personaPanelContainer.classList.remove('visible'); }
+    function showPersonaPanel() { 
+        personaPanelContainer.classList.add('visible'); 
+        console.log('Persona panel shown');
+    }
+    
+    function hidePersonaPanel() { 
+        personaPanelContainer.classList.remove('visible'); 
+        console.log('Persona panel hidden');
+    }
 
     // --- Settings Management ---
     const settingsIdMap = {
@@ -274,7 +387,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         imageSteps: 'image-steps',
         imageCfgScale: 'image-cfg-scale',
         imageSampler: 'image-sampler',
-        // OpenAI-specific settings
         openaiQuality: 'openai-quality',
         openaiOutputFormat: 'openai-output-format',
         openaiBackground: 'openai-background',
@@ -282,7 +394,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
     function saveAllSettings() {
-        // Update the SETTINGS object by reading current values from the form.
         Object.keys(SETTINGS).forEach(key => {
             const elementId = settingsIdMap[key];
             if (!elementId) return;
@@ -295,7 +406,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         });
         
-        // Re-create services if critical settings changed
         const llmSettingsChanged = SETTINGS.customLlmApiUrl !== llmService.apiBaseUrl || SETTINGS.customLlmModelIdentifier !== llmService.modelIdentifier || SETTINGS.customLlmApiKey !== llmService.apiKey || SETTINGS.customLlmProvider !== llmService.providerType;
         const imageSettingsChanged = SETTINGS.customImageApiUrl !== imageService.apiBaseUrl || SETTINGS.customImageProvider !== imageService.provider || SETTINGS.customOpenAIImageApiKey !== imageService.openaiApiKey;
 
@@ -314,7 +424,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             imageService = new ImageService(SETTINGS.customImageApiUrl, SETTINGS.customImageProvider, SETTINGS.customOpenAIImageApiKey);
         }
         
-        // Update non-critical settings
         imageService.updateSettings({
             size: SETTINGS.imageSize,
             width: parseInt(SETTINGS.imageWidth),
@@ -322,7 +431,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             steps: parseInt(SETTINGS.imageSteps),
             cfg_scale: parseFloat(SETTINGS.imageCfgScale),
             sampler_name: SETTINGS.imageSampler,
-            // OpenAI-specific settings
             quality: SETTINGS.openaiQuality,
             output_format: SETTINGS.openaiOutputFormat,
             background: SETTINGS.openaiBackground,
@@ -336,7 +444,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             const html = await response.text();
             settingsPanelContainer.innerHTML = html;
 
-            // Populate settings from SETTINGS object using the map
             Object.keys(SETTINGS).forEach(key => {
                 const elementId = settingsIdMap[key];
                 if (!elementId) return;
@@ -351,35 +458,27 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
             });
             
-            // Setup listeners for settings
             settingsPanelContainer.querySelectorAll('input, select').forEach(el => {
                 el.addEventListener('input', saveAllSettings);
                 el.addEventListener('change', saveAllSettings);
             });
             
-            // ADD CONVERSATION EVENT LISTENERS HERE - AFTER THE HTML IS LOADED
             const saveButton = settingsPanelContainer.querySelector('#save-conversation-button');
             const loadButton = settingsPanelContainer.querySelector('#load-conversation-button');
             const loadInput = settingsPanelContainer.querySelector('#load-conversation-input');
             
-            if (saveButton) {
-                saveButton.addEventListener('click', saveConversationToFile);
-            }
+            if (saveButton) addMobileCompatibleEvent(saveButton, 'click', saveConversationToFile);
+            if (loadButton) addMobileCompatibleEvent(loadButton, 'click', () => { if (loadInput) loadInput.click(); });
+            if (loadInput) loadInput.addEventListener('change', loadConversationFromFile);
             
-            if (loadButton) {
-                loadButton.addEventListener('click', () => {
-                    if (loadInput) {
-                        loadInput.click();
-                    }
-                });
-            }
+            addMobileCompatibleEvent(settingsPanelContainer, 'click', (e) => {
+                if (e.target === settingsPanelContainer) hideSettingsPanel();
+            });
             
-            if (loadInput) {
-                loadInput.addEventListener('change', loadConversationFromFile);
+            const settingsPanel = settingsPanelContainer.querySelector('.settings-panel');
+            if (settingsPanel) {
+                addMobileCompatibleEvent(settingsPanel, 'click', (e) => e.stopPropagation());
             }
-            
-            settingsPanelContainer.addEventListener('click', (e) => e.target === settingsPanelContainer && hideSettingsPanel());
-            settingsPanelContainer.querySelector('.settings-panel').addEventListener('click', (e) => e.stopPropagation());
 
             setupImageControls();
             toggleModelIdentifierVisibility();
@@ -402,32 +501,44 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const toggleProviderUI = () => {
             const isOpenAI = providerSelect.value === 'openai';
-            settingsPanelContainer.querySelector('.a1111-settings').style.display = isOpenAI ? 'none' : 'block';
-            settingsPanelContainer.querySelector('.openai-settings').style.display = isOpenAI ? 'block' : 'none';
-            settingsPanelContainer.querySelector('#image-size-item').style.display = 'flex'; // Always show size
-            settingsPanelContainer.querySelector('#image-api-url-item').style.display = isOpenAI ? 'none' : 'flex';
-            settingsPanelContainer.querySelector('#openai-api-key-item').style.display = isOpenAI ? 'flex' : 'none';
+            const a1111Settings = settingsPanelContainer.querySelector('.a1111-settings');
+            const openaiSettings = settingsPanelContainer.querySelector('.openai-settings');
+            const imageSizeItem = settingsPanelContainer.querySelector('#image-size-item');
+            const imageApiUrlItem = settingsPanelContainer.querySelector('#image-api-url-item');
+            const openaiApiKeyItem = settingsPanelContainer.querySelector('#openai-api-key-item');
+            
+            if (a1111Settings) a1111Settings.style.display = isOpenAI ? 'none' : 'block';
+            if (openaiSettings) openaiSettings.style.display = isOpenAI ? 'block' : 'none';
+            if (imageSizeItem) imageSizeItem.style.display = 'flex';
+            if (imageApiUrlItem) imageApiUrlItem.style.display = isOpenAI ? 'none' : 'flex';
+            if (openaiApiKeyItem) openaiApiKeyItem.style.display = isOpenAI ? 'flex' : 'none';
         };
 
-        header.addEventListener('click', () => content.classList.toggle('expanded'));
-        providerSelect.addEventListener('change', toggleProviderUI);
-        toggleProviderUI(); // Initial setup
+        if (header) addMobileCompatibleEvent(header, 'click', () => content.classList.toggle('expanded'));
+        if (providerSelect) providerSelect.addEventListener('change', toggleProviderUI);
+        toggleProviderUI();
     }
 
     function toggleModelIdentifierVisibility() {
-        const provider = settingsPanelContainer.querySelector('#llm-provider').value;
+        const provider = settingsPanelContainer.querySelector('#llm-provider');
         const modelItem = settingsPanelContainer.querySelector('#model-identifier-item');
         const keyItem = settingsPanelContainer.querySelector('#api-key-item');
-        modelItem.style.display = provider === 'lmstudio' ? 'none' : 'flex';
-        keyItem.style.display = provider === 'lmstudio' ? 'none' : 'flex';
+        
+        if (provider && modelItem && keyItem) {
+            const providerValue = provider.value;
+            modelItem.style.display = providerValue === 'lmstudio' ? 'none' : 'flex';
+            keyItem.style.display = providerValue === 'lmstudio' ? 'none' : 'flex';
+        }
     }
 
     // --- Voice Service Handlers ---
     function handleSttResult(text) { userInput.value = text; }
     function handleSttError(error) { console.error("STT Error:", error); isContinuousConversationActive = false; }
     function handleSttListeningState(isListening) {
-        micButton.textContent = isListening ? '...' : '🎤';
-        micButton.classList.toggle('listening', isListening);
+        if (micButton) {
+            micButton.textContent = isListening ? '...' : '🎤';
+            micButton.classList.toggle('listening', isListening);
+        }
     }
     async function handleSttAutoSend(text) {
         userInput.value = text;
@@ -455,17 +566,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
             });
 
-            // Update attached documents display
             updateAttachedDocsDisplay();
 
-            // Show success message
             if (successCount > 0) {
                 const successMessage = `📎 Attached ${successCount} document(s): ${contextService.getDocumentSummary()}`;
                 await addMessage(successMessage, 'system');
                 console.log('Successfully attached documents:', contextService.getAttachedDocuments());
             }
 
-            // Show error messages if any
             if (errorMessages.length > 0) {
                 const errorMessage = `❌ Failed to attach some documents:\n${errorMessages.join('\n')}`;
                 await addMessage(errorMessage, 'system');
@@ -476,7 +584,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             await addMessage(`❌ Error processing files: ${error.message}`, 'system');
         }
 
-        // Clear the file input
         fileInput.value = '';
     }
 
@@ -515,23 +622,39 @@ document.addEventListener('DOMContentLoaded', async () => {
         updateAttachedDocsDisplay();
     }
 
-    // Make functions globally available for onclick handlers
     window.removeDocument = removeDocument;
     window.clearAllDocuments = clearAllDocuments;
 
-    // --- Initial Setup ---
-    sendButton.addEventListener('click', handleUserInput);
-    userInput.addEventListener('keypress', (e) => e.key === 'Enter' && handleUserInput());
-    fullScreenImageViewer.addEventListener('click', () => fullScreenImageViewer.style.display = 'none');
+    // --- Enhanced Event Listeners for Mobile ---
+    addMobileCompatibleEvent(sendButton, 'click', handleUserInput);
     
-    // Document attachment event listeners
-    attachButton.addEventListener('click', () => {
-        fileInput.click();
+    userInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            handleUserInput();
+        }
     });
-
-    fileInput.addEventListener('change', handleFileAttachment);
     
-    settingsButton.addEventListener('click', async () => {
+    addMobileCompatibleEvent(fullScreenImageViewer, 'click', () => {
+        fullScreenImageViewer.style.display = 'none';
+    });
+    
+    if (attachButton) {
+        addMobileCompatibleEvent(attachButton, 'click', (e) => {
+            e.preventDefault();
+            console.log('Attach button clicked/touched');
+            fileInput.click();
+        });
+    }
+
+    if (fileInput) {
+        fileInput.addEventListener('change', handleFileAttachment);
+    }
+    
+    addMobileCompatibleEvent(settingsButton, 'click', async (e) => {
+        e.preventDefault();
+        console.log('Settings button clicked/touched');
+        
         if (!settingsPanelContainer.classList.contains('visible')) {
             if (!settingsPanelContainer.querySelector('.settings-panel')) {
                 await loadSettingsPanel();
@@ -542,27 +665,26 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    if (voiceService.isRecognitionSupported()) {
-        micButton.addEventListener('click', () => {
+    if (micButton && voiceService && voiceService.isRecognitionSupported()) {
+        addMobileCompatibleEvent(micButton, 'click', (e) => {
+            e.preventDefault();
+            console.log('Mic button clicked/touched');
             isContinuousConversationActive = !voiceService.isRecognitionActive;
             if (isContinuousConversationActive) voiceService.startRecognition();
             else voiceService.stopRecognition();
         });
-    } else {
+    } else if (micButton) {
         micButton.style.display = 'none';
     }
 
-    // Load saved persona on startup (but DON'T clear conversation history)
+    // Load saved persona on startup
     currentPersonaPrompt = localStorage.getItem('currentPersonaPrompt');
     if (currentPersonaPrompt) {
         personaCreated = true;
         
-        // Only set the persona if we don't already have saved conversation history
-        // If we have saved history, the persona is already there
         if (!LLMService.hasSavedConversation()) {
             llmService.setCustomPersona(currentPersonaPrompt);
             
-            // Generate character profile and initial content for restored persona (only if no saved conversation)
             setTimeout(async () => {
                 try {
                     console.log("Generating character profile for restored persona...");
@@ -571,10 +693,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     console.log("Generating initial content for restored persona...");
                     const personaContent = await llmService.generateInitialPersonaContent();
                     
-                    // Generate image if we got a prompt
                     if (personaContent.imagePrompt) {
                         try {
-                            // FIX: Use imageService.generateImage instead of just generateImage
                             const imageUrl = await imageService.generateImage(personaContent.imagePrompt);
                             if (imageUrl) {
                                 addMessage({ type: 'image', url: imageUrl, alt: "Character appearance" }, 'llm');
@@ -584,7 +704,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                         }
                     }
                     
-                    // Add the greeting
                     if (personaContent.greeting) {
                         addMessage(personaContent.greeting, 'llm');
                     }
@@ -592,7 +711,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 } catch (error) {
                     console.error('Error generating initial content on startup:', error);
                 }
-            }, 1000); // Small delay to let the UI finish loading
+            }, 1000);
         }
     }
 
@@ -608,7 +727,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         const conversationState = {
             version: "1.0",
             savedAt: new Date().toISOString(),
-            personaPrompt: currentPersonaPrompt,            llmServiceState: {
+            personaPrompt: currentPersonaPrompt,
+            llmServiceState: {
                 conversationHistory: llmService.conversationHistory,
                 characterInitialized: llmService.characterInitialized
             },
@@ -642,12 +762,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 if (!loadedState.llmServiceState || !loadedState.llmServiceState.conversationHistory) {
                     throw new Error("Invalid conversation file format.");
-                }                // Restore application state
+                }
+
                 currentPersonaPrompt = loadedState.personaPrompt || null;
                 llmService.conversationHistory = loadedState.llmServiceState.conversationHistory;
                 llmService.characterInitialized = loadedState.llmServiceState.characterInitialized;
 
-                // Restore document context if available
                 if (loadedState.documentContext) {
                     const imported = contextService.importContext(loadedState.documentContext);
                     if (imported) {
@@ -655,7 +775,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                     }
                 }
 
-                // Update localStorage
                 llmService.saveConversationHistory();
                 if (currentPersonaPrompt) {
                     localStorage.setItem('currentPersonaPrompt', currentPersonaPrompt);
@@ -663,13 +782,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     localStorage.removeItem('currentPersonaPrompt');
                 }
 
-                // Clear the chat window first
                 chatWindow.innerHTML = '';
-                
-                // Use the existing addWelcomeMessage function (which has the safe click handler)
                 addWelcomeMessage();
-                
-                // Then render conversation history
                 renderConversation(llmService.conversationHistory);
                 
                 hideSettingsPanel();
@@ -685,18 +799,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function renderConversation(history) {
-        // DON'T clear chatWindow here - let the caller decide
-        // chatWindow.innerHTML = '';
-        
         history.forEach(message => {
-            // Don't display system messages or messages explicitly marked as hidden
             if (message.role === 'system' || message.hidden) {
                 return;
             }
             
             const sender = message.role === 'user' ? 'user' : 'llm';
             
-            // Handle image messages which might be JSON strings
             if (typeof message.content === 'string' && message.content.startsWith('{')) {
                 try {
                     const contentObj = JSON.parse(message.content);
@@ -710,4 +819,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             addMessage(message.content, sender);
         });
     }
-});
+
+    console.log('App initialization complete');
+}
+
+window.onload = () => {
+    const event = new Event('DOMContentLoaded', {
+      bubbles: true,
+      cancelable: true
+    });
+    document.dispatchEvent(event);
+};

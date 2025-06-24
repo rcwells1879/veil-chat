@@ -1,8 +1,9 @@
-class ImageService {
-    constructor(apiBaseUrl, provider = 'a1111', openaiApiKey = null) {
-        this.apiBaseUrl = apiBaseUrl; // e.g., 'http://127.0.0.1:7860' for Automatic1111
-        this.provider = provider; // 'a1111' or 'openai'
-        this.openaiApiKey = openaiApiKey;
+if (typeof ImageService === 'undefined') {
+    window.ImageService = class ImageService {
+        constructor(apiBaseUrl, provider = 'a1111', openaiApiKey = null) {
+            this.apiBaseUrl = apiBaseUrl; // e.g., 'http://127.0.0.1:7860' for Automatic1111
+            this.provider = provider; // 'a1111' or 'openai'
+            this.openaiApiKey = openaiApiKey;
         
         // Set default settings for A1111
         this.width = 1024;
@@ -165,11 +166,11 @@ class ImageService {
                 return `data:image/png;base64,${base64Image}`;
             } else {
                 console.error('No image data received from Automatic1111:', data);
-                return null;
-            }
+                return null;            }
         } catch (error) {
             console.error('Error communicating with Image Service (Automatic1111):', error);
             throw error;
         }
     }
+}
 }

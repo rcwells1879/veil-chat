@@ -1,8 +1,9 @@
-class VoiceService {
-    constructor(sttResultCallback, sttErrorCallback, sttListeningStateCallback, sttAutoSendCallback) {
-        this.voices = [];
-        this.recognition = null;
-        this.synthesis = window.speechSynthesis;
+if (typeof VoiceService === 'undefined') {
+    window.VoiceService = class VoiceService {
+        constructor(sttResultCallback, sttErrorCallback, sttListeningStateCallback, sttAutoSendCallback) {
+            this.voices = [];
+            this.recognition = null;
+            this.synthesis = window.speechSynthesis;
         this.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
         this.sttResultCallback = sttResultCallback || function() {};
@@ -365,8 +366,7 @@ class VoiceService {
             console.log("VoiceService: DEBUG: User stopped. Sending accumulated transcript immediately:", `"${transcriptToSend}"`);
             this.sttAutoSendCallback(transcriptToSend);
         } else {
-            console.log("VoiceService: DEBUG: User stopped. No accumulated transcript to send.");
-        }
+            console.log("VoiceService: DEBUG: User stopped. No accumulated transcript to send.");        }
     }
 }
-
+}

@@ -5,6 +5,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>LLM Chat Interface</title>
     <link rel="stylesheet" href="css/style.css">
+    <script>
+        // Mobile debugging and viewport fix
+        console.log('Mobile debug - Page loading started');
+        console.log('User agent:', navigator.userAgent);
+        console.log('Screen dimensions:', screen.width + 'x' + screen.height);
+        console.log('Initial viewport:', window.innerWidth + 'x' + window.innerHeight);
+        
+        // Set CSS custom property for mobile viewport height
+        function setViewportHeight() {
+            const vh = window.innerHeight * 0.01;
+            document.documentElement.style.setProperty('--vh', `${vh}px`);
+            console.log('Viewport height set to:', vh + 'px');
+        }
+        
+        setViewportHeight();
+        window.addEventListener('resize', setViewportHeight);
+        window.addEventListener('orientationchange', () => {
+            setTimeout(setViewportHeight, 100);
+        });
+    </script>
 </head>
 <body>
     <div class="chat-container">
@@ -24,13 +44,14 @@
     </div>
     <div id="settings-panel-container">
         <!-- User settings will be loaded here -->
-    </div>
+    </div>    
     
     <!-- Add PDF.js and Mammoth.js libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
     
-    <script src="js/contextService.js"></script>
+    <!-- Fixed script references to match actual filenames -->
+    <script src="js/contextservice.js"></script>
     <script src="js/imageService.js"></script>
     <script src="js/llmService.js"></script>
     <script src="js/voiceService.js"></script> 

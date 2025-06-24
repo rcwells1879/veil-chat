@@ -1,8 +1,9 @@
-class LLMService {
-    constructor(apiBaseUrl, providerType = 'lmstudio', modelIdentifier = null, apiKey = null) {
-        this.apiBaseUrl = apiBaseUrl;
-        this.providerType = providerType;
-        this.modelIdentifier = modelIdentifier;
+if (typeof LLMService === 'undefined') {
+    window.LLMService = class LLMService {
+        constructor(apiBaseUrl, providerType = 'lmstudio', modelIdentifier = null, apiKey = null) {
+            this.apiBaseUrl = apiBaseUrl;
+            this.providerType = providerType;
+            this.modelIdentifier = modelIdentifier;
         this.apiKey = apiKey;
 
         // --- Easily Modifiable LLM Parameters ---
@@ -665,8 +666,7 @@ Make sure the character you create embodies and follows the persona instructions
         // Only add stop sequences if requested AND the model supports them (not Gemini)
         if (includeStop && !isGemini) {
             payload.stop = ["Human:", "User:", "###", "\n\nUser:"];
-        }
-
-        return payload;
+        }        return payload;
     }
+}
 }

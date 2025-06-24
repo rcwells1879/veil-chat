@@ -1330,3 +1330,56 @@ input:checked + .slider:before {
         min-width: 35px;
     }
 }
+
+/* Mobile touch improvements */
+button {
+    -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+/* Ensure buttons are large enough for mobile touch */
+#attach-button, #send-button, #mic-button, #settings-button {
+    min-height: 44px;
+    min-width: 44px;
+}
+
+/* Fix mobile input area */
+@media (max-width: 768px) {
+    .input-area {
+        padding: 10px;
+    }
+    
+    #user-input {
+        font-size: 16px; /* Prevent zoom on iOS */
+        height: 44px;
+    }
+    
+    #send-button, #mic-button, #settings-button, #attach-button {
+        height: 44px;
+        font-size: 14px;
+        padding: 0 12px;
+    }
+}
+
+/* Very small screens */
+@media (max-width: 480px) {
+    .chat-container {
+        width: 95%;
+        height: 95vh;
+    }
+    
+    .button-row {
+        flex-wrap: nowrap;
+        gap: 2px;
+    }
+    
+    #user-input {
+        font-size: 16px; /* Prevent zoom */
+        min-height: 44px;
+    }
+}
