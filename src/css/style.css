@@ -60,187 +60,41 @@ body {
 /* Ensure .input-area and .button-row are flex containers for desktop */
 .input-area {
     display: flex;
-    align-items: center; /* Vertically align items within input-area */
-    /* border-top: 1px solid #333; */ /* Existing commented out */
+    align-items: flex-end; /* Changed from center to flex-end for proper vertical expansion */
+    flex-shrink: 0;
+    padding: 15px;
+    border-top: 1px solid #333;
+    background-color: #1e1e1e;
+    transition: all 0.3s ease;
+    min-height: 80px; /* Added minimum height for the input area */
 }
 
-.button-row { /* Added for desktop button layout */
-    display: flex;
-    align-items: center; /* Vertically align buttons within the row */
+.input-area.expanded {
+    padding: 12px 15px;
 }
 
+/* Base input styles */
 #user-input {
     border: none;
-    /* padding: 15px; Adjusted for fixed height */
-    font-size: 19px; /* Can keep this if desired for input field */
+    font-size: 19px;
     background-color: #333;
     color: #e0e0e0;
     outline: none;
-    flex-grow: 1;
-    border-radius: 8px 0 0 8px;
-    height: 50px; /* Fixed height */
-    box-sizing: border-box; /* Include padding in height calculation */
-    padding: 0 15px; /* Vertical padding controlled by height + flex, horizontal set here */
-}
-
-#send-button {
-    background-color: #007bff;
-    color: white;
-    border: none;
-    /* padding: 18px; Adjusted for fixed height */
-    font-size: 16px; /* Standardized font size for consistent text height */
-    cursor: pointer;
-    transition: background-color 0.3s ease;
-    border-radius: 0; 
-    height: 50px; /* Fixed height */
+    flex: 1;
+    border-radius: 8px;
+    min-height: 50px;
+    height: 50px;
     box-sizing: border-box;
-    display: flex; /* For centering content within the button */
-    align-items: center;
-    justify-content: center;
-    padding: 0 18px; /* Horizontal padding */
-}
-
-#send-button:hover {
-    background-color: #0056b3;
-}
-
-#mic-button {
-    background-color: #007bff;
-    color: white;
-    border: none;
-    /* padding: 15px; Adjusted for fixed height */
-    font-size: 16px; /* Standardized font size */
-    cursor: pointer;
-    transition: background-color 0.3s ease;
-    margin-left: 5px;
-    border-radius: 0; 
-    height: 50px; /* Fixed height */
-    box-sizing: border-box;
-    display: flex; /* For centering content within the button */
-    align-items: center;
-    justify-content: center;
-    padding: 0 15px; /* Horizontal padding */
-}
-
-#mic-button:hover {
-    background-color: #0056b3;
-}
-
-#mic-button.listening {
-    background-color: #dc3545; /* Red when listening */
-}
-
-#settings-button {
-    background-color: #6c757d; 
-    color: white;
-    border: none;
-    /* padding: 15px; Adjusted for fixed height */
-    font-size: 16px; /* Standardized font size */
-    cursor: pointer;
-    transition: background-color 0.3s ease;
-    margin-left: 5px;
-    border-radius: 0 8px 8px 0; 
-    height: 50px; /* Fixed height */
-    box-sizing: border-box;
-    display: flex; /* For centering content within the button */
-    align-items: center;
-    justify-content: center;
-    padding: 0 15px; /* Horizontal padding */
-}
-
-#settings-button:hover {
-    background-color: #5a6268;
-}
-
-/* Scrollbar styling for webkit browsers */
-.chat-window::-webkit-scrollbar {
-    width: 8px;
-}
-
-.chat-window::-webkit-scrollbar-track {
-    background: #1e1e1e;
-}
-
-.chat-window::-webkit-scrollbar-thumb {
-    background-color: #555;
-    border-radius: 4px;
-    border: 2px solid #1e1e1e;
-}
-
-/* Fullscreen Image Viewer Styles */
-#fullscreen-image-viewer {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.9);
-    display: none;
-    justify-content: center;
-    align-items: center;
-    z-index: 1000;
-    cursor: pointer;
-}
-
-#fullscreen-image {
-    max-width: 95%;
-    max-height: 95%;
-    object-fit: contain;
-}
-
-/* Settings Panel Styles */
-#settings-panel-container {
-    position: fixed;
-    bottom: -100%; /* Start off-screen */
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.3); /* Semi-transparent overlay for context */
-    display: flex;
-    justify-content: center;
-    align-items: flex-end; /* Align panel to the bottom */
-    z-index: 900; /* Below fullscreen image viewer, but above chat */
-    transition: bottom 0.5s ease-in-out;
-    pointer-events: none; /* Allow clicks through overlay when panel is hidden */
-}
-
-#settings-panel-container.visible {
-    bottom: 0; /* Slide in */
-    pointer-events: auto; /* Enable interaction when visible */
-}
-
-.settings-panel {
-    background-color: #2a2a2a; /* Darker than chat window */
-    color: #e0e0e0;
-    width: 100%;
-    max-width: 600px; /* Match chat container max-width */
-    height: 75vh; /* Adjust as needed */
-    border-top-left-radius: 15px;
-    border-top-right-radius: 15px;
-    box-shadow: 0 -5px 15px rgba(0, 0, 0, 0.3);
-    padding: 20px;
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
-    overflow-y: auto;
-}
-
-.settings-content {
-    flex-grow: 1;
-}
-
-.setting-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-    padding: 10px;
-    background-color: #333;
-    border-radius: 5px;
-}
-
-.setting-item label {
-    margin-right: 10px;
+    padding: 12px 15px;
+    margin-right: 8px;
+    transition: all 0.3s ease;
+    resize: none;
+    overflow-y: hidden; /* Changed from auto to hidden to prevent scrollbar */
+    overflow-x: hidden; /* Added to prevent horizontal scrollbar */
+    word-wrap: break-word;
+    white-space: pre-wrap;
+    font-family: inherit;
+    line-height: 1.4;
 }
 
 /* Basic Toggle Switch CSS */
@@ -636,12 +490,13 @@ input:checked + .slider:before {
 /* Expandable input styles - Fixed version */
 .input-area {
     display: flex;
-    align-items: center;
+    align-items: flex-end; /* Changed from center to flex-end for proper vertical expansion */
     flex-shrink: 0;
     padding: 15px;
     border-top: 1px solid #333;
     background-color: #1e1e1e;
     transition: all 0.3s ease;
+    min-height: 80px; /* Added minimum height for the input area */
 }
 
 .input-area.expanded {
@@ -657,14 +512,22 @@ input:checked + .slider:before {
     outline: none;
     flex: 1;
     border-radius: 8px;
+    min-height: 50px;
     height: 50px;
     box-sizing: border-box;
-    padding: 0 15px;
+    padding: 12px 15px;
     margin-right: 8px;
     transition: all 0.3s ease;
+    resize: none;
+    overflow-y: hidden; /* Changed from auto to hidden to prevent scrollbar */
+    overflow-x: hidden; /* Added to prevent horizontal scrollbar */
+    word-wrap: break-word;
+    white-space: pre-wrap;
+    font-family: inherit;
+    line-height: 1.4;
 }
 
-/* Expanded input - takes much more space */
+/* Expanded input - takes much more space horizontally */
 #user-input.expanded {
     flex: 4; /* Take 4 times as much space */
     margin-right: 15px;
@@ -687,6 +550,16 @@ input:checked + .slider:before {
     opacity: 1;
     visibility: visible;
     transform: scale(1);
+    align-self: flex-end; /* Added - align to bottom */
+}
+
+#attach-button:hover {
+    background-color: #4CAF50;
+    transform: translateY(-1px);
+}
+
+#attach-button:active {
+    transform: translateY(0);
 }
 
 #mic-button {
@@ -704,6 +577,15 @@ input:checked + .slider:before {
     opacity: 1;
     visibility: visible;
     transform: scale(1);
+    align-self: flex-end; /* Added - align to bottom */
+}
+
+#mic-button:hover {
+    background-color: #0056b3;
+}
+
+#mic-button.listening {
+    background-color: #dc3545; /* Red when listening */
 }
 
 #settings-button {
@@ -721,6 +603,427 @@ input:checked + .slider:before {
     opacity: 1;
     visibility: visible;
     transform: scale(1);
+    align-self: flex-end; /* Added - align to bottom */
+}
+
+#settings-button:hover {
+    background-color: #5a6268;
+}
+
+/* Scrollbar styling for webkit browsers */
+.chat-window::-webkit-scrollbar {
+    width: 8px;
+}
+
+.chat-window::-webkit-scrollbar-track {
+    background: #1e1e1e;
+}
+
+.chat-window::-webkit-scrollbar-thumb {
+    background-color: #555;
+    border-radius: 4px;
+    border: 2px solid #1e1e1e;
+}
+
+/* Fullscreen Image Viewer Styles */
+#fullscreen-image-viewer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.9);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    cursor: pointer;
+}
+
+#fullscreen-image {
+    max-width: 95%;
+    max-height: 95%;
+    object-fit: contain;
+}
+
+/* Settings Panel Styles */
+#settings-panel-container {
+    position: fixed;
+    bottom: -100%; /* Start off-screen */
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.3); /* Semi-transparent overlay for context */
+    display: flex;
+    justify-content: center;
+    align-items: flex-end; /* Align panel to the bottom */
+    z-index: 900; /* Below fullscreen image viewer, but above chat */
+    transition: bottom 0.5s ease-in-out;
+    pointer-events: none; /* Allow clicks through overlay when panel is hidden */
+}
+
+#settings-panel-container.visible {
+    bottom: 0; /* Slide in */
+    pointer-events: auto; /* Enable interaction when visible */
+}
+
+.settings-panel {
+    background-color: #2a2a2a; /* Darker than chat window */
+    color: #e0e0e0;
+    width: 100%;
+    max-width: 600px; /* Match chat container max-width */
+    height: 75vh; /* Adjust as needed */
+    border-top-left-radius: 15px;
+    border-top-right-radius: 15px;
+    box-shadow: 0 -5px 15px rgba(0, 0, 0, 0.3);
+    padding: 20px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+}
+
+.settings-content {
+    flex-grow: 1;
+}
+
+.setting-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding: 10px;
+    background-color: #333;
+    border-radius: 5px;
+}
+
+.setting-item label {
+    margin-right: 10px;
+}
+
+/* Add styles for specific dropdowns in the main settings panel */
+.settings-panel .setting-item #llm-provider,
+.settings-panel .setting-item #select-tts-voice {
+    padding: 8px 12px; 
+    background-color: #444; 
+    color: #e0e0e0; 
+    border: 1px solid #555; 
+    border-radius: 4px; 
+    font-size: 14px; 
+    width: auto; /* Allow width to fit content */
+    /* flex-grow: 1; Removed to prevent taking full width */
+    /* min-width: 120px; Removed or adjust if a minimum is still desired */
+    box-sizing: border-box; 
+    margin-left: auto; /* Pushes the dropdown to the right if label takes less space */
+}
+
+.settings-panel .setting-item #llm-provider:focus,
+.settings-panel .setting-item #select-tts-voice:focus {
+    border-color: #007bff; /* Match sampler dropdown focus border */
+    outline: none; /* Remove default outline */
+    box-shadow: 0 0 3px rgba(0, 123, 255, 0.3); /* Match sampler dropdown focus shadow */
+}
+
+/* Add this with your other dropdown styles for settings panel */
+.settings-panel .setting-item #llm-model-identifier {
+    padding: 8px 12px;
+    background-color: #444;
+    color: #e0e0e0;
+    border: 1px solid #555;
+    border-radius: 4px;
+    font-size: 14px;
+    width: auto;
+    box-sizing: border-box;
+    margin-left: auto;
+}
+
+.settings-panel .setting-item #llm-model-identifier:focus {
+    border-color: #007bff;
+    outline: none;
+    box-shadow: 0 0 3px rgba(0, 123, 255, 0.3);
+}
+
+/* Style for text input fields in settings panel */
+.settings-panel .setting-item input[type="text"],
+.settings-panel .setting-item input[type="password"] {
+    padding: 8px 12px;
+    background-color: #444;
+    color: #e0e0e0;
+    border: 1px solid #555;
+    border-radius: 4px;
+    font-size: 14px;
+    width: 207px; /* Fixed width that fits most content but not too wide */
+    box-sizing: border-box;
+    margin-left: auto; /* Pushes the input to the right */
+}
+
+/* Style for input fields focus state */
+.settings-panel .setting-item input[type="text"]:focus,
+.settings-panel .setting-item input[type="password"]:focus {
+    border-color: #007bff;
+    outline: none;
+    box-shadow: 0 0 3px rgba(0, 123, 255, 0.3);
+}
+
+/* Mobile adjustments for text inputs */
+@media (max-width: 480px) {
+    .settings-panel .setting-item input[type="text"],
+    .settings-panel .setting-item input[type="password"] {
+        width: 150px;
+        padding: 6px 10px;
+        font-size: 13px;
+    }
+}
+
+/* Welcome message styles - centered in chat */
+.welcome-message {
+    background: linear-gradient(135deg, #000000 0%, #000000 100%);
+    color: white;
+    text-align: center;
+    font-size: 28px;
+    font-weight: bold;
+    padding: 8px 20px;
+    margin: 10px auto;
+    border-radius: 15px;
+    box-shadow: 
+        0 20px 40px rgba(0, 0, 0, 0.4),
+        0 10px 20px rgba(0, 0, 0, 0.3),
+        0 5px 10px rgba(0, 0, 0, 0.2);
+    max-width: 50%;
+    align-self: center;
+    position: relative;
+    overflow: hidden;
+    transform: translateY(-5px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Add hover effect for more floating feel */
+.welcome-message:hover {
+    transform: translateY(-8px);
+    box-shadow: 
+        0 25px 50px rgba(0, 0, 0, 0.5),
+        0 15px 30px rgba(0, 0, 0, 0.4),
+        0 8px 15px rgba(0, 0, 0, 0.3);
+    transition: all 0.3s ease;
+}
+
+/* Add dark glow effect behind the box */
+.welcome-message::after {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    background: linear-gradient(135deg, #333333, #111111);
+    border-radius: 17px;
+    z-index: -1;
+    filter: blur(8px);
+    opacity: 0.6;
+}
+
+/* Update mobile styles to maintain floating effect */
+@media (max-width: 768px) {
+    .welcome-message {
+        font-size: 24px;
+        padding: 25px 15px;
+        margin: 15px auto;
+        transform: translateY(-3px);
+        box-shadow: 
+            0 15px 30px rgba(0, 0, 0, 0.35),
+            0 8px 15px rgba(0, 0, 0, 0.25),
+            0 4px 8px rgba(0, 0, 0, 0.15);
+    }
+    
+    .welcome-message:hover {
+        transform: translateY(-5px);
+    }
+}
+
+@media (max-width: 480px) {
+    .welcome-message {
+        font-size: 20px;
+        padding: 20px 12px;
+        margin: 10px auto;
+        transform: translateY(-2px);
+        box-shadow: 
+            0 12px 25px rgba(0, 0, 0, 0.3),
+            0 6px 12px rgba(0, 0, 0, 0.2),
+            0 3px 6px rgba(0, 0, 0, 0.1);
+    }
+    
+    .welcome-message:hover {
+        transform: translateY(-4px);
+    }
+}
+
+/* Mobile adjustments for welcome message */
+@media (max-width: 768px) {
+    .welcome-message {
+        font-size: 24px;
+        padding: 25px 15px;
+        margin: 15px auto;
+    }
+}
+
+@media (max-width: 480px) {
+    .welcome-message {
+        font-size: 20px;
+        padding: 20px 12px;
+        margin: 10px auto;
+    }
+    
+    .animated-letter {
+        animation-duration: 3.5s;
+    }
+    
+    @keyframes colorWaveJiggle {
+        0%, 100% {
+            transform: translateX(0) translateY(0) scale(1);
+        }
+        25% {
+            transform: translateX(-1px) translateY(-1px) scale(1.02);
+        }
+        50% {
+            transform: translateX(1px) translateY(1px) scale(0.98);
+        }
+        75% {
+            transform: translateX(-1px) translateY(1px) scale(1.01);
+        }
+    }
+}
+
+/* Mobile-first responsive design */
+@media (max-width: 768px) {
+    body {
+        height: 100vh;
+        height: 100dvh; /* Dynamic viewport height for mobile browsers */
+        padding: 0;
+        margin: 0;
+    }
+
+    .chat-container {
+        width: 100%;
+        max-width: none;
+        height: 100vh;
+        height: 100dvh; /* Dynamic viewport height */
+        border-radius: 0;
+        box-shadow: none;
+    }
+
+    .input-area {
+        /* display: flex; is inherited */
+        /* align-items: center; is inherited */
+        flex-wrap: nowrap; 
+        padding: 10px;
+        gap: 5px;
+    }
+    
+    .button-row {
+        /* display: flex; is inherited */
+        /* align-items: center; is inherited */
+        gap: 5px; /* Mobile specific gap if different from desktop */
+    }
+
+    #user-input {
+        flex: 1; /* Takes up available space before buttons */
+        min-width: 0; 
+        font-size: 16px; 
+        border-radius: 4px !important; /* Keep if needed for specificity */
+        height: 44px; /* Mobile height */
+        padding: 0 10px; /* Mobile horizontal padding */
+        /* box-sizing: border-box; is inherited */
+    }
+
+    /* Consolidated rule for mobile buttons */
+    #send-button,
+    #mic-button,
+    #settings-button { /* Settings button is part of this row at this breakpoint */
+        flex-shrink: 0;
+        min-width: 44px; 
+        border-radius: 4px !important; /* Keep if needed */
+        height: 44px; /* Mobile height */
+        font-size: 16px; 
+        padding: 0 12px; /* Mobile horizontal padding */
+        /* display: flex, align-items, justify-content, box-sizing are inherited */
+        margin-left: 0; /* Override desktop margin for consistent gap */
+    }
+    /* Ensure settings button doesn't have fixed position here */
+    #settings-button {
+        position: static; /* Ensure it's in flow for 768px view */
+    }
+}
+
+/* Very small screens - custom layout (max-width: 480px) */
+@media (max-width: 480px) {
+    .input-area {
+        flex-direction: row; 
+        align-items: center; 
+        gap: 8px; 
+        padding: 8px; 
+    }
+
+    #user-input {
+        flex-grow: 1;   /* Let user input grow to take available space */
+        flex-shrink: 1; /* Allow it to shrink if needed */
+        min-width: 0; /* Allow shrinking below content size */
+        /* width: auto; This is fine */
+        margin-bottom: 0; 
+        height: 44px; 
+        padding: 0 10px;
+        border-radius: 4px !important;
+    }
+
+    .button-row {
+        display: flex; 
+        align-items: center;
+        gap: 5px; 
+        /* width: auto; This is fine */
+    }
+
+    #send-button {
+        flex-grow: 1; 
+        flex-basis: 0;
+        flex-shrink: 1;
+        margin-left: 0; 
+        height: 44px;
+        font-size: 16px;
+        padding: 0 10px; 
+        min-width: auto; 
+    }
+
+    #mic-button {
+        flex-grow: 1; 
+        flex-basis: 0;
+        flex-shrink: 1;
+        margin-left: 0; 
+        height: 44px;
+        font-size: 16px;
+        padding: 0 10px; 
+        min-width: auto;
+    }
+
+    #settings-button {
+        position: fixed; 
+        top: 10px;       
+        left: 10px;      
+        z-index: 1100;   
+        flex-grow: 0;
+        flex-shrink: 0;
+        flex-basis: auto;
+        width: 44px;  
+        height: 44px;
+        padding: 0; 
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%; 
+        background-color: #6c757d; 
+        color: white;
+        margin-left: 0; 
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2); 
+        font-size: 20px; 
+    }
 }
 
 /* Hide buttons when expanded - smooth animation */
@@ -750,33 +1053,31 @@ input:checked + .slider:before {
     padding: 0 18px;
     transition: all 0.3s ease;
     flex-shrink: 0;
-    margin-left: auto; /* Push to the right when expanded */
+    align-self: flex-end; /* Added - stay at bottom even when input expands */
+    margin-bottom: 0; /* Added - align with bottom of input */
 }
 
 #send-button:hover {
     background-color: #0056b3;
 }
 
-.input-area.expanded #send-button {
-    margin-left: 0; /* Reset margin when expanded, flex handles positioning */
-}
-
 /* Button row adjustments */
 .button-row {
     display: flex;
-    align-items: center;
+    align-items: flex-end; /* Changed from center to flex-end - align buttons to bottom */
     gap: 5px;
     transition: all 0.3s ease;
 }
 
 .input-area.expanded .button-row {
-    gap: 0; /* Collapse gap when buttons are hidden */
+    gap: 0; /* Added - collapse gap when buttons are hidden */
 }
 
 /* Mobile adjustments for expandable input */
 @media (max-width: 768px) {
     .input-area {
         padding: 10px;
+        min-height: 70px;
     }
     
     .input-area.expanded {
@@ -785,14 +1086,12 @@ input:checked + .slider:before {
     
     #user-input {
         font-size: 16px;
+        min-height: 44px;
         height: 44px;
         border-radius: 4px;
         margin-right: 6px;
-    }
-    
-    #user-input.expanded {
-        flex: 5; /* Even more space on mobile */
-        margin-right: 10px;
+        padding: 10px;
+        overflow-y: hidden; /* Added to prevent scrollbar on mobile */
     }
     
     #send-button {
@@ -817,16 +1116,12 @@ input:checked + .slider:before {
 @media (max-width: 480px) {
     .input-area {
         padding: 8px;
+        min-height: 60px;
     }
     
-    #user-input.expanded {
-        flex: 6; /* Maximum space on very small screens */
-        margin-right: 8px;
-    }
-    
-    #send-button {
-        min-width: 50px;
-        padding: 0 10px;
+    #user-input {
+        padding: 8px;
+        overflow-y: hidden; /* Added to prevent scrollbar on very small screens */
     }
     
     /* Keep settings button accessible on very small screens */
@@ -1170,6 +1465,7 @@ input:checked + .slider:before {
     display: flex;
     align-items: center;
     justify-content: center;
+    align-self: flex-end; /* Added - align to bottom */
 }
 
 #attach-button:hover {

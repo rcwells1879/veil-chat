@@ -190,6 +190,12 @@ async function initializeApp() {
         if (!message) return;
 
         userInput.value = '';
+        
+        // Reset textarea height after clearing content
+        const isMobile = window.innerWidth <= 768;
+        const minHeight = isMobile ? 44 : 50;
+        userInput.style.height = minHeight + 'px';
+        
         addMessage(message, 'user');
 
         const documentContext = contextService.getDocumentContext();
@@ -628,13 +634,6 @@ async function initializeApp() {
     // --- Enhanced Event Listeners for Mobile ---
     addMobileCompatibleEvent(sendButton, 'click', handleUserInput);
     
-    userInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            handleUserInput();
-        }
-    });
-    
     addMobileCompatibleEvent(fullScreenImageViewer, 'click', () => {
         fullScreenImageViewer.style.display = 'none';
     });
@@ -723,6 +722,8 @@ async function initializeApp() {
                     document.activeElement !== userInput) {
                     inputArea.classList.remove('expanded');
                     userInput.classList.remove('expanded');
+                    // Reset height when contracting
+                    userInput.style.height = '50px';
                     console.log('Input contracted on blur');
                 }
             }, 150);
@@ -736,15 +737,16 @@ async function initializeApp() {
             }
         });
         
-        // Contract after sending message (modify existing handleUserInput function)
+        // Contract after sending message
         const originalHandleUserInput = handleUserInput;
         handleUserInput = async function() {
             await originalHandleUserInput();
             
-            // Contract after sending
+            // Contract after sending and reset height
             setTimeout(() => {
                 inputArea.classList.remove('expanded');
                 userInput.classList.remove('expanded');
+                userInput.style.height = '50px';
                 console.log('Input contracted after sending');
             }, 100);
         };
@@ -784,6 +786,92 @@ async function initializeApp() {
 
     // Also call this in your initializeApp function:
     setupMobileInputExpansion();
+
+    // --- Auto-resize Textarea Functionality ---
+function setupTextareaAutoResize() {
+    const userInput = document.getElementById('user-input');
+    
+    if (!userInput) {
+        console.error('User input element not found for auto-resize setup');
+        return;
+    }
+    
+    console.log('Setting up textarea auto-resize for element:', userInput.tagName);
+    
+    // Auto-resize function
+    function autoResize() {
+        // Store the current scroll position
+        const chatWindow = document.getElementById('chat-window');
+        
+        // Reset height to calculate the true content height
+        userInput.style.height = 'auto';
+        
+        // Get the scroll height (the height needed to show all content)
+        const scrollHeight = userInput.scrollHeight;
+        
+        // Set minimum height based on screen size
+        const isMobile = window.innerWidth <= 768;
+        const minHeight = isMobile ? 44 : 50;
+        
+        // Calculate new height (no maximum limit for now)
+        const newHeight = Math.max(minHeight, scrollHeight);
+        
+        // Apply the new height
+        userInput.style.height = newHeight + 'px';
+        
+        // Scroll chat window to bottom when input expands
+        if (chatWindow) {
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+        }
+        
+        console.log('Textarea resized to:', newHeight + 'px', 'Content scroll height:', scrollHeight + 'px');
+    }
+    
+    // Add event listeners for auto-resize
+    userInput.addEventListener('input', autoResize);
+    userInput.addEventListener('paste', () => {
+        // Small delay to allow paste content to be processed
+        setTimeout(autoResize, 50);
+    });
+    
+    // Handle Enter key behavior
+    userInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleUserInput();
+        }
+        // Allow Shift+Enter for new lines
+        if (e.key === 'Enter' && e.shiftKey) {
+            // Let the default behavior happen (new line)
+            setTimeout(autoResize, 50);
+        }
+    });
+    
+    // Reset height when input is cleared
+    userInput.addEventListener('blur', () => {
+        if (userInput.value.trim() === '') {
+            const isMobile = window.innerWidth <= 768;
+            const minHeight = isMobile ? 44 : 50;
+            userInput.style.height = minHeight + 'px';
+            console.log('Reset height to minimum:', minHeight + 'px');
+        }
+    });
+    
+    // Handle window resize for responsive behavior
+    window.addEventListener('resize', () => {
+        setTimeout(autoResize, 100);
+    });
+    
+    // Initial resize call
+    setTimeout(() => {
+        autoResize();
+        console.log('Initial auto-resize completed');
+    }, 200);
+    
+    console.log('Textarea auto-resize setup complete');
+}
+
+setupTextareaAutoResize();
 
     // Load saved persona on startup
     currentPersonaPrompt = localStorage.getItem('currentPersonaPrompt');
