@@ -20,15 +20,34 @@ body {
 .chat-container {
     width: 100%;
     max-width: 600px;
-    /* Use the CSS variable set by the script in index.html for reliable height */
-    height: 100vh; /* Fallback for browsers without JS */
-    height: calc(var(--vh, 1vh) * 100);
+    /* Use fixed height instead of dynamic viewport height */
+    height: 100vh; /* Use standard viewport height */
+    /* Remove the dynamic --vh variable to prevent keyboard-induced resizing */
     background-color: #1e1e1e;
     border-radius: 0;
     box-shadow: none;
     display: flex;
     flex-direction: column;
     overflow: hidden; /* This is important */
+    /* Add this to prevent the container from resizing when keyboard appears */
+    position: relative;
+}
+
+/* Add keyboard-specific styles for mobile */
+@media (max-width: 768px) {
+    .chat-container {
+        /* Ensure the container uses the initial viewport height, not the dynamic one */
+        height: 100vh;
+        /* Prevent any automatic adjustments */
+        min-height: 100vh;
+        max-height: 100vh;
+    }
+    
+    /* When keyboard is active, prevent viewport adjustments */
+    .keyboard-active .chat-container {
+        height: 100vh;
+        transform: translateY(0);
+    }
 }
 
 .chat-window {

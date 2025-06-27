@@ -80,34 +80,33 @@ async function initializeApp() {
     let personaCreated = false;
     let isContinuousConversationActive = false;
 
-    // --- Mobile Viewport Height Fix - Enhanced for real mobile browsers ---
+    // --- Mobile Viewport Height Fix - Disable for keyboard compatibility ---
     function setChatContainerHeight() {
         const chatContainer = document.querySelector('.chat-container');
         if (chatContainer) {
-            // Use visual viewport API if available (modern mobile browsers)
-            if (window.visualViewport) {
-                chatContainer.style.height = `${window.visualViewport.height}px`;
-            } else {
-                // Fallback for older browsers
-                const vh = window.innerHeight * 0.01;
-                chatContainer.style.setProperty('--vh', `${vh}px`);
-                chatContainer.style.height = 'calc(var(--vh, 1vh) * 100)';
-            }
+            // Don't adjust height dynamically to prevent keyboard issues
+            // Just ensure it uses the standard viewport height
+            chatContainer.style.height = '100vh';
+            
+            // Remove any CSS variable adjustments that cause resizing
+            chatContainer.style.removeProperty('--vh');
         }
     }
 
-    // Enhanced mobile event listeners
+    // Disable the viewport resize listeners that cause the gap issue
+    // Comment out or remove these lines:
+    /*
     window.addEventListener('resize', setChatContainerHeight);
     window.addEventListener('orientationchange', () => {
-        setTimeout(setChatContainerHeight, 100); // Delay for mobile orientation change
+        setTimeout(setChatContainerHeight, 100);
     });
-    
-    // Visual viewport support for modern mobile browsers
+
     if (window.visualViewport) {
         window.visualViewport.addEventListener('resize', setChatContainerHeight);
     }
+    */
 
-    // Set initial height
+    // Set initial height once
     setChatContainerHeight();
 
     // --- Settings Configuration ---
