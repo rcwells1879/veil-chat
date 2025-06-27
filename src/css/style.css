@@ -210,7 +210,6 @@ input:checked + .slider:before {
     min-width: 0; /* Allow the slider to shrink below its default minimum width */
 }
 .setting-item input[type="number"] {
-    /* width: 70px; <-- This fixed width was preventing the row from shrinking */
     max-width: 70px; /* Use max-width to allow shrinking */
     min-width: 60px; /* Prevent it from becoming too small */
     flex-shrink: 1;  /* Explicitly allow shrinking */
@@ -220,82 +219,6 @@ input:checked + .slider:before {
     border: 1px solid #555;
     border-radius: 3px;
 }
-
-/* Add styles for specific dropdowns in the main settings panel */
-.settings-panel .setting-item #llm-provider,
-.settings-panel .setting-item #select-tts-voice {
-    padding: 8px 12px; 
-    background-color: #444; 
-    color: #e0e0e0; 
-    border: 1px solid #555; 
-    border-radius: 4px; 
-    font-size: 14px; 
-    box-sizing: border-box; 
-    margin-left: auto; /* Pushes the dropdown to the right if label takes less space */
-    flex-grow: 1; /* Allow the element to grow and shrink */
-    max-width: 220px; /* Set a maximum width */
-}
-
-.settings-panel .setting-item #llm-provider:focus,
-.settings-panel .setting-item #select-tts-voice:focus {
-    border-color: #007bff; /* Match sampler dropdown focus border */
-    outline: none; /* Remove default outline */
-    box-shadow: 0 0 3px rgba(0, 123, 255, 0.3); /* Match sampler dropdown focus shadow */
-}
-
-/* Add this with your other dropdown styles for settings panel */
-.settings-panel .setting-item #llm-model-identifier {
-    padding: 8px 12px;
-    background-color: #444;
-    color: #e0e0e0;
-    border: 1px solid #555;
-    border-radius: 4px;
-    font-size: 14px;
-    box-sizing: border-box;
-    margin-left: auto;
-    flex-grow: 1; /* Allow the element to grow and shrink */
-    max-width: 220px; /* Set a maximum width */
-}
-
-.settings-panel .setting-item #llm-model-identifier:focus {
-    border-color: #007bff;
-    outline: none;
-    box-shadow: 0 0 3px rgba(0, 123, 255, 0.3);
-}
-
-/* Style for text input fields in settings panel */
-.settings-panel .setting-item input[type="text"],
-.settings-panel .setting-item input[type="password"] {
-    padding: 8px 12px;
-    background-color: #444;
-    color: #e0e0e0;
-    border: 1px solid #555;
-    border-radius: 4px;
-    font-size: 14px;
-    box-sizing: border-box;
-    margin-left: auto; /* Pushes the input to the right */
-    flex-grow: 1; /* Allow the element to grow and shrink */
-    max-width: 220px; /* Set a maximum width */
-}
-
-/* Style for input fields focus state */
-.settings-panel .setting-item input[type="text"]:focus,
-.settings-panel .setting-item input[type="password"]:focus {
-    border-color: #007bff;
-    outline: none;
-    box-shadow: 0 0 3px rgba(0, 123, 255, 0.3);
-}
-
-/* Add this rule to ensure all specific inputs and selects can shrink properly */
-.settings-panel .setting-item input[type="text"],
-.settings-panel .setting-item input[type="password"],
-.settings-panel .setting-item #llm-provider,
-.settings-panel .setting-item #select-tts-voice,
-.settings-panel .setting-item #llm-model-identifier {
-    min-width: 0; /* This is the critical fix */
-}
-
-
 /* Welcome message styles - centered in chat */
 .welcome-message {
     background: linear-gradient(135deg, #000000 0%, #000000 100%);
@@ -575,7 +498,6 @@ body.panel-open .animated-letter {
     color: #b0b0b0;
     font-size: 1em;
     white-space: nowrap; /* Prevent label text from wrapping to a new line */
-    /* flex-shrink: 0; <-- This was preventing the label from shrinking on narrow screens, so it's removed. */
 }
 
 .settings-panel input,
@@ -584,7 +506,6 @@ body.panel-open .animated-letter {
 .persona-panel input,
 .persona-panel select,
 .persona-panel textarea {
-    /* width: 100%; <-- This was the main cause of wrapping, as it conflicts with flexbox sizing. */
     background: #181818;
     color: #e0e0e0;
     border: 1px solid #333;
@@ -708,7 +629,6 @@ body.panel-open .animated-letter {
 .settings-group[open] > .settings-group-header::before {
     transform: rotate(90deg);
 }
-
 
 /* --- Responsive for small screens --- */
 @media (max-width: 600px) {
