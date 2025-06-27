@@ -69,6 +69,46 @@ body {
     max-width: 100%;
     border-radius: 5px;
     margin-top: 10px;
+    cursor: pointer; /* Add this to indicate images are clickable */
+}
+
+/* --- Fullscreen Image Viewer --- */
+#fullscreen-image-viewer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.9);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+    cursor: pointer;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+#fullscreen-image {
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    border-radius: 8px;
+    box-shadow: 0 0 30px rgba(0, 0, 0, 0.7);
+}
+
+/* Mobile optimizations for fullscreen viewer */
+@media (max-width: 768px) {
+    #fullscreen-image-viewer {
+        padding: 10px;
+    }
+    
+    #fullscreen-image {
+        max-width: calc(100vw - 20px);
+        max-height: calc(100vh - 20px);
+    }
 }
 
 /* --- Input Area (Robust Flexbox) --- */
