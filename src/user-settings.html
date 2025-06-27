@@ -7,17 +7,16 @@
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-    <div class="settings-panel" id="settings-panel">
-        <div class="settings-content">
-            
-            <!-- Save/Load Conversation Section at the top -->
+    <div class="settings-panel">
+        <div class="panel-content">
+            <!-- ALL of your existing settings items go INSIDE here -->
+            <h2>Settings</h2>
             <div class="conversation-controls">
-                <button id="save-conversation-button" class="conversation-button save-button">
-                    Save Conversation
-                </button>
-                <button id="load-conversation-button" class="conversation-button load-button">
-                    Load Conversation
-                </button>
+                <!-- This div groups the buttons so we can space them as a unit -->
+                <div class="panel-button-group">
+                    <button id="save-conversation-button">Save Conversation</button>
+                    <button id="load-conversation-button" class="secondary-button">Load Conversation</button>
+                </div>
                 <input type="file" id="load-conversation-input" style="display: none;" accept=".json,application/json">
             </div>
             
@@ -70,41 +69,66 @@
                 <label for="llm-api-key">LLM API Key </label>
                 <input type="password" id="llm-api-key" placeholder="Enter API Key if required">
             </div>
-            <div class="setting-item">
-                <label for="image-provider">Image Provider</label>
-                <select id="image-provider">
-                    <option value="a1111">Local A1111</option>
-                    <option value="openai">OpenAI (GPT-image-1)</option>
-                </select>
-            </div>
 
-            <div class="setting-item" id="image-api-url-item">
-                <label for="image-api-url">A1111 API URL</label>
-                <input type="text" id="image-api-url" placeholder="e.g., http://localhost:7860">
-            </div>
+            <!-- All image settings are now grouped in this collapsible section -->
+            <details class="settings-group">
+                <summary class="settings-group-header">Image Generation Settings</summary>
 
-            <div class="setting-item" id="openai-api-key-item" style="display: none;">
-                <label for="openai-image-api-key">OpenAI API Key</label>
-                <input type="password" id="openai-image-api-key" placeholder="Enter OpenAI API Key">
-            </div>
-
-            <div class="setting-item collapsible-header" id="image-controls-header">
-                <label>Image Generation Settings</label>
-                <span class="expand-arrow">▼</span>
-            </div>
-            <div class="collapsible-content" id="image-controls-content">
-                <div class="setting-item" id="image-size-item">
-                    <label for="image-size">Image Size</label>
-                    <select id="image-size">
-                        <option value="auto" selected>Auto</option>
-                        <option value="1024x1024">Square (1024x1024)</option>
-                        <option value="1536x1024">Landscape (1536x1024)</option>
-                        <option value="1024x1536">Portrait (1024x1536)</option>
+                <div class="setting-item">
+                    <label for="image-provider">Image Provider</label>
+                    <select id="image-provider">
+                        <option value="a1111">Local A1111</option>
+                        <option value="openai">OpenAI (GPT-image-1)</option>
                     </select>
                 </div>
 
-                <!-- OpenAI-specific settings (shown when OpenAI is selected) -->
+                <!-- A1111-specific settings -->
+                <div class="a1111-settings">
+                    <div class="setting-item">
+                        <label for="image-api-url">A1111 API URL</label>
+                        <input type="text" id="image-api-url" placeholder="e.g., http://localhost:7860">
+                    </div>
+                    <div class="setting-item">
+                        <label for="image-width">Width (px)</label>
+                        <input type="number" id="image-width" min="256" max="2048" step="64" value="1024">
+                    </div>
+                    <div class="setting-item">
+                        <label for="image-height">Height (px)</label>
+                        <input type="number" id="image-height" min="256" max="2048" step="64" value="1536">
+                    </div>
+                    <div class="setting-item">
+                        <label for="image-steps">Steps</label>
+                        <input type="number" id="image-steps" min="1" max="100" step="1" value="20">
+                    </div>
+                    <div class="setting-item">
+                        <label for="image-cfg-scale">CFG Scale</label>
+                        <input type="number" id="image-cfg-scale" min="1" max="20" step="0.1" value="1.4">
+                    </div>
+                    <div class="setting-item">
+                        <label for="image-sampler">Sampler</label>
+                        <select id="image-sampler">
+                            <option value="Euler a" selected>Euler a</option>
+                            <option value="DPM++ 2M">DPM++ 2M</option>
+                            <option value="LCM">LCM</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- OpenAI-specific settings -->
                 <div class="openai-settings" style="display: none;">
+                    <div class="setting-item">
+                        <label for="openai-image-api-key">OpenAI API Key</label>
+                        <input type="password" id="openai-image-api-key" placeholder="Enter OpenAI API Key">
+                    </div>
+                    <div class="setting-item">
+                        <label for="image-size">Image Size</label>
+                        <select id="image-size">
+                            <option value="auto" selected>Auto</option>
+                            <option value="1024x1024">Square (1024x1024)</option>
+                            <option value="1536x1024">Landscape (1536x1024)</option>
+                            <option value="1024x1536">Portrait (1024x1536)</option>
+                        </select>
+                    </div>
                     <div class="setting-item">
                         <label for="openai-quality">Quality</label>
                         <select id="openai-quality">
@@ -131,35 +155,8 @@
                         </select>
                     </div>
                 </div>
-                
-                <!-- A1111-specific settings (shown when A1111 is selected) -->
-                <div class="a1111-settings">
-                    <div class="setting-item">
-                        <label for="image-width">Width (px)</label>
-                        <input type="number" id="image-width" min="256" max="2048" step="64" value="1024">
-                    </div>
-                    <div class="setting-item">
-                        <label for="image-height">Height (px)</label>
-                        <input type="number" id="image-height" min="256" max="2048" step="64" value="1536">
-                    </div>
-                    <div class="setting-item">
-                        <label for="image-steps">Steps</label>
-                        <input type="number" id="image-steps" min="1" max="100" step="1" value="20">
-                    </div>
-                    <div class="setting-item">
-                        <label for="image-cfg-scale">CFG Scale</label>
-                        <input type="number" id="image-cfg-scale" min="1" max="20" step="0.1" value="1.4">
-                    </div>
-                    <div class="setting-item">
-                        <label for="image-sampler">Sampler</label>
-                        <select id="image-sampler">
-                            <option value="Euler a" selected>Euler a</option>
-                            <option value="DPM++ 2M">DPM++ 2M</option>
-                            <option value="LCM">LCM</option>
-                        </select>
-                    </div>
-                </div>
-            </div>
+            </details>
+
         </div>
     </div>
 </body>

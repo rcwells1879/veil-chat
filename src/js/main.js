@@ -1,8 +1,12 @@
 let isInitialized = false;
 
-// Use both DOMContentLoaded and window.onload for better mobile compatibility
-document.addEventListener('DOMContentLoaded', initializeApp);
-window.addEventListener('load', initializeApp);
+// --- Simplified and reliable initialization ---
+// This ensures initializeApp runs exactly once when the document is ready.
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeApp);
+} else {
+    initializeApp(); // DOM is already ready
+}
 
 async function initializeApp() {
     if (isInitialized) return;
@@ -196,6 +200,13 @@ async function initializeApp() {
         const minHeight = isMobile ? 44 : 50;
         userInput.style.height = minHeight + 'px';
         
+        // Contract the input expansion after sending
+        const inputArea = document.querySelector('.input-area');
+        if (inputArea) {
+            inputArea.classList.remove('expanded');
+            userInput.classList.remove('expanded');
+        }
+        
         addMessage(message, 'user');
 
         const documentContext = contextService.getDocumentContext();
@@ -224,17 +235,11 @@ async function initializeApp() {
     // --- Enhanced Mobile Event Handling ---
     function addMobileCompatibleEvent(element, eventType, handler) {
         if (!element) return;
-        
-        // Add both mouse and touch events
+        // Modern browsers handle touch-to-click translation well.
+        // The 'setTimeout(0)' trick in the panel handlers is the robust way
+        // to deal with any residual "ghost click" issues.
+        // This simplified function prevents the previous double-firing of events.
         element.addEventListener(eventType, handler, { passive: false });
-        
-        // Add touch-specific events for mobile
-        if (eventType === 'click') {
-            element.addEventListener('touchend', (e) => {
-                e.preventDefault();
-                handler(e);
-            }, { passive: false });
-        }
     }
 
     // --- Persona Management ---
@@ -260,7 +265,7 @@ async function initializeApp() {
             llmService.setCustomPersona(currentPersonaPrompt);
         }
 
-        hidePersonaPanel();
+        closePersonaPanel(); // Corrected function name from hidePersonaPanel
         addWelcomeMessage();
 
         const successMessage = customPrompt ? 'Creating custom persona...' : 'Generating random persona...';
@@ -297,14 +302,14 @@ async function initializeApp() {
     function addWelcomeMessage() {
         const welcomeElement = document.createElement('div');
         welcomeElement.classList.add('message', 'welcome-message');
-        welcomeElement.innerHTML = "Welcome to Veil".split('').map((char, i) => 
+        welcomeElement.innerHTML = "VeilChat".split('').map((char, i) => 
             `<span class="animated-letter" style="animation-delay: ${i * 0.1}s">${char}</span>`
         ).join('');
         
         // Enhanced mobile event handling for welcome message
         const handleWelcomeInteraction = async (e) => {
             e.preventDefault();
-            e.stopPropagation();
+            e.stopPropagation(); // PREVENTS the event from bubbling to the overlay
             console.log('Welcome message clicked/touched');
             
             if (!personaPanelContainer.querySelector('.persona-panel')) {
@@ -325,58 +330,138 @@ async function initializeApp() {
     async function loadPersonaPanel() {
         try {
             const response = await fetch('persona.html');
+            if (!response.ok) throw new Error(`Failed to load persona.html: ${response.statusText}`);
             const html = await response.text();
-            personaPanelContainer.innerHTML = html;
 
-            const panel = personaPanelContainer.querySelector('.persona-panel');
-            const textarea = personaPanelContainer.querySelector('#persona-prompt');
-            
-            if (textarea) {
-                textarea.value = localStorage.getItem('draftPersonaPrompt') || '';
-                textarea.addEventListener('input', () => localStorage.setItem('draftPersonaPrompt', textarea.value));
-            }
+            // Parse the fetched HTML and extract only the .persona-panel element
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const panelElement = doc.querySelector('.persona-panel');
 
-            const createButton = personaPanelContainer.querySelector('#create-persona-button');
-            const randomButton = personaPanelContainer.querySelector('#use-random-persona-button');
-            const cancelButton = personaPanelContainer.querySelector('#cancel-persona-button');
-            
-            if (createButton) addMobileCompatibleEvent(createButton, 'click', () => createPersona(textarea.value));
-            if (randomButton) addMobileCompatibleEvent(randomButton, 'click', () => createPersona(null));
-            if (cancelButton) addMobileCompatibleEvent(cancelButton, 'click', hidePersonaPanel);
-            
-            personaPanelContainer.querySelectorAll('.example-button').forEach(button => {
-                addMobileCompatibleEvent(button, 'click', () => {
-                    const personaText = button.getAttribute('data-persona');
-                    if (textarea) {
-                        textarea.value = personaText;
-                        localStorage.setItem('draftPersonaPrompt', personaText);
-                    }
-                });
-            });
+            if (panelElement) {
+                personaPanelContainer.innerHTML = ''; // Clear previous content
+                // Clone the node to ensure it's fully part of the main document
+                personaPanelContainer.appendChild(panelElement.cloneNode(true));
 
-            addMobileCompatibleEvent(personaPanelContainer, 'click', (e) => {
-                if (e.target === personaPanelContainer) hidePersonaPanel();
-            });
-            
-            if (panel) {
-                addMobileCompatibleEvent(panel, 'click', (e) => e.stopPropagation());
+                // Re-run setup for the newly added elements
+                const textarea = personaPanelContainer.querySelector('#persona-prompt');
+                if (textarea) {
+                    textarea.value = localStorage.getItem('draftPersonaPrompt') || '';
+                    textarea.addEventListener('input', (e) => localStorage.setItem('draftPersonaPrompt', e.target.value));
+                }
+
+                const createButton = personaPanelContainer.querySelector('#create-persona-button');
+                const randomButton = personaPanelContainer.querySelector('#use-random-persona-button');
+                // const cancelButton = personaPanelContainer.querySelector('#cancel-persona-button'); // Button removed from HTML
+
+                if (createButton) addMobileCompatibleEvent(createButton, 'click', () => createPersona(textarea.value));
+                if (randomButton) addMobileCompatibleEvent(randomButton, 'click', () => createPersona(null));
+                // if (cancelButton) addMobileCompatibleEvent(cancelButton, 'click', closePersonaPanel); // Logic for removed button
+
+            } else {
+                throw new Error('.persona-panel element not found in persona.html');
             }
 
         } catch (error) {
             console.error('Error loading persona panel:', error);
-            personaPanelContainer.innerHTML = '<p>Error loading persona creator.</p>';
+            personaPanelContainer.innerHTML = `<p style="color:red; text-align:center;">Error: Could not load persona creator.</p>`;
         }
     }
-    
-    function showPersonaPanel() { 
-        personaPanelContainer.classList.add('visible'); 
-        console.log('Persona panel shown');
+
+    // --- Sliding Panel Overlay Logic ---
+    function createOverlay() {
+        let overlay = document.querySelector('.overlay');
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.className = 'overlay';
+            document.body.appendChild(overlay);
+        }
+        overlay.classList.remove('hidden');
+        return overlay;
     }
-    
-    function hidePersonaPanel() { 
-        personaPanelContainer.classList.remove('visible'); 
-        console.log('Persona panel hidden');
+    function removeOverlay() {
+        const overlay = document.querySelector('.overlay');
+        if (overlay) overlay.classList.add('hidden');
+        setTimeout(() => {
+            if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
+        }, 300);
     }
+    // --- Settings Panel Slide Up ---
+    function showSettingsPanel() {
+        console.log(`%c[${new Date().toLocaleTimeString()}] SHOW settings panel triggered.`, 'color: lightblue; font-weight: bold;');
+        const panel = document.querySelector('#settings-panel-container .settings-panel');
+        if (!panel) {
+            console.warn('showSettingsPanel called, but no panel element found.');
+            return;
+        }
+        const overlay = createOverlay();
+        panel.classList.add('open');
+        document.body.classList.add('panel-open');
+        // Delay attaching the close handler to prevent the same click/touch event
+        // that opened the panel from immediately closing it.
+        setTimeout(() => {
+            console.log(`%c[${new Date().toLocaleTimeString()}] ATTACHING close-on-click to overlay.`, 'color: gray;');
+            overlay.onclick = function(e) {
+                console.log(`%c[${new Date().toLocaleTimeString()}] OVERLAY clicked. Target:`, 'color: orange;', e.target);
+                if (e.target === overlay) {
+                    console.log(`%c[${new Date().toLocaleTimeString()}] Click was on overlay itself. Closing panel.`, 'color: orange; font-weight: bold;');
+                    closeSettingsPanel();
+                }
+            };
+        }, 0);
+    }
+    function closeSettingsPanel() {
+        console.log(`%c[${new Date().toLocaleTimeString()}] CLOSE settings panel triggered.`, 'color: red; font-weight: bold;');
+        console.trace("Call stack for closeSettingsPanel:"); // This will show what called the function.
+        const panel = document.querySelector('#settings-panel-container .settings-panel');
+        if (!panel) {
+            console.warn('closeSettingsPanel called, but no panel element found.');
+            return;
+        }
+        panel.classList.remove('open');
+        document.body.classList.remove('panel-open');
+        removeOverlay();
+    }
+    // --- Persona Panel Slide Down ---
+    function showPersonaPanel() {
+        const panel = document.querySelector('#persona-panel-container .persona-panel');
+        if (!panel) return;
+        const overlay = createOverlay();
+        panel.classList.add('open');
+        document.body.classList.add('panel-open'); // ADD THIS
+        // Delay attaching the close handler for the same reason as above.
+        setTimeout(() => {
+            overlay.onclick = function(e) {
+                if (e.target === overlay) closePersonaPanel();
+            };
+        }, 0);
+    }
+    function closePersonaPanel() {
+        const panel = document.querySelector('#persona-panel-container .persona-panel');
+        if (!panel) return;
+        panel.classList.remove('open');
+        document.body.classList.remove('panel-open'); // ADD THIS
+        removeOverlay();
+    }
+
+    // The following 'if' block is redundant and is the cause of the flickering.
+    // It is being replaced by a more robust event listener later in the file.
+    /*
+    // --- Attach open/close logic to settings and persona buttons ---
+    if (settingsButton) {
+        settingsButton.onclick = showSettingsPanel;
+    }
+    */
+
+    // Persona panel open logic should be attached to wherever you open persona (e.g., a button or menu)
+    // Example: document.getElementById('open-persona-btn').onclick = showPersonaPanel;
+    // --- Close panels on ESC key ---
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeSettingsPanel();
+            closePersonaPanel();
+        }
+    });
 
     // --- Settings Management ---
     const settingsIdMap = {
@@ -441,99 +526,112 @@ async function initializeApp() {
             output_format: SETTINGS.openaiOutputFormat,
             background: SETTINGS.openaiBackground,
         });
-        if (voiceService) voiceService.finalAutoSendDelay = parseInt(SETTINGS.micAutoSendDelay);
-    }
-
-    async function loadSettingsPanel() {
-        try {
-            const response = await fetch('user-settings.html');
-            const html = await response.text();
-            settingsPanelContainer.innerHTML = html;
-
-            Object.keys(SETTINGS).forEach(key => {
-                const elementId = settingsIdMap[key];
-                if (!elementId) return;
-
-                const element = settingsPanelContainer.querySelector(`#${elementId}`);
-                if (element) {
-                    if (element.type === 'checkbox') {
-                        element.checked = SETTINGS[key];
-                    } else {
-                        element.value = SETTINGS[key];
-                    }
-                }
-            });
-            
-            settingsPanelContainer.querySelectorAll('input, select').forEach(el => {
-                el.addEventListener('input', saveAllSettings);
-                el.addEventListener('change', saveAllSettings);
-            });
-            
-            const saveButton = settingsPanelContainer.querySelector('#save-conversation-button');
-            const loadButton = settingsPanelContainer.querySelector('#load-conversation-button');
-            const loadInput = settingsPanelContainer.querySelector('#load-conversation-input');
-            
-            if (saveButton) addMobileCompatibleEvent(saveButton, 'click', saveConversationToFile);
-            if (loadButton) addMobileCompatibleEvent(loadButton, 'click', () => { if (loadInput) loadInput.click(); });
-            if (loadInput) loadInput.addEventListener('change', loadConversationFromFile);
-            
-            addMobileCompatibleEvent(settingsPanelContainer, 'click', (e) => {
-                if (e.target === settingsPanelContainer) hideSettingsPanel();
-            });
-            
-            const settingsPanel = settingsPanelContainer.querySelector('.settings-panel');
-            if (settingsPanel) {
-                addMobileCompatibleEvent(settingsPanel, 'click', (e) => e.stopPropagation());
-            }
-
-            setupImageControls();
-            toggleModelIdentifierVisibility();
-
-        } catch (error) {
-            console.error('Error loading settings panel:', error);
-            settingsPanelContainer.innerHTML = '<p>Error loading settings.</p>';
+        if (voiceService) {
+            voiceService.finalAutoSendDelay = parseInt(SETTINGS.sttFinalTimeout, 10);
         }
     }
 
-    function hideSettingsPanel() {
-        saveAllSettings();
-        settingsPanelContainer.classList.remove('visible');
-    }
-
     function setupImageControls() {
-        const header = settingsPanelContainer.querySelector('#image-controls-header');
-        const content = settingsPanelContainer.querySelector('#image-controls-content');
-        const providerSelect = settingsPanelContainer.querySelector('#image-provider');
+        const container = settingsPanelContainer;
+        if (!container) return;
 
-        const toggleProviderUI = () => {
-            const isOpenAI = providerSelect.value === 'openai';
-            const a1111Settings = settingsPanelContainer.querySelector('.a1111-settings');
-            const openaiSettings = settingsPanelContainer.querySelector('.openai-settings');
-            const imageSizeItem = settingsPanelContainer.querySelector('#image-size-item');
-            const imageApiUrlItem = settingsPanelContainer.querySelector('#image-api-url-item');
-            const openaiApiKeyItem = settingsPanelContainer.querySelector('#openai-api-key-item');
+        const imageProviderSelect = container.querySelector('#image-provider');
+        const a1111Settings = container.querySelector('.a1111-settings');
+        const openaiSettings = container.querySelector('.openai-settings');
+
+        function toggleProviderSettings() {
+            if (!imageProviderSelect || !a1111Settings || !openaiSettings) return;
             
-            if (a1111Settings) a1111Settings.style.display = isOpenAI ? 'none' : 'block';
-            if (openaiSettings) openaiSettings.style.display = isOpenAI ? 'block' : 'none';
-            if (imageSizeItem) imageSizeItem.style.display = 'flex';
-            if (imageApiUrlItem) imageApiUrlItem.style.display = isOpenAI ? 'none' : 'flex';
-            if (openaiApiKeyItem) openaiApiKeyItem.style.display = isOpenAI ? 'flex' : 'none';
-        };
+            const provider = imageProviderSelect.value;
 
-        if (header) addMobileCompatibleEvent(header, 'click', () => content.classList.toggle('expanded'));
-        if (providerSelect) providerSelect.addEventListener('change', toggleProviderUI);
-        toggleProviderUI();
+            if (provider === 'openai') {
+                openaiSettings.style.display = 'block';
+                a1111Settings.style.display = 'none';
+            } else { // a1111
+                openaiSettings.style.display = 'none';
+                a1111Settings.style.display = 'block';
+            }
+        }
+
+        if (imageProviderSelect) {
+            imageProviderSelect.addEventListener('change', toggleProviderSettings);
+            toggleProviderSettings(); // Initial call to set the correct state on load
+        }
     }
 
     function toggleModelIdentifierVisibility() {
-        const provider = settingsPanelContainer.querySelector('#llm-provider');
-        const modelItem = settingsPanelContainer.querySelector('#model-identifier-item');
-        const keyItem = settingsPanelContainer.querySelector('#api-key-item');
-        
-        if (provider && modelItem && keyItem) {
-            const providerValue = provider.value;
-            modelItem.style.display = providerValue === 'lmstudio' ? 'none' : 'flex';
-            keyItem.style.display = providerValue === 'lmstudio' ? 'none' : 'flex';
+        const container = settingsPanelContainer;
+        if (!container) return;
+
+        const llmProviderSelect = container.querySelector('#llm-provider');
+        const modelIdentifierItem = container.querySelector('#model-identifier-item');
+
+        function toggleVisibility() {
+            if (!llmProviderSelect || !modelIdentifierItem) return;
+            const provider = llmProviderSelect.value;
+            // LMStudio uses a path, not a model identifier from a list
+            if (provider === 'lmstudio') {
+                modelIdentifierItem.style.display = 'none';
+            } else {
+                modelIdentifierItem.style.display = 'flex';
+            }
+        }
+
+        if (llmProviderSelect) {
+            llmProviderSelect.addEventListener('change', toggleVisibility);
+            toggleVisibility(); // Initial call to set state
+        }
+    }
+
+
+    async function loadSettingsPanel() {
+        console.log('%c[DEBUG] LOAD_SETTINGS_PANEL called.', 'color: red; font-weight: bold;');
+        try {
+            const response = await fetch('user-settings.html');
+            if (!response.ok) throw new Error(`Failed to load user-settings.html: ${response.statusText}`);
+            const html = await response.text();
+
+            // Parse the fetched HTML and extract only the .settings-panel element
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const panelElement = doc.querySelector('.settings-panel');
+
+            if (panelElement) {
+                settingsPanelContainer.innerHTML = ''; // Clear any previous content
+                // Clone the node to ensure it's fully part of the main document
+                settingsPanelContainer.appendChild(panelElement.cloneNode(true));
+
+                // Re-run setup for the newly added elements
+                Object.keys(SETTINGS).forEach(key => {
+                    const elementId = settingsIdMap[key];
+                    if (!elementId) return;
+                    const element = settingsPanelContainer.querySelector(`#${elementId}`);
+                    if (element) {
+                        element.value = SETTINGS[key];
+                    }
+                });
+
+                settingsPanelContainer.querySelectorAll('input, select').forEach(el => {
+                    el.addEventListener('change', saveAllSettings);
+                });
+
+                const saveButton = settingsPanelContainer.querySelector('#save-conversation-button');
+                const loadButton = settingsPanelContainer.querySelector('#load-conversation-button');
+                const loadInput = settingsPanelContainer.querySelector('#load-conversation-input');
+
+                if (saveButton) addMobileCompatibleEvent(saveButton, 'click', saveConversationToFile);
+                if (loadButton) addMobileCompatibleEvent(loadButton, 'click', () => loadInput.click());
+                if (loadInput) loadInput.addEventListener('change', loadConversationFromFile);
+
+                setupImageControls();
+                toggleModelIdentifierVisibility();
+            } else {
+                throw new Error('.settings-panel element not found in user-settings.html');
+            }
+
+        } catch (error) {
+            console.error('Error loading settings panel:', error);
+            settingsPanelContainer.innerHTML = `<p style="color:red; text-align:center;">Error: Could not load settings.</p>`;
         }
     }
 
@@ -652,16 +750,19 @@ async function initializeApp() {
     
     addMobileCompatibleEvent(settingsButton, 'click', async (e) => {
         e.preventDefault();
+        e.stopPropagation(); // PREVENTS the event from bubbling to the overlay
         console.log('Settings button clicked/touched');
         
-        if (!settingsPanelContainer.classList.contains('visible')) {
-            if (!settingsPanelContainer.querySelector('.settings-panel')) {
-                await loadSettingsPanel();
-            }
-            settingsPanelContainer.classList.add('visible');
+        const panelExists = settingsPanelContainer.querySelector('.settings-panel');
+        console.log(`%c[DEBUG] Checking for panel... Panel exists? ${!!panelExists}`, 'color: purple;');
+
+        if (!panelExists) {
+            console.log('%c[DEBUG] Panel does NOT exist. Loading now...', 'color: orange;');
+            await loadSettingsPanel();
         } else {
-            hideSettingsPanel();
+            console.log('%c[DEBUG] Panel already exists. Not reloading.', 'color: green;');
         }
+        showSettingsPanel();
     });
 
     if (micButton && voiceService && voiceService.isRecognitionSupported()) {
@@ -728,33 +829,14 @@ async function initializeApp() {
                 }
             }, 150);
         });
-        
-        // Keep expanded while typing
-        userInput.addEventListener('input', () => {
-            if (userInput.value.trim() !== '') {
-                inputArea.classList.add('expanded');
-                userInput.classList.add('expanded');
-            }
-        });
-        
-        // Contract after sending message
-        const originalHandleUserInput = handleUserInput;
-        handleUserInput = async function() {
-            await originalHandleUserInput();
-            
-            // Contract after sending and reset height
-            setTimeout(() => {
-                inputArea.classList.remove('expanded');
-                userInput.classList.remove('expanded');
-                userInput.style.height = '50px';
-                console.log('Input contracted after sending');
-            }, 100);
-        };
     }
 
     // Call this function in your initializeApp function, after DOM elements are ready
-    // Add this line after line ~125 where you set up other event listeners:
     setupInputExpansion();
+
+    // Call mobile and textarea setup functions ONCE.
+    setupMobileInputExpansion();
+    setupTextareaAutoResize();
 
     // --- Mobile Touch Enhancement for Input Expansion ---
     function setupMobileInputExpansion() {
@@ -779,101 +861,88 @@ async function initializeApp() {
             setTimeout(() => {
                 if (inputArea.classList.contains('expanded')) {
                     userInput.focus();
+                    // Recalculate textarea height after orientation change
+                    const autoResizeEvent = new Event('input');
+                    userInput.dispatchEvent(autoResizeEvent);
                 }
             }, 500);
         });
     }
 
-    // Also call this in your initializeApp function:
-    setupMobileInputExpansion();
-
     // --- Auto-resize Textarea Functionality ---
-function setupTextareaAutoResize() {
-    const userInput = document.getElementById('user-input');
-    
-    if (!userInput) {
-        console.error('User input element not found for auto-resize setup');
-        return;
-    }
-    
-    console.log('Setting up textarea auto-resize for element:', userInput.tagName);
-    
-    // Auto-resize function
-    function autoResize() {
-        // Store the current scroll position
-        const chatWindow = document.getElementById('chat-window');
+    function setupTextareaAutoResize() {
+        const userInput = document.getElementById('user-input');
         
-        // Reset height to calculate the true content height
-        userInput.style.height = 'auto';
-        
-        // Get the scroll height (the height needed to show all content)
-        const scrollHeight = userInput.scrollHeight;
-        
-        // Set minimum height based on screen size
-        const isMobile = window.innerWidth <= 768;
-        const minHeight = isMobile ? 44 : 50;
-        
-        // Calculate new height (no maximum limit for now)
-        const newHeight = Math.max(minHeight, scrollHeight);
-        
-        // Apply the new height
-        userInput.style.height = newHeight + 'px';
-        
-        // Scroll chat window to bottom when input expands
-        if (chatWindow) {
-            chatWindow.scrollTop = chatWindow.scrollHeight;
+        if (!userInput) {
+            console.error('User input element not found for auto-resize setup');
+            return;
         }
         
-        console.log('Textarea resized to:', newHeight + 'px', 'Content scroll height:', scrollHeight + 'px');
-    }
-    
-    // Add event listeners for auto-resize
-    userInput.addEventListener('input', autoResize);
-    userInput.addEventListener('paste', () => {
-        // Small delay to allow paste content to be processed
-        setTimeout(autoResize, 50);
-    });
-    
-    // Handle Enter key behavior
-    userInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            handleUserInput();
-        }
-        // Allow Shift+Enter for new lines
-        if (e.key === 'Enter' && e.shiftKey) {
-            // Let the default behavior happen (new line)
-            setTimeout(autoResize, 50);
-        }
-    });
-    
-    // Reset height when input is cleared
-    userInput.addEventListener('blur', () => {
-        if (userInput.value.trim() === '') {
+        console.log('Setting up textarea auto-resize for element:', userInput.tagName);
+        
+        // Auto-resize function
+        function autoResize() {
+            // Reset height to calculate the true content height
+            userInput.style.height = 'auto';
+            
+            // Get the scroll height (the height needed to show all content)
+            const scrollHeight = userInput.scrollHeight;
+            
+            // Set minimum height based on screen size
             const isMobile = window.innerWidth <= 768;
             const minHeight = isMobile ? 44 : 50;
-            userInput.style.height = minHeight + 'px';
-            console.log('Reset height to minimum:', minHeight + 'px');
+            
+            // Calculate new height
+            const newHeight = Math.max(minHeight, scrollHeight);
+            
+            // Apply the new height
+            userInput.style.height = newHeight + 'px';
+            
+            // Scroll chat window to bottom when input expands
+            const chatWindow = document.getElementById('chat-window');
+            if (chatWindow) {
+                chatWindow.scrollTop = chatWindow.scrollHeight;
+            }
+            
+            console.log('Textarea resized to:', newHeight + 'px');
         }
-    });
-    
-    // Handle window resize for responsive behavior
-    window.addEventListener('resize', () => {
+        
+        // Add event listeners for auto-resize
+        userInput.addEventListener('input', autoResize);
+        userInput.addEventListener('paste', () => {
+            setTimeout(autoResize, 50);
+        });
+        
+        // Handle Enter key behavior
+        userInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleUserInput();
+            }
+            if (e.key === 'Enter' && e.shiftKey) {
+                setTimeout(autoResize, 10);
+            }
+        });
+        
+        // Reset height when input is cleared
+        userInput.addEventListener('blur', () => {
+            if (userInput.value.trim() === '') {
+                const isMobile = window.innerWidth <= 768;
+                const minHeight = isMobile ? 44 : 50;
+                userInput.style.height = minHeight + 'px';
+            }
+        });
+        
+        // Handle window resize for responsive behavior
+        window.addEventListener('resize', () => {
+            setTimeout(autoResize, 100);
+        });
+        
+        // Initial resize call
         setTimeout(autoResize, 100);
-    });
-    
-    // Initial resize call
-    setTimeout(() => {
-        autoResize();
-        console.log('Initial auto-resize completed');
-    }, 200);
-    
-    console.log('Textarea auto-resize setup complete');
-}
+    }
 
-setupTextareaAutoResize();
-
-    // Load saved persona on startup
+    // --- Load saved persona on startup ---
     currentPersonaPrompt = localStorage.getItem('currentPersonaPrompt');
     if (currentPersonaPrompt) {
         personaCreated = true;
@@ -982,7 +1051,7 @@ setupTextareaAutoResize();
                 addWelcomeMessage();
                 renderConversation(llmService.conversationHistory);
                 
-                hideSettingsPanel();
+                closeSettingsPanel(); // Corrected from hideSettingsPanel, which is not defined
                 addMessage("(Conversation loaded successfully)", 'llm');
 
             } catch (error) {
@@ -1018,11 +1087,3 @@ setupTextareaAutoResize();
 
     console.log('App initialization complete');
 }
-
-window.onload = () => {
-    const event = new Event('DOMContentLoaded', {
-      bubbles: true,
-      cancelable: true
-    });
-    document.dispatchEvent(event);
-};

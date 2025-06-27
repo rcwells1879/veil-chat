@@ -1,38 +1,52 @@
-body {
-    font-family: sans-serif;
+/* --- Foundational Layout (Mobile-First & iOS Fixes) --- */
+html, body {
     margin: 0;
+    padding: 0;
+    height: 100%;
+    width: 100%;
+    overflow: hidden; /* Prevents accidental scrolling of the body */
+    position: fixed; /* Critical fix for iOS viewport issues */
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     background-color: #121212;
     color: #e0e0e0;
     display: flex;
     justify-content: center;
     align-items: center;
-    height: 100vh;
 }
 
 .chat-container {
-    width: 80%;
+    width: 100%;
     max-width: 600px;
-    height: 90vh;
+    /* Use the CSS variable set by the script in index.html for reliable height */
+    height: 100vh; /* Fallback for browsers without JS */
+    height: calc(var(--vh, 1vh) * 100);
     background-color: #1e1e1e;
-    border-radius: 8px;
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+    border-radius: 0;
+    box-shadow: none;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    overflow: hidden; /* This is important */
 }
 
 .chat-window {
-    flex-grow: 1;
-    padding: 20px;
+    flex: 1;
     overflow-y: auto;
-    /*border-bottom: 1px solid #333;*/
+    -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
 }
 
 .message {
     margin-bottom: 15px;
-    padding: 10px;
-    border-radius: 5px;
-    line-height: 1.4;
+    padding: 10px 12px;
+    border-radius: 8px;
+    line-height: 1.45;
+    word-wrap: break-word;
 }
 
 .user-message {
@@ -40,7 +54,7 @@ body {
     color: white;
     align-self: flex-end;
     margin-left: auto;
-    max-width: 70%;
+    max-width: 80%;
     text-align: right;
 }
 
@@ -48,7 +62,7 @@ body {
     background-color: #333;
     color: #e0e0e0;
     align-self: flex-start;
-    max-width: 70%;
+    max-width: 80%;
 }
 
 .message img {
@@ -57,44 +71,85 @@ body {
     margin-top: 10px;
 }
 
-/* Ensure .input-area and .button-row are flex containers for desktop */
+/* --- Input Area (Robust Flexbox) --- */
 .input-area {
     display: flex;
-    align-items: flex-end; /* Changed from center to flex-end for proper vertical expansion */
+    align-items: flex-end; /* Align items to the bottom */
     flex-shrink: 0;
-    padding: 15px;
-    border-top: 1px solid #333;
+    padding: 8px;
     background-color: #1e1e1e;
+    min-height: 60px;
+    box-sizing: border-box;
     transition: all 0.3s ease;
-    min-height: 80px; /* Added minimum height for the input area */
 }
 
-.input-area.expanded {
-    padding: 12px 15px;
-}
-
-/* Base input styles */
 #user-input {
+    flex: 1 1 auto; /* Allow it to grow and shrink */
+    min-width: 0; /* Prevent it from overflowing */
     border: none;
-    font-size: 19px;
+    font-size: 16px;
     background-color: #333;
     color: #e0e0e0;
     outline: none;
-    flex: 1;
-    border-radius: 8px;
-    min-height: 50px;
-    height: 50px;
+    border-radius: 4px;
+    min-height: 44px;
+    height: 44px;
     box-sizing: border-box;
-    padding: 12px 15px;
-    margin-right: 8px;
+    padding: 12px 10px;
     transition: all 0.3s ease;
     resize: none;
-    overflow-y: hidden; /* Changed from auto to hidden to prevent scrollbar */
-    overflow-x: hidden; /* Added to prevent horizontal scrollbar */
-    word-wrap: break-word;
-    white-space: pre-wrap;
+    overflow-y: hidden;
     font-family: inherit;
     line-height: 1.4;
+}
+
+.input-area.expanded #user-input {
+    /* No change needed, flexbox handles it */
+}
+
+/* --- Button Row & Individual Buttons --- */
+.button-row {
+    display: flex;
+    align-items: flex-end;
+    flex-shrink: 0; /* Prevent this container from shrinking */
+    margin-left: 6px;
+    gap: 5px;
+}
+
+#attach-button, #mic-button, #settings-button, #send-button {
+    background-color: #333;
+    color: #e0e0e0;
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+    border-radius: 4px;
+    height: 44px;
+    width: 44px;
+    padding: 0;
+    flex-shrink: 0; /* Prevent buttons from shrinking */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+}
+
+#send-button {
+    background-color: #007bff;
+    color: white;
+}
+
+#send-button:hover {
+    background-color: #0056b3;
+}
+
+.input-area.expanded #attach-button,
+.input-area.expanded #mic-button {
+    opacity: 0;
+    visibility: hidden;
+    width: 0;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
 }
 
 /* Basic Toggle Switch CSS */
@@ -149,12 +204,16 @@ input:checked + .slider:before {
 
 /* Basic Slider CSS */
 .setting-item input[type="range"] {
-    flex-grow: 1;
+    flex-grow: 1; /* Corrected from flex-shrink to allow the slider to fill available space */
     margin: 0 10px;
     cursor: pointer;
+    min-width: 0; /* Allow the slider to shrink below its default minimum width */
 }
 .setting-item input[type="number"] {
-    width: 70px;
+    /* width: 70px; <-- This fixed width was preventing the row from shrinking */
+    max-width: 70px; /* Use max-width to allow shrinking */
+    min-width: 60px; /* Prevent it from becoming too small */
+    flex-shrink: 1;  /* Explicitly allow shrinking */
     padding: 5px;
     background-color: #444;
     color: #e0e0e0;
@@ -171,11 +230,10 @@ input:checked + .slider:before {
     border: 1px solid #555; 
     border-radius: 4px; 
     font-size: 14px; 
-    width: auto; /* Allow width to fit content */
-    /* flex-grow: 1; Removed to prevent taking full width */
-    /* min-width: 120px; Removed or adjust if a minimum is still desired */
     box-sizing: border-box; 
     margin-left: auto; /* Pushes the dropdown to the right if label takes less space */
+    flex-grow: 1; /* Allow the element to grow and shrink */
+    max-width: 220px; /* Set a maximum width */
 }
 
 .settings-panel .setting-item #llm-provider:focus,
@@ -193,9 +251,10 @@ input:checked + .slider:before {
     border: 1px solid #555;
     border-radius: 4px;
     font-size: 14px;
-    width: auto;
     box-sizing: border-box;
     margin-left: auto;
+    flex-grow: 1; /* Allow the element to grow and shrink */
+    max-width: 220px; /* Set a maximum width */
 }
 
 .settings-panel .setting-item #llm-model-identifier:focus {
@@ -213,9 +272,10 @@ input:checked + .slider:before {
     border: 1px solid #555;
     border-radius: 4px;
     font-size: 14px;
-    width: 207px; /* Fixed width that fits most content but not too wide */
     box-sizing: border-box;
     margin-left: auto; /* Pushes the input to the right */
+    flex-grow: 1; /* Allow the element to grow and shrink */
+    max-width: 220px; /* Set a maximum width */
 }
 
 /* Style for input fields focus state */
@@ -226,554 +286,15 @@ input:checked + .slider:before {
     box-shadow: 0 0 3px rgba(0, 123, 255, 0.3);
 }
 
-/* Mobile adjustments for text inputs */
-@media (max-width: 480px) {
-    .settings-panel .setting-item input[type="text"],
-    .settings-panel .setting-item input[type="password"] {
-        width: 150px;
-        padding: 6px 10px;
-        font-size: 13px;
-    }
-}
-
-/* Welcome message styles - centered in chat */
-.welcome-message {
-    background: linear-gradient(135deg, #000000 0%, #000000 100%);
-    color: white;
-    text-align: center;
-    font-size: 28px;
-    font-weight: bold;
-    padding: 8px 20px;
-    margin: 10px auto;
-    border-radius: 15px;
-    box-shadow: 
-        0 20px 40px rgba(0, 0, 0, 0.4),
-        0 10px 20px rgba(0, 0, 0, 0.3),
-        0 5px 10px rgba(0, 0, 0, 0.2);
-    max-width: 50%;
-    align-self: center;
-    position: relative;
-    overflow: hidden;
-    transform: translateY(-5px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-/* Add hover effect for more floating feel */
-.welcome-message:hover {
-    transform: translateY(-8px);
-    box-shadow: 
-        0 25px 50px rgba(0, 0, 0, 0.5),
-        0 15px 30px rgba(0, 0, 0, 0.4),
-        0 8px 15px rgba(0, 0, 0, 0.3);
-    transition: all 0.3s ease;
-}
-
-/* Add dark glow effect behind the box */
-.welcome-message::after {
-    content: '';
-    position: absolute;
-    top: -2px;
-    left: -2px;
-    right: -2px;
-    bottom: -2px;
-    background: linear-gradient(135deg, #333333, #111111);
-    border-radius: 17px;
-    z-index: -1;
-    filter: blur(8px);
-    opacity: 0.6;
-}
-
-/* Update mobile styles to maintain floating effect */
-@media (max-width: 768px) {
-    .welcome-message {
-        font-size: 24px;
-        padding: 25px 15px;
-        margin: 15px auto;
-        transform: translateY(-3px);
-        box-shadow: 
-            0 15px 30px rgba(0, 0, 0, 0.35),
-            0 8px 15px rgba(0, 0, 0, 0.25),
-            0 4px 8px rgba(0, 0, 0, 0.15);
-    }
-    
-    .welcome-message:hover {
-        transform: translateY(-5px);
-    }
-}
-
-@media (max-width: 480px) {
-    .welcome-message {
-        font-size: 20px;
-        padding: 20px 12px;
-        margin: 10px auto;
-        transform: translateY(-2px);
-        box-shadow: 
-            0 12px 25px rgba(0, 0, 0, 0.3),
-            0 6px 12px rgba(0, 0, 0, 0.2),
-            0 3px 6px rgba(0, 0, 0, 0.1);
-    }
-    
-    .welcome-message:hover {
-        transform: translateY(-4px);
-    }
-}
-
-/* Mobile adjustments for welcome message */
-@media (max-width: 768px) {
-    .welcome-message {
-        font-size: 24px;
-        padding: 25px 15px;
-        margin: 15px auto;
-    }
-}
-
-@media (max-width: 480px) {
-    .welcome-message {
-        font-size: 20px;
-        padding: 20px 12px;
-        margin: 10px auto;
-    }
-    
-    .animated-letter {
-        animation-duration: 3.5s;
-    }
-    
-    @keyframes colorWaveJiggle {
-        0%, 100% {
-            transform: translateX(0) translateY(0) scale(1);
-        }
-        25% {
-            transform: translateX(-1px) translateY(-1px) scale(1.02);
-        }
-        50% {
-            transform: translateX(1px) translateY(1px) scale(0.98);
-        }
-        75% {
-            transform: translateX(-1px) translateY(1px) scale(1.01);
-        }
-    }
-}
-
-/* Mobile-first responsive design */
-@media (max-width: 768px) {
-    body {
-        height: 100vh;
-        height: 100dvh; /* Dynamic viewport height for mobile browsers */
-        padding: 0;
-        margin: 0;
-    }
-
-    .chat-container {
-        width: 100%;
-        max-width: none;
-        height: 100vh;
-        height: 100dvh; /* Dynamic viewport height */
-        border-radius: 0;
-        box-shadow: none;
-    }
-
-    .input-area {
-        /* display: flex; is inherited */
-        /* align-items: center; is inherited */
-        flex-wrap: nowrap; 
-        padding: 10px;
-        gap: 5px;
-    }
-    
-    .button-row {
-        /* display: flex; is inherited */
-        /* align-items: center; is inherited */
-        gap: 5px; /* Mobile specific gap if different from desktop */
-    }
-
-    #user-input {
-        flex: 1; /* Takes up available space before buttons */
-        min-width: 0; 
-        font-size: 16px; 
-        border-radius: 4px !important; /* Keep if needed for specificity */
-        height: 44px; /* Mobile height */
-        padding: 0 10px; /* Mobile horizontal padding */
-        /* box-sizing: border-box; is inherited */
-    }
-
-    /* Consolidated rule for mobile buttons */
-    #send-button,
-    #mic-button,
-    #settings-button { /* Settings button is part of this row at this breakpoint */
-        flex-shrink: 0;
-        min-width: 44px; 
-        border-radius: 4px !important; /* Keep if needed */
-        height: 44px; /* Mobile height */
-        font-size: 16px; 
-        padding: 0 12px; /* Mobile horizontal padding */
-        /* display: flex, align-items, justify-content, box-sizing are inherited */
-        margin-left: 0; /* Override desktop margin for consistent gap */
-    }
-    /* Ensure settings button doesn't have fixed position here */
-    #settings-button {
-        position: static; /* Ensure it's in flow for 768px view */
-    }
-}
-
-/* Very small screens - custom layout (max-width: 480px) */
-@media (max-width: 480px) {
-    .input-area {
-        flex-direction: row; 
-        align-items: center; 
-        gap: 8px; 
-        padding: 8px; 
-    }
-
-    #user-input {
-        flex-grow: 1;   /* Let user input grow to take available space */
-        flex-shrink: 1; /* Allow it to shrink if needed */
-        min-width: 0; /* Allow shrinking below content size */
-        /* width: auto; This is fine */
-        margin-bottom: 0; 
-        height: 44px; 
-        padding: 0 10px;
-        border-radius: 4px !important;
-    }
-
-    .button-row {
-        display: flex; 
-        align-items: center;
-        gap: 5px; 
-        /* width: auto; This is fine */
-    }
-
-    #send-button {
-        flex-grow: 1; 
-        flex-basis: 0;
-        flex-shrink: 1;
-        margin-left: 0; 
-        height: 44px;
-        font-size: 16px;
-        padding: 0 10px; 
-        min-width: auto; 
-    }
-
-    #mic-button {
-        flex-grow: 1; 
-        flex-basis: 0;
-        flex-shrink: 1;
-        margin-left: 0; 
-        height: 44px;
-        font-size: 16px;
-        padding: 0 10px; 
-        min-width: auto;
-    }
-
-    #settings-button {
-        position: fixed; 
-        top: 10px;       
-        left: 10px;      
-        z-index: 1100;   
-        flex-grow: 0;
-        flex-shrink: 0;
-        flex-basis: auto;
-        width: 44px;  
-        height: 44px;
-        padding: 0; 
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 50%; 
-        background-color: #6c757d; 
-        color: white;
-        margin-left: 0; 
-        box-shadow: 0 2px 5px rgba(0,0,0,0.2); 
-        font-size: 20px; 
-    }
-}
-
-/* Expandable input styles - Fixed version */
-.input-area {
-    display: flex;
-    align-items: flex-end; /* Changed from center to flex-end for proper vertical expansion */
-    flex-shrink: 0;
-    padding: 15px;
-    border-top: 1px solid #333;
-    background-color: #1e1e1e;
-    transition: all 0.3s ease;
-    min-height: 80px; /* Added minimum height for the input area */
-}
-
-.input-area.expanded {
-    padding: 12px 15px;
-}
-
-/* Base input styles */
-#user-input {
-    border: none;
-    font-size: 19px;
-    background-color: #333;
-    color: #e0e0e0;
-    outline: none;
-    flex: 1;
-    border-radius: 8px;
-    min-height: 50px;
-    height: 50px;
-    box-sizing: border-box;
-    padding: 12px 15px;
-    margin-right: 8px;
-    transition: all 0.3s ease;
-    resize: none;
-    overflow-y: hidden; /* Changed from auto to hidden to prevent scrollbar */
-    overflow-x: hidden; /* Added to prevent horizontal scrollbar */
-    word-wrap: break-word;
-    white-space: pre-wrap;
-    font-family: inherit;
-    line-height: 1.4;
-}
-
-/* Expanded input - takes much more space horizontally */
-#user-input.expanded {
-    flex: 4; /* Take 4 times as much space */
-    margin-right: 15px;
-    border-radius: 8px;
-}
-
-/* Base button styles with transitions */
-#attach-button {
-    background-color: #333;
-    color: #e0e0e0;
-    border: none;
-    cursor: pointer;
-    font-size: 16px;
-    border-radius: 5px;
-    height: 50px;
-    min-width: 44px;
-    padding: 0 12px;
-    margin-right: 5px;
-    transition: all 0.3s ease;
-    opacity: 1;
-    visibility: visible;
-    transform: scale(1);
-    align-self: flex-end; /* Added - align to bottom */
-}
-
-#attach-button:hover {
-    background-color: #4CAF50;
-    transform: translateY(-1px);
-}
-
-#attach-button:active {
-    transform: translateY(0);
-}
-
-#mic-button {
-    background-color: #007bff;
-    color: white;
-    border: none;
-    cursor: pointer;
-    font-size: 16px;
-    border-radius: 5px;
-    height: 50px;
-    min-width: 44px;
-    padding: 0 12px;
-    margin-right: 5px;
-    transition: all 0.3s ease;
-    opacity: 1;
-    visibility: visible;
-    transform: scale(1);
-    align-self: flex-end; /* Added - align to bottom */
-}
-
-#mic-button:hover {
-    background-color: #0056b3;
-}
-
-#mic-button.listening {
-    background-color: #dc3545; /* Red when listening */
-}
-
-#settings-button {
-    background-color: #6c757d;
-    color: white;
-    border: none;
-    cursor: pointer;
-    font-size: 16px;
-    border-radius: 5px;
-    height: 50px;
-    min-width: 44px;
-    padding: 0 12px;
-    margin-right: 5px;
-    transition: all 0.3s ease;
-    opacity: 1;
-    visibility: visible;
-    transform: scale(1);
-    align-self: flex-end; /* Added - align to bottom */
-}
-
-#settings-button:hover {
-    background-color: #5a6268;
-}
-
-/* Scrollbar styling for webkit browsers */
-.chat-window::-webkit-scrollbar {
-    width: 8px;
-}
-
-.chat-window::-webkit-scrollbar-track {
-    background: #1e1e1e;
-}
-
-.chat-window::-webkit-scrollbar-thumb {
-    background-color: #555;
-    border-radius: 4px;
-    border: 2px solid #1e1e1e;
-}
-
-/* Fullscreen Image Viewer Styles */
-#fullscreen-image-viewer {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.9);
-    display: none;
-    justify-content: center;
-    align-items: center;
-    z-index: 1000;
-    cursor: pointer;
-}
-
-#fullscreen-image {
-    max-width: 95%;
-    max-height: 95%;
-    object-fit: contain;
-}
-
-/* Settings Panel Styles */
-#settings-panel-container {
-    position: fixed;
-    bottom: -100%; /* Start off-screen */
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.3); /* Semi-transparent overlay for context */
-    display: flex;
-    justify-content: center;
-    align-items: flex-end; /* Align panel to the bottom */
-    z-index: 900; /* Below fullscreen image viewer, but above chat */
-    transition: bottom 0.5s ease-in-out;
-    pointer-events: none; /* Allow clicks through overlay when panel is hidden */
-}
-
-#settings-panel-container.visible {
-    bottom: 0; /* Slide in */
-    pointer-events: auto; /* Enable interaction when visible */
-}
-
-.settings-panel {
-    background-color: #2a2a2a; /* Darker than chat window */
-    color: #e0e0e0;
-    width: 100%;
-    max-width: 600px; /* Match chat container max-width */
-    height: 75vh; /* Adjust as needed */
-    border-top-left-radius: 15px;
-    border-top-right-radius: 15px;
-    box-shadow: 0 -5px 15px rgba(0, 0, 0, 0.3);
-    padding: 20px;
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
-    overflow-y: auto;
-}
-
-.settings-content {
-    flex-grow: 1;
-}
-
-.setting-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-    padding: 10px;
-    background-color: #333;
-    border-radius: 5px;
-}
-
-.setting-item label {
-    margin-right: 10px;
-}
-
-/* Add styles for specific dropdowns in the main settings panel */
+/* Add this rule to ensure all specific inputs and selects can shrink properly */
+.settings-panel .setting-item input[type="text"],
+.settings-panel .setting-item input[type="password"],
 .settings-panel .setting-item #llm-provider,
-.settings-panel .setting-item #select-tts-voice {
-    padding: 8px 12px; 
-    background-color: #444; 
-    color: #e0e0e0; 
-    border: 1px solid #555; 
-    border-radius: 4px; 
-    font-size: 14px; 
-    width: auto; /* Allow width to fit content */
-    /* flex-grow: 1; Removed to prevent taking full width */
-    /* min-width: 120px; Removed or adjust if a minimum is still desired */
-    box-sizing: border-box; 
-    margin-left: auto; /* Pushes the dropdown to the right if label takes less space */
-}
-
-.settings-panel .setting-item #llm-provider:focus,
-.settings-panel .setting-item #select-tts-voice:focus {
-    border-color: #007bff; /* Match sampler dropdown focus border */
-    outline: none; /* Remove default outline */
-    box-shadow: 0 0 3px rgba(0, 123, 255, 0.3); /* Match sampler dropdown focus shadow */
-}
-
-/* Add this with your other dropdown styles for settings panel */
+.settings-panel .setting-item #select-tts-voice,
 .settings-panel .setting-item #llm-model-identifier {
-    padding: 8px 12px;
-    background-color: #444;
-    color: #e0e0e0;
-    border: 1px solid #555;
-    border-radius: 4px;
-    font-size: 14px;
-    width: auto;
-    box-sizing: border-box;
-    margin-left: auto;
+    min-width: 0; /* This is the critical fix */
 }
 
-.settings-panel .setting-item #llm-model-identifier:focus {
-    border-color: #007bff;
-    outline: none;
-    box-shadow: 0 0 3px rgba(0, 123, 255, 0.3);
-}
-
-/* Style for text input fields in settings panel */
-.settings-panel .setting-item input[type="text"],
-.settings-panel .setting-item input[type="password"] {
-    padding: 8px 12px;
-    background-color: #444;
-    color: #e0e0e0;
-    border: 1px solid #555;
-    border-radius: 4px;
-    font-size: 14px;
-    width: 207px; /* Fixed width that fits most content but not too wide */
-    box-sizing: border-box;
-    margin-left: auto; /* Pushes the input to the right */
-}
-
-/* Style for input fields focus state */
-.settings-panel .setting-item input[type="text"]:focus,
-.settings-panel .setting-item input[type="password"]:focus {
-    border-color: #007bff;
-    outline: none;
-    box-shadow: 0 0 3px rgba(0, 123, 255, 0.3);
-}
-
-/* Mobile adjustments for text inputs */
-@media (max-width: 480px) {
-    .settings-panel .setting-item input[type="text"],
-    .settings-panel .setting-item input[type="password"] {
-        width: 150px;
-        padding: 6px 10px;
-        font-size: 13px;
-    }
-}
 
 /* Welcome message styles - centered in chat */
 .welcome-message {
@@ -822,662 +343,58 @@ input:checked + .slider:before {
     opacity: 0.6;
 }
 
-/* Update mobile styles to maintain floating effect */
-@media (max-width: 768px) {
-    .welcome-message {
-        font-size: 24px;
-        padding: 25px 15px;
-        margin: 15px auto;
-        transform: translateY(-3px);
-        box-shadow: 
-            0 15px 30px rgba(0, 0, 0, 0.35),
-            0 8px 15px rgba(0, 0, 0, 0.25),
-            0 4px 8px rgba(0, 0, 0, 0.15);
-    }
-    
-    .welcome-message:hover {
-        transform: translateY(-5px);
-    }
+/* Animated letter styles for the colorful effect */
+.animated-letter {
+    display: inline-block;
+    animation: colorWave 3s ease-in-out infinite;
+    animation-fill-mode: both;
 }
 
-@media (max-width: 480px) {
-    .welcome-message {
-        font-size: 20px;
-        padding: 20px 12px;
-        margin: 10px auto;
-        transform: translateY(-2px);
-        box-shadow: 
-            0 12px 25px rgba(0, 0, 0, 0.3),
-            0 6px 12px rgba(0, 0, 0, 0.2),
-            0 3px 6px rgba(0, 0, 0, 0.1);
-    }
-    
-    .welcome-message:hover {
-        transform: translateY(-4px);
-    }
+/* When a panel is open, pause the expensive background animation to prevent rendering glitches. */
+body.panel-open .animated-letter {
+    animation: none;
 }
 
-/* Mobile adjustments for welcome message */
-@media (max-width: 768px) {
-    .welcome-message {
-        font-size: 24px;
-        padding: 25px 15px;
-        margin: 15px auto;
+@keyframes colorWave {
+    0%, 100% {
+        color: #ffffff;
+        transform: translateY(0px) scale(1);
+        text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+    }
+    25% {
+        color: #ff6b6b;
+        transform: translateY(-3px) scale(1.05);
+        text-shadow: 0 0 15px rgba(255, 107, 107, 0.8);
+    }
+    50% {
+        color: #4ecdc4;
+        transform: translateY(-5px) scale(1.1);
+        text-shadow: 0 0 20px rgba(78, 205, 196, 0.9);
+    }
+    75% {
+        color: #45b7d1;
+        transform: translateY(-3px) scale(1.05);
+        text-shadow: 0 0 15px rgba(69, 183, 209, 0.8);
     }
 }
 
-@media (max-width: 480px) {
-    .welcome-message {
-        font-size: 20px;
-        padding: 20px 12px;
-        margin: 10px auto;
-    }
-    
-    .animated-letter {
-        animation-duration: 3.5s;
-    }
-    
-    @keyframes colorWaveJiggle {
-        0%, 100% {
-            transform: translateX(0) translateY(0) scale(1);
-        }
-        25% {
-            transform: translateX(-1px) translateY(-1px) scale(1.02);
-        }
-        50% {
-            transform: translateX(1px) translateY(1px) scale(0.98);
-        }
-        75% {
-            transform: translateX(-1px) translateY(1px) scale(1.01);
-        }
-    }
-}
+/* Stagger the animation for each letter */
+.animated-letter:nth-child(1) { animation-delay: 0.1s; }
+.animated-letter:nth-child(2) { animation-delay: 0.2s; }
+.animated-letter:nth-child(3) { animation-delay: 0.3s; }
+.animated-letter:nth-child(4) { animation-delay: 0.4s; }
+.animated-letter:nth-child(5) { animation-delay: 0.5s; }
+.animated-letter:nth-child(6) { animation-delay: 0.6s; }
+.animated-letter:nth-child(7) { animation-delay: 0.7s; }
+.animated-letter:nth-child(8) { animation-delay: 0.8s; }
+.animated-letter:nth-child(9) { animation-delay: 0.9s; }
+.animated-letter:nth-child(10) { animation-delay: 1.0s; }
+.animated-letter:nth-child(11) { animation-delay: 1.1s; }
+.animated-letter:nth-child(12) { animation-delay: 1.2s; }
+.animated-letter:nth-child(13) { animation-delay: 1.3s; }
+.animated-letter:nth-child(14) { animation-delay: 1.4s; }
+.animated-letter:nth-child(15) { animation-delay: 1.5s; }
 
-/* Mobile-first responsive design */
-@media (max-width: 768px) {
-    body {
-        height: 100vh;
-        height: 100dvh; /* Dynamic viewport height for mobile browsers */
-        padding: 0;
-        margin: 0;
-    }
-
-    .chat-container {
-        width: 100%;
-        max-width: none;
-        height: 100vh;
-        height: 100dvh; /* Dynamic viewport height */
-        border-radius: 0;
-        box-shadow: none;
-    }
-
-    .input-area {
-        /* display: flex; is inherited */
-        /* align-items: center; is inherited */
-        flex-wrap: nowrap; 
-        padding: 10px;
-        gap: 5px;
-    }
-    
-    .button-row {
-        /* display: flex; is inherited */
-        /* align-items: center; is inherited */
-        gap: 5px; /* Mobile specific gap if different from desktop */
-    }
-
-    #user-input {
-        flex: 1; /* Takes up available space before buttons */
-        min-width: 0; 
-        font-size: 16px; 
-        border-radius: 4px !important; /* Keep if needed for specificity */
-        height: 44px; /* Mobile height */
-        padding: 0 10px; /* Mobile horizontal padding */
-        /* box-sizing: border-box; is inherited */
-    }
-
-    /* Consolidated rule for mobile buttons */
-    #send-button,
-    #mic-button,
-    #settings-button { /* Settings button is part of this row at this breakpoint */
-        flex-shrink: 0;
-        min-width: 44px; 
-        border-radius: 4px !important; /* Keep if needed */
-        height: 44px; /* Mobile height */
-        font-size: 16px; 
-        padding: 0 12px; /* Mobile horizontal padding */
-        /* display: flex, align-items, justify-content, box-sizing are inherited */
-        margin-left: 0; /* Override desktop margin for consistent gap */
-    }
-    /* Ensure settings button doesn't have fixed position here */
-    #settings-button {
-        position: static; /* Ensure it's in flow for 768px view */
-    }
-}
-
-/* Very small screens - custom layout (max-width: 480px) */
-@media (max-width: 480px) {
-    .input-area {
-        flex-direction: row; 
-        align-items: center; 
-        gap: 8px; 
-        padding: 8px; 
-    }
-
-    #user-input {
-        flex-grow: 1;   /* Let user input grow to take available space */
-        flex-shrink: 1; /* Allow it to shrink if needed */
-        min-width: 0; /* Allow shrinking below content size */
-        /* width: auto; This is fine */
-        margin-bottom: 0; 
-        height: 44px; 
-        padding: 0 10px;
-        border-radius: 4px !important;
-    }
-
-    .button-row {
-        display: flex; 
-        align-items: center;
-        gap: 5px; 
-        /* width: auto; This is fine */
-    }
-
-    #send-button {
-        flex-grow: 1; 
-        flex-basis: 0;
-        flex-shrink: 1;
-        margin-left: 0; 
-        height: 44px;
-        font-size: 16px;
-        padding: 0 10px; 
-        min-width: auto; 
-    }
-
-    #mic-button {
-        flex-grow: 1; 
-        flex-basis: 0;
-        flex-shrink: 1;
-        margin-left: 0; 
-        height: 44px;
-        font-size: 16px;
-        padding: 0 10px; 
-        min-width: auto;
-    }
-
-    #settings-button {
-        position: fixed; 
-        top: 10px;       
-        left: 10px;      
-        z-index: 1100;   
-        flex-grow: 0;
-        flex-shrink: 0;
-        flex-basis: auto;
-        width: 44px;  
-        height: 44px;
-        padding: 0; 
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 50%; 
-        background-color: #6c757d; 
-        color: white;
-        margin-left: 0; 
-        box-shadow: 0 2px 5px rgba(0,0,0,0.2); 
-        font-size: 20px; 
-    }
-}
-
-/* Hide buttons when expanded - smooth animation */
-.input-area.expanded #attach-button,
-.input-area.expanded #mic-button,
-.input-area.expanded #settings-button {
-    opacity: 0;
-    visibility: hidden;
-    transform: scale(0);
-    width: 0;
-    min-width: 0;
-    margin: 0;
-    padding: 0;
-    overflow: hidden;
-}
-
-/* Send button - always visible, moves to the right */
-#send-button {
-    background-color: #007bff;
-    color: white;
-    border: none;
-    font-size: 16px;
-    cursor: pointer;
-    border-radius: 8px;
-    height: 50px;
-    min-width: 60px;
-    padding: 0 18px;
-    transition: all 0.3s ease;
-    flex-shrink: 0;
-    align-self: flex-end; /* Added - stay at bottom even when input expands */
-    margin-bottom: 0; /* Added - align with bottom of input */
-}
-
-#send-button:hover {
-    background-color: #0056b3;
-}
-
-/* Button row adjustments */
-.button-row {
-    display: flex;
-    align-items: flex-end; /* Changed from center to flex-end - align buttons to bottom */
-    gap: 5px;
-    transition: all 0.3s ease;
-}
-
-.input-area.expanded .button-row {
-    gap: 0; /* Added - collapse gap when buttons are hidden */
-}
-
-/* Mobile adjustments for expandable input */
-@media (max-width: 768px) {
-    .input-area {
-        padding: 10px;
-        min-height: 70px;
-    }
-    
-    .input-area.expanded {
-        padding: 10px;
-    }
-    
-    #user-input {
-        font-size: 16px;
-        min-height: 44px;
-        height: 44px;
-        border-radius: 4px;
-        margin-right: 6px;
-        padding: 10px;
-        overflow-y: hidden; /* Added to prevent scrollbar on mobile */
-    }
-    
-    #send-button {
-        height: 44px;
-        font-size: 16px;
-        padding: 0 12px;
-        border-radius: 4px;
-        min-width: 50px;
-    }
-    
-    #attach-button,
-    #mic-button,
-    #settings-button {
-        height: 44px;
-        min-width: 44px;
-        margin-right: 4px;
-        font-size: 14px;
-    }
-}
-
-/* Very small screens */
-@media (max-width: 480px) {
-    .input-area {
-        padding: 8px;
-        min-height: 60px;
-    }
-    
-    #user-input {
-        padding: 8px;
-        overflow-y: hidden; /* Added to prevent scrollbar on very small screens */
-    }
-    
-    /* Keep settings button accessible on very small screens */
-    .input-area.expanded #settings-button {
-        position: fixed;
-        top: 10px;
-        left: 10px;
-        z-index: 1100;
-        opacity: 1;
-        visibility: visible;
-        transform: scale(1);
-        width: 44px;
-        height: 44px;
-        border-radius: 50%;
-        margin: 0;
-        padding: 0;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-        font-size: 20px;
-    }
-}
-
-/* Persona Panel Styles */
-#persona-panel-container {
-    position: fixed;
-    top: -100vh; /* Use viewport height instead of percentage */
-    left: 0;
-    width: 100%;
-    height: 100vh; /* Use viewport height for consistency */
-    background-color: rgba(0, 0, 0, 0.4); /* Semi-transparent overlay */
-    display: flex;
-    justify-content: center;
-    align-items: flex-start; /* Align panel to the top */
-    z-index: 950; /* Above settings panel */
-    transition: top 0.5s ease-in-out;
-    pointer-events: none; /* Allow clicks through overlay when panel is hidden */
-    padding-top: 20px;
-    opacity: 0; /* Add opacity transition for smoother hiding */
-}
-
-#persona-panel-container.visible {
-    top: 0; /* Slide in */
-    opacity: 1; /* Fade in */
-    pointer-events: auto; /* Enable interaction when visible */
-}
-
-.persona-panel {
-    background-color: #2a2a2a; /* Match settings panel */
-    color: #e0e0e0;
-    width: 90%;
-    max-width: 600px; /* Match chat container max-width */
-    max-height: 85vh; /* Don't take full height */
-    border-radius: 15px;
-    box-shadow: 0 5px 25px rgba(0, 0, 0, 0.4);
-    padding: 25px;
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
-    overflow-y: auto;
-}
-
-.persona-content {
-    flex-grow: 1;
-}
-
-.persona-item {
-    margin-bottom: 25px;
-}
-
-.persona-item label {
-    display: block;
-    margin-bottom: 10px;
-    font-weight: bold;
-    color: #e0e0e0;
-    font-size: 16px;
-}
-
-#persona-prompt {
-    width: 100%;
-    padding: 15px;
-    background-color: #333;
-    color: #e0e0e0;
-    border: 1px solid #555;
-    border-radius: 8px;
-    font-size: 14px;
-    font-family: inherit;
-    resize: vertical;
-    min-height: 120px;
-    box-sizing: border-box;
-}
-
-#persona-prompt:focus {
-    border-color: #007bff;
-    outline: none;
-    box-shadow: 0 0 5px rgba(0, 123, 255, 0.3);
-}
-
-.persona-buttons {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 25px;
-    flex-wrap: wrap;
-}
-
-.primary-button {
-    background-color: #007bff;
-    color: white;
-    border: none;
-    padding: 12px 20px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 14px;
-    font-weight: bold;
-    transition: background-color 0.3s ease;
-    flex: 1;
-    min-width: 120px;
-}
-
-.primary-button:hover {
-    background-color: #0056b3;
-}
-
-.secondary-button {
-    background-color: #6c757d;
-    color: white;
-    border: none;
-    padding: 12px 20px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 14px;
-    transition: background-color 0.3s ease;
-    flex: 1;
-    min-width: 120px;
-}
-
-.secondary-button:hover {
-    background-color: #5a6268;
-}
-
-.cancel-button {
-    background-color: #dc3545;
-    color: white;
-    border: none;
-    padding: 12px 20px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 14px;
-    transition: background-color 0.3s ease;
-    flex: 1;
-    min-width: 120px;
-}
-
-.cancel-button:hover {
-    background-color: #c82333;
-}
-
-.persona-examples {
-    margin-top: 20px;
-}
-
-.persona-examples h3 {
-    margin-bottom: 15px;
-    color: #007bff;
-    font-size: 16px;
-}
-
-.example-buttons {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 10px;
-}
-
-.example-button {
-    background-color: #444;
-    color: #e0e0e0;
-    border: 1px solid #555;
-    padding: 10px 8px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 12px;
-    transition: all 0.3s ease;
-    text-align: center;
-}
-
-.example-button:hover {
-    background-color: #007bff;
-    border-color: #007bff;
-    transform: translateY(-2px);
-}
-
-/* Mobile adjustments */
-@media (max-width: 480px) {
-    .persona-panel {
-        width: 95%;
-        padding: 20px;
-        max-height: 90vh;
-    }
-    
-    .persona-panel h2 {
-        font-size: 20px;
-        margin-bottom: 20px;
-    }
-    
-    .persona-buttons {
-        flex-direction: column;
-    }
-    
-    .primary-button,
-    .secondary-button,
-    .cancel-button {
-        flex: none;
-        width: 100%;
-    }
-    
-    .example-buttons {
-        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-    }
-    
-    .example-button {
-        font-size: 11px;
-        padding: 8px 6px;
-    }
-}
-
-/* Add these styles for the OpenAI-specific settings */
-.openai-settings .setting-item select {
-    padding: 8px 12px;
-    background-color: #444;
-    color: #e0e0e0;
-    border: 1px solid #555;
-    border-radius: 4px;
-    font-size: 14px;
-    min-width: 120px;
-}
-
-.openai-settings .setting-item select:focus {
-    border-color: #007bff;
-    outline: none;
-    box-shadow: 0 0 3px rgba(0, 123, 255, 0.3);
-}
-
-/* Mobile responsive adjustments for OpenAI settings */
-@media (max-width: 480px) {
-    .openai-settings .setting-item select {
-        padding: 6px 8px;
-        font-size: 13px;
-        min-width: 100px;
-    }
-}
-
-/* Add these styles at the end of your existing CSS */
-
-/* Conversation Controls */
-.conversation-controls {
-    display: flex;
-    gap: 15px;
-    margin-bottom: 25px;
-    padding: 15px;
-    background-color: rgba(0, 123, 255, 0.1);
-    border-radius: 10px;
-    border: 1px solid rgba(0, 123, 255, 0.3);
-}
-
-.conversation-button {
-    flex: 1;
-    padding: 12px 20px;
-    border: none;
-    border-radius: 8px;
-    font-size: 14px;
-    font-weight: bold;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-}
-
-.save-button {
-    background: linear-gradient(135deg, #28a745, #20c997);
-    color: white;
-}
-
-.save-button:hover {
-    background: linear-gradient(135deg, #218838, #1c7d6e);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.4);
-}
-
-.load-button {
-    background: linear-gradient(135deg, #007bff, #6610f2);
-    color: white;
-}
-
-.load-button:hover {
-    background: linear-gradient(135deg, #0056b3, #520dc2);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 123, 255, 0.4);
-}
-
-.conversation-button:active {
-    transform: translateY(0);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-}
-
-/* Mobile adjustments for conversation controls */
-@media (max-width: 480px) {
-    .conversation-controls {
-        flex-direction: column;
-        gap: 10px;
-    }
-    
-    .conversation-button {
-        padding: 14px 16px;
-        font-size: 13px;
-    }
-}
-
-@media (max-width: 320px) {
-    .conversation-controls {
-        gap: 8px;
-        padding: 12px;
-    }
-    
-    .conversation-button {
-        padding: 12px 14px;
-        font-size: 12px;
-    }
-}
-
-/* Document Attachment Styles */
-#attach-button {
-    background-color: #333;
-    color: #e0e0e0;
-    border: none;
-    padding: 8px 12px;
-    border-radius: 5px;
-    cursor: pointer;
-    font-size: 16px;
-    transition: background-color 0.3s ease, transform 0.1s ease;
-    margin-right: 5px;
-    min-width: 40px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    align-self: flex-end; /* Added - align to bottom */
-}
-
-#attach-button:hover {
-    background-color: #4CAF50;
-    transform: translateY(-1px);
-}
-
-#attach-button:active {
-    transform: translateY(0);
-}
-
-/* Attached Documents Container */
 #attached-docs-container {
     display: none;
     background-color: #2a2a2a;
@@ -1492,23 +409,22 @@ input:checked + .slider:before {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 8px;
-    font-size: 14px;
-    color: #b0b0b0;
 }
 
 .clear-docs-btn {
-    background-color: #d32f2f;
-    color: white;
+    background: none;
     border: none;
-    padding: 4px 8px;
-    border-radius: 4px;
+    color: #ff6b6b;
     cursor: pointer;
-    font-size: 12px;
-    transition: background-color 0.3s ease;
+    font-size: 14px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    transition: background-color 0.2s, color 0.2s;
 }
 
 .clear-docs-btn:hover {
-    background-color: #c62828;
+    background-color: #ff6b6b;
+    color: white;
 }
 
 .attached-docs-list {
@@ -1518,28 +434,24 @@ input:checked + .slider:before {
 }
 
 .attached-doc-item {
+    background-color: #222;
+    border-radius: 4px;
+    padding: 4px 8px;
     display: flex;
     align-items: center;
-    background-color: #333;
-    border-radius: 6px;
-    padding: 6px 10px;
-    border: 1px solid #555;
-    max-width: 200px;
-    transition: background-color 0.3s ease;
+    gap: 4px;
+    font-size: 13px;
 }
 
 .attached-doc-item:hover {
-    background-color: #404040;
+    background-color: #333;
 }
 
 .doc-name {
-    color: #e0e0e0;
-    font-size: 13px;
+    max-width: 100px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    flex: 1;
-    margin-right: 8px;
 }
 
 .remove-doc-btn {
@@ -1547,17 +459,12 @@ input:checked + .slider:before {
     border: none;
     color: #ff6b6b;
     cursor: pointer;
-    font-size: 16px;
-    font-weight: bold;
-    line-height: 1;
-    padding: 0;
-    width: 18px;
-    height: 18px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    font-size: 14px;
+    padding: 2px 6px;
     border-radius: 50%;
     transition: background-color 0.3s ease, color 0.3s ease;
+    align-items: center;
+    justify-content: center;
 }
 
 .remove-doc-btn:hover {
@@ -1565,82 +472,253 @@ input:checked + .slider:before {
     color: white;
 }
 
-/* Mobile adjustments for document attachment */
-@media (max-width: 480px) {
-    #attached-docs-container {
-        margin: 10px;
+/* --- Overlay for modal panels --- */
+.overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(10, 10, 20, 0.55);
+    z-index: 1000;
+    transition: opacity 0.3s ease;
+    backdrop-filter: blur(2px);
+}
+.overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* --- Panel Containers (Common Styles) --- */
+#settings-panel-container,
+#persona-panel-container {
+    position: fixed;
+    left: 0;
+    right: 0;
+    z-index: 1100;
+    pointer-events: none;
+    display: flex;
+    justify-content: center;
+}
+
+#settings-panel-container {
+    bottom: 0;
+    align-items: flex-end;
+}
+
+#persona-panel-container {
+    top: 0;
+    align-items: flex-start;
+}
+
+/* --- Panel Base Styles (The Animated Container) --- */
+.settings-panel,
+.persona-panel {
+    position: relative;
+    width: 100%;
+    max-width: 600px;
+    background: linear-gradient(135deg, #232323 80%, #181818 100%);
+    box-shadow: 0 0 40px rgba(0,0,0,0.5);
+    border: 1px solid #292929;
+    transition: transform 0.35s cubic-bezier(.2, .8, .2, 1), opacity 0.3s ease;
+    opacity: 0;
+    pointer-events: auto;
+    contain: layout style; /* Optimize rendering */
+    transform: translateZ(0); /* Forces hardware acceleration and creates a new rendering layer */
+    /* This outer panel has NO padding, overflow, or height. It only animates. */
+}
+
+.settings-panel {
+    border-radius: 18px 18px 0 0;
+    transform: translateY(100%);
+}
+.persona-panel {
+    border-radius: 0 0 18px 18px;
+    transform: translateY(-100%);
+}
+
+.settings-panel.open,
+.persona-panel.open {
+    transform: translateY(0);
+    opacity: 1;
+}
+
+/* --- Panel Content (The Scrollable Inner Wrapper) --- */
+.panel-content {
+    padding: 24px 20px;
+    overflow-y: scroll; /* Changed to 'scroll' to permanently reserve space for the scrollbar */
+    max-height: 480px; /* Fixed pixel height instead of vh */
+    min-height: 200px; /* Prevent collapse */
+    box-sizing: border-box;
+    /* The 'will-change' property has been removed as it was likely causing issues. */
+}
+
+/* --- Panel Form Elements Styling --- */
+.settings-panel h2,
+.persona-panel h2 {
+    font-size: 1.4em;
+    font-weight: bold;
+    margin-top: 0;
+    margin-bottom: 24px;
+    color: #fff;
+    text-align: center;
+}
+
+.settings-panel .setting-item,
+.persona-panel .persona-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    gap: 15px;
+}
+
+.settings-panel label,
+.persona-panel label {
+    color: #b0b0b0;
+    font-size: 1em;
+    white-space: nowrap; /* Prevent label text from wrapping to a new line */
+    /* flex-shrink: 0; <-- This was preventing the label from shrinking on narrow screens, so it's removed. */
+}
+
+.settings-panel input,
+.settings-panel select,
+.settings-panel textarea,
+.persona-panel input,
+.persona-panel select,
+.persona-panel textarea {
+    /* width: 100%; <-- This was the main cause of wrapping, as it conflicts with flexbox sizing. */
+    background: #181818;
+    color: #e0e0e0;
+    border: 1px solid #333;
+    border-radius: 8px;
+    padding: 12px;
+    font-size: 1em;
+    flex-grow: 1; /* Allow them to grow to fill space */
+    max-width: 250px; /* But not get too wide */
+    min-width: 0; /* CRITICAL FIX: Allows elements to shrink below their intrinsic minimum width */
+}
+
+.settings-panel button,
+.persona-panel button {
+    background: #007bff;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 12px 18px;
+    font-size: 1em;
+    margin-top: 12px;
+    cursor: pointer;
+    transition: background 0.2s, box-shadow 0.2s, transform 0.2s ease;
+    flex: 1 1 auto; /* Allow buttons to grow and shrink as needed */
+}
+
+/* Add this new class for button containers */
+.panel-button-group {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+    margin-bottom: 20px; /* Add this to create space below the buttons */
+}
+
+.settings-panel button.secondary-button,
+.persona-panel button.secondary-button {
+    background: #444;
+}
+.settings-panel button.cancel-button,
+.persona-panel button.cancel-button {
+    background: #555;
+}
+.settings-panel button:hover,
+.persona-panel button:hover {
+    background: #0056b3;
+    transform: translateY(-2px);
+}
+
+/* --- Persona Panel Specific Styles --- */
+.persona-panel textarea {
+    min-height: 150px;
+    resize: vertical;
+    width: 100%;
+    max-width: none; /* This removes the 250px limit from the general rule */
+    box-sizing: border-box;
+    margin-bottom: 16px;
+}
+
+.panel-description {
+    text-align: center;
+    color: #b0b0b0;
+    margin-top: -16px;
+    margin-bottom: 24px;
+}
+
+#create-persona-button {
+    background-color: #4a934a; /* Muted Green */
+    box-shadow: 0 4px 15px -5px rgba(74, 147, 74, 0.6);
+}
+#create-persona-button:hover {
+    background-color: #3a7d3a;
+    box-shadow: 0 6px 20px -5px rgba(74, 147, 74, 0.8);
+}
+
+#use-random-persona-button {
+    background-color: #8867a5; /* Muted Purple */
+    box-shadow: 0 4px 15px -5px rgba(136, 103, 165, 0.6);
+}
+#use-random-persona-button:hover {
+    background-color: #6f5287;
+    box-shadow: 0 6px 20px -5px rgba(136, 103, 165, 0.8);
+}
+
+/* --- Collapsible Settings Group --- */
+.settings-group {
+    border: 1px solid #333;
+    border-radius: 8px;
+    margin-top: 16px;
+    margin-bottom: 16px;
+    padding: 0 15px;
+}
+
+.settings-group[open] {
+    padding-bottom: 10px;
+}
+
+.settings-group-header {
+    display: block;
+    padding: 12px 0;
+    cursor: pointer;
+    font-weight: bold;
+    color: #e0e0e0;
+    list-style: none; /* Removes the default marker in Firefox */
+}
+
+.settings-group-header::-webkit-details-marker {
+    display: none; /* Removes the default marker in Chrome/Safari */
+}
+
+.settings-group-header:hover {
+    color: #fff;
+}
+
+.settings-group-header::before {
+    content: '▶';
+    display: inline-block;
+    margin-right: 10px;
+    font-size: 0.8em;
+    transition: transform 0.2s ease-in-out;
+}
+
+.settings-group[open] > .settings-group-header::before {
+    transform: rotate(90deg);
+}
+
+
+/* --- Responsive for small screens --- */
+@media (max-width: 600px) {
+    .panel-content {
+        padding: 20px 15px;
+        max-height: 400px; /* Fixed pixel height for mobile too */
+        min-height: 300px;
     }
-    
-    .attached-docs-header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 5px;
-    }
-    
-    .attached-doc-item {
-        max-width: 150px;
-    }
-    
-    .doc-name {
-        font-size: 12px;
-    }
-    
-    #attach-button {
-        padding: 6px 10px;
-        font-size: 14px;
-        min-width: 35px;
+    .settings-panel, .persona-panel {
+        border-radius: 0; /* Edge-to-edge on mobile */
     }
 }
 
-/* Mobile touch improvements */
-button {
-    -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
-    -webkit-touch-callout: none;
-    -webkit-user-select: none;
-    -khtml-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
-}
-
-/* Ensure buttons are large enough for mobile touch */
-#attach-button, #send-button, #mic-button, #settings-button {
-    min-height: 44px;
-    min-width: 44px;
-}
-
-/* Fix mobile input area */
-@media (max-width: 768px) {
-    .input-area {
-        padding: 10px;
-    }
-    
-    #user-input {
-        font-size: 16px; /* Prevent zoom on iOS */
-        height: 44px;
-    }
-    
-    #send-button, #mic-button, #settings-button, #attach-button {
-        height: 44px;
-        font-size: 14px;
-        padding: 0 12px;
-    }
-}
-
-/* Very small screens */
-@media (max-width: 480px) {
-    .chat-container {
-        width: 95%;
-        height: 95vh;
-    }
-    
-    .button-row {
-        flex-wrap: nowrap;
-        gap: 2px;
-    }
-    
-    #user-input {
-        font-size: 16px; /* Prevent zoom */
-        min-height: 44px;
-    }
-}
