@@ -1,0 +1,42 @@
+{
+  "name": "sequential-thinking-mcp-server",
+  "version": "1.0.0",
+  "description": "A simple sequential-thinking MCP server for enhanced reasoning capabilities",
+  "main": "mcp-server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node mcp-server.js",
+    "start:http": "node mcp-http-server.js",
+    "start:simple": "node mcp-http-server-simple.js",
+    "start:both": "node start-servers.js",
+    "dev": "node --watch mcp-server.js",
+    "dev:http": "node --watch mcp-http-server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "sequential-thinking",
+    "reasoning",
+    "ai",
+    "llm"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^0.4.0",
+    "express": "^4.18.2",
+    "cors": "^2.8.5"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/sequential-thinking-mcp-server.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/sequential-thinking-mcp-server/issues"
+  },
+  "homepage": "https://github.com/yourusername/sequential-thinking-mcp-server#readme"
+} 

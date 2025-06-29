@@ -80,6 +80,29 @@ async function initializeApp() {
     let personaCreated = false;
     let isContinuousConversationActive = false;
 
+    // --- MCP Client Integration ---
+    let mcpClient = null;
+    let mcpEnabled = localStorage.getItem('mcpEnabled') === 'true';
+
+    async function initializeMCPClient() {
+        if (!mcpEnabled) return;
+        
+        try {
+            mcpClient = new MCPClient();
+            const connected = await mcpClient.connect();
+            if (connected) {
+                console.log('MCP Client: Successfully connected');
+                await addMessage('🧠 Sequential Thinking MCP Server connected', 'system');
+            } else {
+                console.warn('MCP Client: Failed to connect');
+                await addMessage('⚠️ Sequential Thinking MCP Server connection failed', 'system');
+            }
+        } catch (error) {
+            console.error('MCP Client: Initialization error:', error);
+            await addMessage('❌ Sequential Thinking MCP Server error: ' + error.message, 'system');
+        }
+    }
+
     // --- Mobile Viewport Height Fix - Disable for keyboard compatibility ---
     function setChatContainerHeight() {
         const chatContainer = document.querySelector('.chat-container');
@@ -132,6 +155,8 @@ async function initializeApp() {
         openaiBackground: localStorage.getItem('openaiBackground') || 'auto',
         // Voice & UI
         ttsVoice: localStorage.getItem('ttsVoice') || 'Sonia',
+        // MCP
+        mcpEnabled: mcpEnabled,
     };
 
     // --- Service Initialization ---
@@ -150,6 +175,9 @@ async function initializeApp() {
     if (voiceService) {
         voiceService.finalAutoSendDelay = 500;
     }
+
+    // Initialize MCP Client
+    await initializeMCPClient();
 
     // --- Core Functions ---
     async function addMessage(message, sender) {
@@ -207,6 +235,30 @@ async function initializeApp() {
         }
         
         addMessage(message, 'user');
+
+        // Check if MCP client should handle this message
+        if (mcpClient && mcpClient.isConnected) {
+            console.log('🔍 MCP Client is connected, checking if message should be handled...');
+            console.log('📝 Message:', message);
+            try {
+                const mcpResult = await mcpClient.integrateWithChat(message);
+                console.log('🎯 MCP Integration Result:', mcpResult);
+                console.log('📄 Full MCP Response Text:', mcpResult?.content?.[0]?.text);
+                if (mcpResult && mcpResult.content && mcpResult.content[0]) {
+                    console.log('✅ MCP handled the message, displaying result');
+                    // MCP handled the message, display the result
+                    await addMessage(mcpResult.content[0].text, 'llm');
+                    return; // Don't proceed with normal LLM processing
+                } else {
+                    console.log('❌ MCP did not handle the message, proceeding with normal LLM processing');
+                }
+            } catch (error) {
+                console.error('❌ MCP integration error:', error);
+                // Continue with normal LLM processing if MCP fails
+            }
+        } else {
+            console.log('⚠️ MCP Client not available or not connected');
+        }
 
         const documentContext = contextService.getDocumentContext();
         const response = await llmService.sendMessage(message, documentContext);
@@ -480,7 +532,9 @@ async function initializeApp() {
         openaiQuality: 'openai-quality',
         openaiOutputFormat: 'openai-output-format',
         openaiBackground: 'openai-background',
-        ttsVoice: 'select-tts-voice'
+        ttsVoice: 'select-tts-voice',
+        mcpEnabled: 'mcp-enabled',
+        mcpServerUrl: 'mcp-server-url'
     };
 
     function saveAllSettings() {
@@ -498,6 +552,7 @@ async function initializeApp() {
         
         const llmSettingsChanged = SETTINGS.customLlmApiUrl !== llmService.apiBaseUrl || SETTINGS.customLlmModelIdentifier !== llmService.modelIdentifier || SETTINGS.customLlmApiKey !== llmService.apiKey || SETTINGS.customLlmProvider !== llmService.providerType;
         const imageSettingsChanged = SETTINGS.customImageApiUrl !== imageService.apiBaseUrl || SETTINGS.customImageProvider !== imageService.provider || SETTINGS.customOpenAIImageApiKey !== imageService.openaiApiKey;
+        const mcpSettingsChanged = SETTINGS.mcpEnabled !== mcpEnabled;
 
         if (llmSettingsChanged) {
             const oldHistory = llmService.conversationHistory;
@@ -512,6 +567,21 @@ async function initializeApp() {
         }
         if (imageSettingsChanged) {
             imageService = new ImageService(SETTINGS.customImageApiUrl, SETTINGS.customImageProvider, SETTINGS.customOpenAIImageApiKey);
+        }
+        
+        // Handle MCP settings changes
+        if (mcpSettingsChanged) {
+            mcpEnabled = SETTINGS.mcpEnabled;
+            if (mcpEnabled) {
+                // Reinitialize MCP client if enabled
+                initializeMCPClient();
+            } else {
+                // Disconnect MCP client if disabled
+                if (mcpClient) {
+                    mcpClient.disconnect();
+                    mcpClient = null;
+                }
+            }
         }
         
         imageService.updateSettings({

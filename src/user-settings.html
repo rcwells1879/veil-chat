@@ -70,6 +70,47 @@
                 <input type="password" id="llm-api-key" placeholder="Enter API Key if required">
             </div>
 
+            <!-- MCP Settings -->
+            <details class="settings-group">
+                <summary class="settings-group-header">Sequential Thinking MCP Server</summary>
+                
+                <div class="setting-item">
+                    <label for="mcp-enabled">Enable Sequential Thinking</label>
+                    <input type="checkbox" id="mcp-enabled" style="width: auto; margin-left: 10px;">
+                    <span style="margin-left: 10px; font-size: 0.9em; color: #888;">
+                        Enable enhanced reasoning capabilities
+                    </span>
+                </div>
+                
+                <div class="setting-item">
+                    <label for="mcp-server-url">MCP Server URL</label>
+                    <input type="text" id="mcp-server-url" placeholder="http://localhost:3001" value="http://localhost:3001">
+                    <span style="font-size: 0.9em; color: #888; display: block; margin-top: 5px;">
+                        URL for the MCP HTTP server (if using HTTP mode)
+                    </span>
+                </div>
+                
+                <div class="setting-item">
+                    <p style="font-size: 0.9em; color: #888; margin: 10px 0;">
+                        <strong>Available Tools:</strong><br>
+                        • <strong>Break Down Problem:</strong> Analyze complex problems step-by-step<br>
+                        • <strong>Sequential Reasoning:</strong> Apply logical reasoning to questions<br>
+                        • <strong>Step-by-Step Analysis:</strong> Systematic analysis of topics<br>
+                        • <strong>Logical Chain:</strong> Create reasoning chains from premise to conclusion
+                    </p>
+                </div>
+                
+                <div class="setting-item">
+                    <p style="font-size: 0.9em; color: #888; margin: 10px 0;">
+                        <strong>Usage Examples:</strong><br>
+                        • "Break down the problem of climate change"<br>
+                        • "Reason through why the sky is blue"<br>
+                        • "Analyze the benefits of renewable energy"<br>
+                        • "Create a logical chain from fossil fuels to climate change"
+                    </p>
+                </div>
+            </details>
+
             <!-- All image settings are now grouped in this collapsible section -->
             <details class="settings-group">
                 <summary class="settings-group-header">Image Generation Settings</summary>
