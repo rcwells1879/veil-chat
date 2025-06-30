@@ -6,7 +6,7 @@ import { dirname, join } from 'path';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const parentDir = join(__dirname, '..');
+const parentDir = join(__dirname, '..', '..'); // Go up two levels to reach llm-chat-interface root
 
 console.log('🚀 Starting both servers...\n');
 
@@ -31,7 +31,7 @@ mcpServer.on('error', (error) => {
 
 // Start Live Server (port 8080) - use the one from parent directory
 const liveServer = spawn('node', [join(parentDir, 'node_modules', 'live-server', 'live-server.js'), '.'], {
-    cwd: parentDir,
+    cwd: join(parentDir, 'src'),
     stdio: 'pipe'
 });
 

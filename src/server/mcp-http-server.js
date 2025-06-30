@@ -16,7 +16,7 @@ class MCPHTTPServer {
     setupMiddleware() {
         this.app.use(cors());
         this.app.use(express.json());
-        this.app.use(express.static('.')); // Serve static files from current directory
+        this.app.use(express.static('..')); // Serve static files from parent directory
     }
 
     setupRoutes() {

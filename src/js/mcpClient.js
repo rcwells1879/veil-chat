@@ -1,7 +1,7 @@
 if (typeof MCPClient === 'undefined') {
     window.MCPClient = class MCPClient {
         constructor(serverPath = null) {
-            this.serverPath = serverPath || 'node mcp-server.js';
+            this.serverPath = serverPath || 'node server/mcp-server.js';
             this.isConnected = false;
             this.tools = [];
             this.serverProcess = null;
@@ -54,7 +54,7 @@ if (typeof MCPClient === 'undefined') {
             // Node.js environment - spawn the MCP server process
             const { spawn } = require('child_process');
             
-            this.serverProcess = spawn('node', ['mcp-server.js'], {
+            this.serverProcess = spawn('node', ['server/mcp-server.js'], {
                 stdio: ['pipe', 'pipe', 'pipe']
             });
 

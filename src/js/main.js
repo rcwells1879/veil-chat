@@ -380,7 +380,7 @@ async function initializeApp() {
 
     async function loadPersonaPanel() {
         try {
-            const response = await fetch('persona.html');
+            const response = await fetch('/pages/persona.html');
             if (!response.ok) throw new Error(`Failed to load persona.html: ${response.statusText}`);
             const html = await response.text();
 
@@ -654,9 +654,8 @@ async function initializeApp() {
 
 
     async function loadSettingsPanel() {
-        console.log('%c[DEBUG] LOAD_SETTINGS_PANEL called.', 'color: red; font-weight: bold;');
         try {
-            const response = await fetch('user-settings.html');
+            const response = await fetch('/pages/user-settings.html');
             if (!response.ok) throw new Error(`Failed to load user-settings.html: ${response.statusText}`);
             const html = await response.text();
 
@@ -666,24 +665,35 @@ async function initializeApp() {
             const panelElement = doc.querySelector('.settings-panel');
 
             if (panelElement) {
-                settingsPanelContainer.innerHTML = ''; // Clear any previous content
+                settingsPanelContainer.innerHTML = ''; // Clear previous content
                 // Clone the node to ensure it's fully part of the main document
                 settingsPanelContainer.appendChild(panelElement.cloneNode(true));
 
-                // Re-run setup for the newly added elements
+                // Initialize all settings values from localStorage
                 Object.keys(SETTINGS).forEach(key => {
                     const elementId = settingsIdMap[key];
                     if (!elementId) return;
+
                     const element = settingsPanelContainer.querySelector(`#${elementId}`);
                     if (element) {
-                        element.value = SETTINGS[key];
+                        if (element.type === 'checkbox') {
+                            element.checked = SETTINGS[key] === true || SETTINGS[key] === 'true';
+                        } else {
+                            element.value = SETTINGS[key];
+                        }
                     }
                 });
 
+                // Re-run setup for the newly added elements
+                setupImageControls();
+                toggleModelIdentifierVisibility();
+
+                // Add event listeners to all settings elements
                 settingsPanelContainer.querySelectorAll('input, select').forEach(el => {
                     el.addEventListener('change', saveAllSettings);
                 });
 
+                // Add event listeners for save/load conversation buttons
                 const saveButton = settingsPanelContainer.querySelector('#save-conversation-button');
                 const loadButton = settingsPanelContainer.querySelector('#load-conversation-button');
                 const loadInput = settingsPanelContainer.querySelector('#load-conversation-input');
@@ -692,8 +702,6 @@ async function initializeApp() {
                 if (loadButton) addMobileCompatibleEvent(loadButton, 'click', () => loadInput.click());
                 if (loadInput) loadInput.addEventListener('change', loadConversationFromFile);
 
-                setupImageControls();
-                toggleModelIdentifierVisibility();
             } else {
                 throw new Error('.settings-panel element not found in user-settings.html');
             }
