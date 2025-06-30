@@ -26,7 +26,7 @@ class SequentialThinkingMCPServer {
     }
 
     // LLM Integration method
-    async callLLM(prompt, temperature = 0.7, maxTokens = 400, llmSettings = null) {
+    async callLLM(prompt, temperature = 0.7, maxTokens = 2000, llmSettings = null) {
         try {
             // Use provided settings or defaults
             const apiBaseUrl = llmSettings?.apiBaseUrl || 'https://litellm-veil.veilstudio.io';
@@ -122,20 +122,66 @@ class SequentialThinkingMCPServer {
             switch (name) {
                 case 'break_down_problem':
                     return this.handleBreakDownProblem(args);
-                
                 case 'sequential_reasoning':
                     return this.handleSequentialReasoning(args);
-                
                 case 'step_by_step_analysis':
                     return this.handleStepByStepAnalysis(args);
-                
                 case 'logical_chain':
                     return this.handleLogicalChain(args);
-                
+                case 'format_markdown':
+                    return this.handleFormatMarkdown(args);
                 default:
                     throw new Error(`Unknown tool: ${name}`);
             }
         });
+    }
+
+    async handleFormatMarkdown(args) {
+        // Accepts either a string or a structured object
+        // Returns a well-formatted Markdown string
+        if (typeof args === 'string') {
+            // If it's just a string, return as a Markdown paragraph
+            return {
+                content: [
+                    { type: 'text', text: args }
+                ]
+            };
+        }
+        // If it's an object, format as Markdown
+        let md = '';
+        if (args.title) {
+            md += `# ${args.title}\n\n`;
+        }
+        if (args.subtitle) {
+            md += `## ${args.subtitle}\n\n`;
+        }
+        if (args.sections && Array.isArray(args.sections)) {
+            for (const section of args.sections) {
+                if (section.heading) {
+                    md += `### ${section.heading}\n`;
+                }
+                if (section.text) {
+                    md += `${section.text}\n`;
+                }
+                if (section.bullets && Array.isArray(section.bullets)) {
+                    for (const bullet of section.bullets) {
+                        md += `- ${bullet}\n`;
+                    }
+                }
+                if (section.code) {
+                    md += `\n\`\`\`${section.codeLang || ''}\n${section.code}\n\`\`\`\n`;
+                }
+                md += '\n';
+            }
+        }
+        if (args.summary) {
+            md += `**Summary:** ${args.summary}\n`;
+        }
+        return {
+            content: [
+                { type: 'text', text: md.trim() }
+            ]
+        };
     }
 
     async handleBreakDownProblem(args, llmSettings = null) {
@@ -145,18 +191,16 @@ class SequentialThinkingMCPServer {
             throw new Error('Problem description is required');
         }
 
-        const steps = [
-            '1. **Problem Analysis**: Understanding the core issue',
-            '2. **Context Gathering**: Identifying relevant information',
-            '3. **Solution Planning**: Breaking down into manageable parts',
-            '4. **Implementation Steps**: Creating actionable tasks',
-            '5. **Verification**: Ensuring the solution addresses the problem'
+        const stepNames = [
+            'Problem Analysis',
+            'Context Gathering', 
+            'Solution Planning',
+            'Implementation Steps',
+            'Verification'
         ];
 
         // Generate content for each step using LLM
-        const breakdown = await Promise.all(steps.map(async (step, index) => {
-            const stepName = step.match(/\*\*(.*?)\*\*/)?.[1] || step.split(':')[0]?.trim();
-            
+        const sections = await Promise.all(stepNames.map(async (stepName, index) => {
             const prompt = `Analyze this problem: "${problem}"
 
 Focus on this specific step: ${stepName}
@@ -169,21 +213,21 @@ Please provide:
 
 Be specific, actionable, and thorough. Keep your response focused and concise (2-3 sentences).`;
 
-            const llmResponse = await this.callLLM(prompt, 0.7, 800, llmSettings);
+            const llmResponse = await this.callLLM(prompt, 0.7, 2000, llmSettings);
             
-            return `${step}\n   - ${llmResponse}`;
+            return {
+                heading: `${index + 1}. ${stepName}`,
+                text: llmResponse
+            };
         }));
 
-        const breakdownText = breakdown.join('\n\n');
-
-        return {
-            content: [
-                {
-                    type: 'text',
-                    text: `## Problem Breakdown: ${problem}\n\n${breakdownText}\n\n**Next Action**: Choose the most critical step to focus on first.`
-                }
-            ]
+        const markdownArgs = {
+            title: `Problem Breakdown: ${problem}`,
+            sections: sections,
+            summary: 'Choose the most critical step to focus on first.'
         };
+
+        return this.handleFormatMarkdown(markdownArgs);
     }
 
     async handleSequentialReasoning(args, llmSettings = null) {
@@ -194,7 +238,7 @@ Be specific, actionable, and thorough. Keep your response focused and concise (2
         }
 
         // Generate reasoning steps using LLM
-        const reasoningSteps = await Promise.all(Array.from({ length: steps }, async (_, i) => {
+        const sections = await Promise.all(Array.from({ length: steps }, async (_, i) => {
             const stepNumber = i + 1;
             
             const prompt = `Apply step-by-step reasoning to answer this question: "${question}"
@@ -209,19 +253,21 @@ For this step, please:
 
 Be logical, clear, and focused. Keep your response concise (2-3 sentences).`;
 
-            const llmResponse = await this.callLLM(prompt, 0.7, 800, llmSettings);
+            const llmResponse = await this.callLLM(prompt, 0.7, 2000, llmSettings);
             
-            return `**Step ${stepNumber}**: ${llmResponse}`;
+            return {
+                heading: `Step ${stepNumber}`,
+                text: llmResponse
+            };
         }));
 
-        return {
-            content: [
-                {
-                    type: 'text',
-                    text: `## Sequential Reasoning: ${question}\n\n${reasoningSteps.join('\n\n')}\n\n**Conclusion**: Based on this step-by-step analysis, we can now formulate a comprehensive answer.`
-                }
-            ]
+        const markdownArgs = {
+            title: `Sequential Reasoning: ${question}`,
+            sections: sections,
+            summary: 'Based on this step-by-step analysis, we can now formulate a comprehensive answer.'
         };
+
+        return this.handleFormatMarkdown(markdownArgs);
     }
 
     async handleStepByStepAnalysis(args, llmSettings = null) {
@@ -258,7 +304,7 @@ Be logical, clear, and focused. Keep your response concise (2-3 sentences).`;
         const steps = analysisSteps[analysis_type] || analysisSteps['general'];
         
         // Generate analysis using LLM
-        const analysis = await Promise.all(steps.map(async (step, index) => {
+        const sections = await Promise.all(steps.map(async (step, index) => {
             const prompt = `Perform a ${analysis_type} analysis of: "${topic}"
 
 Focus on this specific step: ${step}
@@ -271,21 +317,21 @@ Please provide:
 
 Be specific, thorough, and relevant to the topic. Keep your response focused and concise (2-3 sentences).`;
 
-            const llmResponse = await this.callLLM(prompt, 0.7, 800, llmSettings);
+            const llmResponse = await this.callLLM(prompt, 0.7, 2000, llmSettings);
             
-            return `**${index + 1}. ${step}**\n   - ${llmResponse}`;
+            return {
+                heading: `${index + 1}. ${step}`,
+                text: llmResponse
+            };
         }));
 
-        const analysisText = analysis.join('\n\n');
-
-        return {
-            content: [
-                {
-                    type: 'text',
-                    text: `## ${analysis_type.charAt(0).toUpperCase() + analysis_type.slice(1)} Analysis: ${topic}\n\n${analysisText}\n\n**Summary**: This systematic approach ensures comprehensive understanding and actionable insights.`
-                }
-            ]
+        const markdownArgs = {
+            title: `${analysis_type.charAt(0).toUpperCase() + analysis_type.slice(1)} Analysis: ${topic}`,
+            sections: sections,
+            summary: 'This systematic approach ensures comprehensive understanding and actionable insights.'
         };
+
+        return this.handleFormatMarkdown(markdownArgs);
     }
 
     async handleLogicalChain(args, llmSettings = null) {
@@ -296,7 +342,7 @@ Be specific, thorough, and relevant to the topic. Keep your response focused and
         }
 
         // Generate logical chain using LLM
-        const logicalSteps = await Promise.all(Array.from({ length: steps }, async (_, i) => {
+        const sections = await Promise.all(Array.from({ length: steps }, async (_, i) => {
             const stepNumber = i + 1;
             
             const prompt = `Create a logical chain from premise to conclusion.
@@ -314,19 +360,21 @@ For this link, please:
 
 Be logical, clear, and focused. Keep your response concise (2-3 sentences).`;
 
-            const llmResponse = await this.callLLM(prompt, 0.7, 800, llmSettings);
+            const llmResponse = await this.callLLM(prompt, 0.7, 2000, llmSettings);
             
-            return `**Link ${stepNumber}**: ${llmResponse}`;
+            return {
+                heading: `Link ${stepNumber}`,
+                text: llmResponse
+            };
         }));
 
-        return {
-            content: [
-                {
-                    type: 'text',
-                    text: `## Logical Chain: ${premise} → ${conclusion}\n\n${logicalSteps.join('\n\n')}\n\n**Logical Flow**: This chain demonstrates how each step logically leads to the next, building a coherent argument.`
-                }
-            ]
+        const markdownArgs = {
+            title: `Logical Chain: ${premise} → ${conclusion}`,
+            sections: sections,
+            summary: 'This chain demonstrates how each step logically leads to the next, building a coherent argument.'
         };
+
+        return this.handleFormatMarkdown(markdownArgs);
     }
 
     // Helper methods for generating content
@@ -471,6 +519,36 @@ const tools = [
                 }
             },
             required: ['premise', 'conclusion']
+        }
+    },
+    {
+        name: 'format_markdown',
+        description: 'Format structured data or text as high-quality Markdown for visually appealing output',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                title: { type: 'string', description: 'Main title for the document' },
+                subtitle: { type: 'string', description: 'Optional subtitle' },
+                sections: {
+                    type: 'array',
+                    description: 'Sections of the document',
+                    items: {
+                        type: 'object',
+                        properties: {
+                            heading: { type: 'string', description: 'Section heading' },
+                            text: { type: 'string', description: 'Section text' },
+                            bullets: {
+                                type: 'array',
+                                description: 'Bullet points',
+                                items: { type: 'string' }
+                            },
+                            code: { type: 'string', description: 'Code block' },
+                            codeLang: { type: 'string', description: 'Code language for syntax highlighting' }
+                        }
+                    }
+                },
+                summary: { type: 'string', description: 'Summary or conclusion' }
+            }
         }
     }
 ];

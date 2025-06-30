@@ -200,7 +200,7 @@ if (typeof MCPClient === 'undefined') {
         }
 
         // Integration helper for the chat interface
-        async integrateWithChat(message) {
+        async integrateWithChat(message, context = '') {
             if (!this.isConnected) {
                 console.log('❌ MCP Client not connected');
                 return null;
@@ -212,17 +212,17 @@ if (typeof MCPClient === 'undefined') {
             
             if (lowerMessage.includes('break down') || lowerMessage.includes('analyze step by step')) {
                 console.log('✅ Detected "break down" keyword, calling breakDownProblem');
-                return await this.breakDownProblem(message);
+                return await this.breakDownProblem(message, context);
             }
             
             if (lowerMessage.includes('reason through') || lowerMessage.includes('think step by step')) {
                 console.log('✅ Detected "reason through" keyword, calling sequentialReasoning');
-                return await this.sequentialReasoning(message);
+                return await this.sequentialReasoning(message, context);
             }
             
             if (lowerMessage.includes('analyze') || lowerMessage.includes('examine')) {
                 console.log('✅ Detected "analyze" keyword, calling stepByStepAnalysis');
-                return await this.stepByStepAnalysis(message);
+                return await this.stepByStepAnalysis(message, context);
             }
             
             if (lowerMessage.includes('logical chain') || lowerMessage.includes('reasoning chain')) {
@@ -230,7 +230,7 @@ if (typeof MCPClient === 'undefined') {
                 // Extract premise and conclusion from the message
                 const parts = message.split(/\s+(?:to|→|leads to|results in)\s+/i);
                 if (parts.length >= 2) {
-                    return await this.logicalChain(parts[0], parts[1]);
+                    return await this.logicalChain(parts[0], parts[1], context);
                 }
             }
 

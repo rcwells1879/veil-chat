@@ -186,8 +186,14 @@ async function initializeApp() {
         let textToSpeak = null;
 
         if (typeof message === 'string') {
-            messageElement.textContent = message;
-            if (sender === 'llm') textToSpeak = message;
+            // If it's an LLM message, treat as Markdown and render as HTML
+            if (sender === 'llm' && window.marked) {
+                messageElement.innerHTML = marked.parse(message);
+                textToSpeak = message;
+            } else {
+                messageElement.textContent = message;
+                if (sender === 'llm') textToSpeak = message;
+            }
         } else if (message.type === 'image' && message.url) {
             const img = document.createElement('img');
             img.src = message.url;
@@ -200,8 +206,14 @@ async function initializeApp() {
             });
             messageElement.appendChild(img);
         } else if (message.text) {
-            messageElement.textContent = message.text;
-            if (sender === 'llm') textToSpeak = message.text;
+            // If it's an LLM message, treat as Markdown and render as HTML
+            if (sender === 'llm' && window.marked) {
+                messageElement.innerHTML = marked.parse(message.text);
+                textToSpeak = message.text;
+            } else {
+                messageElement.textContent = message.text;
+                if (sender === 'llm') textToSpeak = message.text;
+            }
         }
 
         chatWindow.appendChild(messageElement);
@@ -236,18 +248,39 @@ async function initializeApp() {
         
         addMessage(message, 'user');
 
+        // Prepare conversation context for MCP
+        const conversationContext = llmService.conversationHistory
+            .map(msg => `${msg.role}: ${msg.content}`)
+            .join('\n');
+
         // Check if MCP client should handle this message
         if (mcpClient && mcpClient.isConnected) {
             console.log('🔍 MCP Client is connected, checking if message should be handled...');
             console.log('📝 Message:', message);
             try {
-                const mcpResult = await mcpClient.integrateWithChat(message);
+                const mcpResult = await mcpClient.integrateWithChat(message, conversationContext);
                 console.log('🎯 MCP Integration Result:', mcpResult);
                 console.log('📄 Full MCP Response Text:', mcpResult?.content?.[0]?.text);
                 if (mcpResult && mcpResult.content && mcpResult.content[0]) {
                     console.log('✅ MCP handled the message, displaying result');
                     // MCP handled the message, display the result
                     await addMessage(mcpResult.content[0].text, 'llm');
+                    if (llmService) {
+                        llmService.conversationHistory.push({
+                            role: "user",
+                            content: message
+                        });
+                        llmService.conversationHistory.push({
+                            role: "assistant",
+                            content: mcpResult.content[0].text
+                        });
+                        llmService.saveConversationHistory();
+                        // Add logging for debugging
+                        console.log("Saving conversation history:", llmService.conversationHistory);
+                        console.log("Passing context to MCP:", conversationContext);
+                        // Re-render the full conversation in the UI
+                        renderConversation(llmService.conversationHistory);
+                    }
                     return; // Don't proceed with normal LLM processing
                 } else {
                     console.log('❌ MCP did not handle the message, proceeding with normal LLM processing');
