@@ -200,7 +200,8 @@ if (typeof ContextService === 'undefined') {
     }
 
     removeDocument(documentId) {
-        this.attachedDocuments = this.attachedDocuments.filter(doc => doc.id !== documentId);
+        const idNum = Number(documentId);
+        this.attachedDocuments = this.attachedDocuments.filter(doc => doc.id !== idNum);
         return this.attachedDocuments.length;
     }
 

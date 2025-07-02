@@ -92,7 +92,6 @@ async function initializeApp() {
             const connected = await mcpClient.connect();
             if (connected) {
                 console.log('MCP Client: Successfully connected');
-                await addMessage('🧠 Sequential Thinking MCP Server connected', 'system');
             } else {
                 console.warn('MCP Client: Failed to connect');
                 await addMessage('⚠️ Sequential Thinking MCP Server connection failed', 'system');
@@ -235,8 +234,7 @@ async function initializeApp() {
         userInput.value = '';
         
         // Reset textarea height after clearing content
-        const isMobile = window.innerWidth <= 768;
-        const minHeight = isMobile ? 44 : 50;
+        const minHeight = 44;
         userInput.style.height = minHeight + 'px';
         
         // Contract the input expansion after sending
@@ -811,19 +809,23 @@ async function initializeApp() {
 
         attachedDocsContainer.style.display = 'block';
         attachedDocsContainer.innerHTML = `
-            <div class="attached-docs-header">
-                <span>📎 ${docs.length} document(s) attached</span>
-                <button class="clear-docs-btn" onclick="clearAllDocuments()">Clear All</button>
-            </div>
             <div class="attached-docs-list">
                 ${docs.map(doc => `
                     <div class="attached-doc-item">
                         <span class="doc-name" title="${doc.name}">${doc.name}</span>
-                        <button class="remove-doc-btn" onclick="removeDocument('${doc.id}')" title="Remove">×</button>
+                        <button class="remove-doc-btn" data-doc-id="${doc.id}" title="Remove">×</button>
                     </div>
                 `).join('')}
             </div>
         `;
+
+        // Attach event listeners to the remove buttons
+        attachedDocsContainer.querySelectorAll('.remove-doc-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const docId = btn.getAttribute('data-doc-id');
+                removeDocument(docId);
+            });
+        });
     }
 
     function removeDocument(documentId) {
@@ -934,7 +936,7 @@ async function initializeApp() {
                     inputArea.classList.remove('expanded');
                     userInput.classList.remove('expanded');
                     // Reset height when contracting
-                    userInput.style.height = '50px';
+                    userInput.style.height = '44px';
                     console.log('Input contracted on blur');
                 }
             }, 150);
@@ -999,8 +1001,7 @@ async function initializeApp() {
             const scrollHeight = userInput.scrollHeight;
             
             // Set minimum height based on screen size
-            const isMobile = window.innerWidth <= 768;
-            const minHeight = isMobile ? 44 : 50;
+            const minHeight = 44;
             
             // Calculate new height
             const newHeight = Math.max(minHeight, scrollHeight);
@@ -1037,9 +1038,7 @@ async function initializeApp() {
         // Reset height when input is cleared
         userInput.addEventListener('blur', () => {
             if (userInput.value.trim() === '') {
-                const isMobile = window.innerWidth <= 768;
-                const minHeight = isMobile ? 44 : 50;
-                userInput.style.height = minHeight + 'px';
+                userInput.style.height = '44px';
             }
         });
         
