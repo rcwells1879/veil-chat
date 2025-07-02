@@ -153,13 +153,13 @@ body {
     border-radius: 4px;
     min-height: 44px;
     height: 44px;
-    box-sizing: border-box;
-    padding: 12px 10px;
+    max-height: 44px;
+    padding: 0 10px;
     transition: all 0.3s ease;
     resize: none;
     overflow-y: hidden;
     font-family: inherit;
-    line-height: 1.4;
+    line-height: 44px;
 }
 
 .input-area.expanded #user-input {

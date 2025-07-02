@@ -14,6 +14,66 @@ class MCPHTTPServer {
     }
 
     setupMiddleware() {
+        // IP whitelist middleware (optional additional security)
+        this.app.use((req, res, next) => {
+            // Skip IP check for API endpoints
+            if (req.path.startsWith('/api/mcp/')) {
+                return next();
+            }
+            
+            // Allow localhost
+            if (req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1') {
+                return next();
+            }
+            
+            // Add your IP addresses here (replace with your actual IPs)
+            const allowedIPs = [
+                '192.168.1.100',  // Example home IP
+                '203.0.113.1',    // Example work IP
+                // Add your actual IP addresses here
+            ];
+            
+            const clientIP = req.ip || req.connection.remoteAddress;
+            
+            if (allowedIPs.includes(clientIP)) {
+                next();
+            } else {
+                console.log(`Blocked access from IP: ${clientIP}`);
+                res.status(403).send('Access denied - IP not whitelisted');
+            }
+        });
+        
+        // Basic authentication middleware
+        this.app.use((req, res, next) => {
+            // Skip auth for API endpoints (MCP tools should work without auth)
+            if (req.path.startsWith('/api/mcp/')) {
+                return next();
+            }
+            
+            // Get auth header
+            const authHeader = req.headers.authorization;
+            
+            if (!authHeader) {
+                res.setHeader('WWW-Authenticate', 'Basic realm="VeilChat Development"');
+                return res.status(401).send('Authentication required');
+            }
+            
+            // Simple hardcoded credentials (change these!)
+            const expectedUsername = process.env.VEILCHAT_USERNAME || 'admin';
+            const expectedPassword = process.env.VEILCHAT_PASSWORD || 'veilchat2024';
+            
+            // Parse basic auth
+            const credentials = Buffer.from(authHeader.split(' ')[1], 'base64').toString();
+            const [username, password] = credentials.split(':');
+            
+            if (username === expectedUsername && password === expectedPassword) {
+                next();
+            } else {
+                res.setHeader('WWW-Authenticate', 'Basic realm="VeilChat Development"');
+                res.status(401).send('Invalid credentials');
+            }
+        });
+        
         this.app.use(cors());
         this.app.use(express.json());
         this.app.use(express.static('..')); // Serve static files from parent directory

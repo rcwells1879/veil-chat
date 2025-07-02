@@ -141,7 +141,7 @@ async function initializeApp() {
         customLlmApiKey: localStorage.getItem('customLlmApiKey') || 'sk-DSHSfgTh65Fvd',
         // Image
         customImageProvider: localStorage.getItem('customImageProvider') || 'openai',
-        customImageApiUrl: (localStorage.getItem('customImageApiUrl') || 'http://localhost:7860').replace(/\/$/, ""),
+        customImageApiUrl: (localStorage.getItem('customImageApiUrl') || 'https://a1111-veil.veilstudio.io').replace(/\/$/, ""),
         customOpenAIImageApiKey: localStorage.getItem('customOpenAIImageApiKey') || '',
         imageSize: localStorage.getItem('imageSize') || 'auto',
         imageWidth: localStorage.getItem('imageWidth') || '1024',
@@ -186,10 +186,10 @@ async function initializeApp() {
         let textToSpeak = null;
 
         if (typeof message === 'string') {
-            // If it's an LLM message, treat as Markdown and render as HTML
             if (sender === 'llm' && window.marked) {
-                messageElement.innerHTML = marked.parse(message);
-                textToSpeak = message;
+                const cleanMessage = stripMarkdownCodeBlock(message);
+                messageElement.innerHTML = marked.parse(cleanMessage);
+                textToSpeak = cleanMessage;
             } else {
                 messageElement.textContent = message;
                 if (sender === 'llm') textToSpeak = message;
@@ -206,10 +206,10 @@ async function initializeApp() {
             });
             messageElement.appendChild(img);
         } else if (message.text) {
-            // If it's an LLM message, treat as Markdown and render as HTML
             if (sender === 'llm' && window.marked) {
-                messageElement.innerHTML = marked.parse(message.text);
-                textToSpeak = message.text;
+                const cleanMessage = stripMarkdownCodeBlock(message.text);
+                messageElement.innerHTML = marked.parse(cleanMessage);
+                textToSpeak = cleanMessage;
             } else {
                 messageElement.textContent = message.text;
                 if (sender === 'llm') textToSpeak = message.text;
@@ -1191,9 +1191,25 @@ async function initializeApp() {
                 } catch (e) { /* Not a JSON object, treat as string */ }
             }
             
-            addMessage(message.content, sender);
+            // Always render LLM messages as Markdown
+            if (sender === 'llm' && window.marked) {
+                addMessage(message.content, 'llm');
+            } else {
+                addMessage(message.content, sender);
+            }
         });
     }
 
     console.log('App initialization complete');
+}
+
+// Add this helper function near the top or above addMessage
+function stripMarkdownCodeBlock(text) {
+    text = text.trim();
+    const codeBlockRegex = /^```(?:markdown)?\n([\s\S]*?)\n```$/i;
+    const match = text.match(codeBlockRegex);
+    if (match) {
+        return match[1];
+    }
+    return text;
 }
