@@ -28,6 +28,14 @@ class SequentialThinkingMCPServer {
     // LLM Integration method
     async callLLM(prompt, temperature = 0.7, maxTokens = 2000, llmSettings = null) {
         try {
+            // Log all incoming settings and prompt
+            console.log('callLLM called with:', {
+                prompt,
+                temperature,
+                maxTokens,
+                llmSettings
+            });
+
             // Use provided settings or defaults
             const apiBaseUrl = llmSettings?.apiBaseUrl || 'https://litellm-veil.veilstudio.io';
             const apiKey = llmSettings?.apiKey || 'sk-DSHSfgTh65Fvd';
@@ -35,6 +43,9 @@ class SequentialThinkingMCPServer {
             
             const endpoint = `${apiBaseUrl}/v1/chat/completions`;
             
+            // Log the endpoint, model, and key (mask the key for safety)
+            console.log('🌐 MCP Server calling LLM:', endpoint, 'Model:', model, 'Key:', apiKey ? apiKey.slice(0, 6) + '...' : '(none)');
+
             const messages = [
                 {
                     role: "system",
@@ -62,7 +73,6 @@ class SequentialThinkingMCPServer {
                 headers['Authorization'] = `Bearer ${apiKey}`;
             }
 
-            console.log('🌐 MCP Server calling LLM:', endpoint);
             console.log('🌐 MCP Server payload:', JSON.stringify(payload, null, 2));
 
             const response = await fetch(endpoint, {
@@ -109,8 +119,9 @@ class SequentialThinkingMCPServer {
             }
 
         } catch (error) {
-            console.error('🌐 MCP Server LLM call failed:', error);
-            return "Unable to generate response due to an error: " + error.message;
+            const text = await response.text?.() || '';
+            console.error('🌐 MCP Server LLM call failed:', error, 'Response body:', text);
+            throw error;
         }
     }
 

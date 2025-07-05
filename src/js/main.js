@@ -88,7 +88,7 @@ async function initializeApp() {
         if (!mcpEnabled) return;
         
         try {
-            mcpClient = new MCPClient();
+            mcpClient = new MCPClient(SETTINGS.mcpServerUrl);
             const connected = await mcpClient.connect();
             if (connected) {
                 console.log('MCP Client: Successfully connected');
@@ -156,6 +156,7 @@ async function initializeApp() {
         ttsVoice: localStorage.getItem('ttsVoice') || 'Sonia',
         // MCP
         mcpEnabled: mcpEnabled,
+        mcpServerUrl: localStorage.getItem('mcpServerUrl') || 'http://localhost:3001',
     };
 
     // --- Service Initialization ---

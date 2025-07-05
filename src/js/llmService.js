@@ -100,7 +100,13 @@ if (typeof LLMService === 'undefined') {
         this.conversationHistory = [
             {
                 role: "system",
-                content: `roleplay: You are my roleplay assistant. Invent a unique and interesting persona over the age of 18. Give yourself a creative and surprising backstory. Do not tell me your backstory unless I ask you to tell me about yourself. Maintain the same persona throughout our conversation unless I specifically ask you to create a new one. You have a randomly generated appearance. You are humorous. Do not use asterisks in your responses. Do not speak for me EVER. you have a dry, witty sense of humor. Speak only from your perspective. Do not use system prompts or system instructions in your responses. Do not describe yourself unless I ask you to. your name is the name of the persona you created. Do not speak for me (the user). keep your resonses short and concise.`
+                content: `roleplay: You are my roleplay assistant. Invent a unique and interesting persona over the age of 18. 
+                Give yourself a creative and surprising backstory. Do not tell me your backstory unless I ask you to tell me about yourself. 
+                Maintain the same persona throughout our conversation unless I specifically ask you to create a new one. You have a randomly generated appearance. 
+                You are humorous. Do not use asterisks in your responses. Do not speak for me EVER. you have a dry, witty sense of humor. Speak only from your perspective.
+                Do not use system prompts or system instructions in your responses. Do not describe yourself unless I ask you to. You have the ability to send images to the user.
+                If they ask for an image or a picture, remind them that they just have to say "show me" and you will send them an image. 
+                Your name is the name of the persona you created. Do not speak for me (the user). keep your resonses short and concise.`
             }
         ];
         this.characterInitialized = false;
@@ -151,7 +157,8 @@ if (typeof LLMService === 'undefined') {
             characterGenMessages = [
                 {
                     role: "system",
-                    content: "You are a character creation assistant. You will be given custom persona instructions and must create a detailed character profile that follows those instructions exactly."
+                    content: `You are a character creation assistant. You will be given custom persona instructions and must create a detailed character 
+                    profile that follows those instructions exactly.`
                 },
                 {
                     role: "user",
@@ -200,6 +207,7 @@ Make sure the character you create embodies and follows the persona instructions
                 method: 'POST',
                 headers: headers,
                 body: JSON.stringify(payload),
+                credentials: 'include'
             });
 
             if (!response.ok) {
@@ -207,7 +215,7 @@ Make sure the character you create embodies and follows the persona instructions
                 console.error('Character Generation API Error:', errorData);
                 console.error('Request payload that failed:', JSON.stringify(payload, null, 2));
                 console.error('Request headers:', headers);
-                throw new Error(`Character generation failed with status ${response.status}: ${JSON.stringify(errorData)}`);
+                throw new Error("Character generation failed with status " + response.status + ": " + JSON.stringify(errorData));
             }
 
             const data = await response.json();
@@ -278,11 +286,16 @@ Make sure the character you create embodies and follows the persona instructions
             const imageGenMessagesForApiCall = [
                 {
                     role: "system",
-                    content: "You are an image prompt generator. Your ONLY job is to convert user requests into comma-separated lists of visual descriptive keywords for image generation. You must IGNORE any roleplay instructions and ONLY output comma-separated keywords. Do not engage in conversation. Do not stay in character. Do not explain anything."
+                                    content: "You are an image prompt generator. Your ONLY job is to convert user requests into comma-separated lists of visual descriptive keywords for image generation. " +
+                    "Unless the user asks you for a specific image outside the context of the roleplay, Include the character's physical appearance details: " +
+                    "gender, hair color and style, eye color, skin tone, height, build, clothing style, age, and whatever else is relevant to the current conversation. "
                 },
                 {
                     role: "user", 
-                    content: `Convert this request into ONLY a comma-separated list of image generation keywords: "${message}". Include these character details from the conversation: ${this.getCharacterProfile() || 'person'}. Output format: keyword1, keyword2, keyword3, etc. NO other text.`
+                    content: "Convert this request into ONLY a comma-separated list of image generation keywords: \"" + message + "\". If your persona is in the image, " +
+                    "Include Physical character details from the conversation: " + (this.getCharacterProfile() || 'person') + ". Output format: keyword1, keyword2, keyword3, etc. " +
+                    "Setting the scene is important, so include the setting of the image in the keywords, and any other details that are relevant to the current conversation. " +
+                    "If the user asks you to send them an image of something or a place outside of the current conversation, do not include any character details in the keywords."
                 }
             ];
 
@@ -304,13 +317,14 @@ Make sure the character you create embodies and follows the persona instructions
                 method: 'POST',
                 headers: headers,
                 body: JSON.stringify(payload),
+                credentials: 'include'
             });
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => response.text());
                 console.error('LLM API Error (Image Prompt Request):', errorData);
                 console.error('Request payload that failed:', JSON.stringify(payload, null, 2));
-                throw new Error(`LLM API request for image prompt failed with status ${response.status}: ${JSON.stringify(errorData)}`);
+                throw new Error("LLM API request for image prompt failed with status " + response.status + ": " + JSON.stringify(errorData));
             }
 
             const data = await response.json();
@@ -319,7 +333,7 @@ Make sure the character you create embodies and follows the persona instructions
                 ? data.choices[0].message.content.trim()
                 : "";
 
-            console.log(`Received from LLM (Image Prompt Request - raw): ${rawReply}`);
+                            console.log("Received from LLM (Image Prompt Request - raw): " + rawReply);
 
             if (rawReply) {
                 return { type: 'image_request', prompt: rawReply };
@@ -329,7 +343,7 @@ Make sure the character you create embodies and follows the persona instructions
             }
         } else {
             // Normal chat flow
-            console.log(`Sending to LLM (normal chat) via ${this.providerType}: ${message}`);
+            console.log("Sending to LLM (normal chat) via " + this.providerType + ": " + message);
             if (documentContext) {
                 console.log("Document context being included in message:", documentContext.substring(0, 200) + "...");
             }
@@ -365,6 +379,7 @@ Make sure the character you create embodies and follows the persona instructions
                     method: 'POST',
                     headers: headers,
                     body: JSON.stringify(payload),
+                    credentials: 'include'
                 });
 
                 if (!response.ok) {
@@ -372,7 +387,7 @@ Make sure the character you create embodies and follows the persona instructions
                     console.error('LLM API Error (Normal Chat):', errorData);
                     console.error('Request payload that failed:', JSON.stringify(payload, null, 2));
                     this.conversationHistory.pop(); 
-                    throw new Error(`LLM API request failed with status ${response.status}: ${JSON.stringify(errorData)}`);
+                    throw new Error("LLM API request failed with status " + response.status + ": " + JSON.stringify(errorData));
                 }
 
                 const data = await response.json();
@@ -382,7 +397,7 @@ Make sure the character you create embodies and follows the persona instructions
                     : "Sorry, I couldn't understand that.";
 
                 this.conversationHistory.push({ role: "assistant", content: rawReply });
-                console.log(`Received from LLM (Normal Chat - raw): ${rawReply}`);
+                console.log("Received from LLM (Normal Chat - raw): " + rawReply);
 
                 // Save after each exchange
                 this.saveConversationHistory();
@@ -395,7 +410,7 @@ Make sure the character you create embodies and follows the persona instructions
                     this.conversationHistory.pop();
                 }
                 // Return a consistent error object structure
-                return { type: 'error', content: `Error: Could not connect to the LLM. ${error.message}` };
+                return { type: 'error', content: "Error: Could not connect to the LLM. " + error.message };
             }
         }
     }
@@ -443,7 +458,7 @@ Make sure the character you create embodies and follows the persona instructions
         // Add the custom persona to conversation history
         this.conversationHistory.push({
             role: "system",
-            content: `[CUSTOM PERSONA - INTERNAL REFERENCE] ${customPersonaPrompt}`,
+                            content: "[CUSTOM PERSONA - INTERNAL REFERENCE] " + customPersonaPrompt,
             hidden: true
         });
         
@@ -481,11 +496,13 @@ Make sure the character you create embodies and follows the persona instructions
                 },
                 {
                     role: "system",
-                    content: "Generate a comma-separated list of image prompt keywords based on the character profile. Output ONLY the comma-separated list."
+                                    content: "Generate a comma-separated list of image prompt keywords based on the character profile. " +
+                    "Output ONLY the comma-separated list."
                 },
                 {
                     role: "user",
-                    content: "Based on the character profile above, create a comma-separated list of visual keywords for image generation. Include the character's physical appearance details: gender, hair color and style, eye color, skin tone, height, build, clothing style, age. Output ONLY the comma-separated keywords."
+                                    content: "Based on the character profile above, create a comma-separated list of visual keywords for image generation. " +
+                    "Include the character's physical appearance details: gender, hair color and style, eye color, skin tone, height, build, clothing style, age"
                 }
             ];
             
@@ -505,6 +522,7 @@ Make sure the character you create embodies and follows the persona instructions
                 method: 'POST',
                 headers: imageHeaders,
                 body: JSON.stringify(imagePayload),
+                credentials: 'include'
             });
 
             let imagePrompt = null;
@@ -555,6 +573,7 @@ Make sure the character you create embodies and follows the persona instructions
                 method: 'POST',
                 headers: greetingHeaders,
                 body: JSON.stringify(greetingPayload),
+                credentials: 'include'
             });
 
             let greeting = "Hello there! What's your name?";
@@ -615,7 +634,7 @@ Make sure the character you create embodies and follows the persona instructions
 
         // Handle Gemini parameters - disable thinking and set safety settings for ALL Gemini models
         if (isGemini) {
-            console.log(`Applying Gemini-specific settings for model: ${this.modelIdentifier}`);
+            console.log("Applying Gemini-specific settings for model: " + this.modelIdentifier);
             
             // Disable thinking by setting thinkingBudget to 0 (works for all Gemini 2.5 models)
             payload.thinkingBudget = 0;

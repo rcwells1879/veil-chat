@@ -1,7 +1,7 @@
 if (typeof MCPClient === 'undefined') {
     window.MCPClient = class MCPClient {
-        constructor(serverPath = null) {
-            this.serverPath = serverPath || 'node server/mcp-server.js';
+        constructor(serverUrl = null) {
+            this.serverUrl = serverUrl || localStorage.getItem('mcpServerUrl') || 'http://localhost:3001';
             this.isConnected = false;
             this.tools = [];
             this.serverProcess = null;
@@ -35,7 +35,7 @@ if (typeof MCPClient === 'undefined') {
         async connectViaHTTP() {
             // For browser usage, we'll assume the MCP server exposes an HTTP API
             // This is a simplified approach - in production you'd want proper MCP over HTTP
-            const response = await fetch('http://localhost:3001/api/mcp/tools', {
+            const response = await fetch(`${this.serverUrl}/api/mcp/tools`, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json'
@@ -109,7 +109,7 @@ if (typeof MCPClient === 'undefined') {
                 model: localStorage.getItem('customLlmModelIdentifier') || 'gemini2.5-flash'
             };
             
-            const response = await fetch('http://localhost:3001/api/mcp/call', {
+            const response = await fetch(`${this.serverUrl}/api/mcp/call`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'

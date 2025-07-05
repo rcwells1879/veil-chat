@@ -149,6 +149,7 @@ if (typeof ImageService === 'undefined') {
                     send_images: true,
                     save_images: false
                 }),
+                credentials: 'include'
             });
 
             if (!response.ok) {
