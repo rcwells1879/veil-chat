@@ -55,7 +55,7 @@ A modern, feature-rich chat interface with AI capabilities, voice interaction, i
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/yourusername/veilchat.git
+   git clone https://github.com/rcwells1879/veilchat.git
    cd veilchat
    ```
 
