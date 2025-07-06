@@ -1,15 +1,25 @@
 {
   "name": "llm-chat-interface",
   "version": "1.0.0",
-  "description": "A web-based chat interface for interacting with a local LLM and generating images using Automatic1111.",
+  "description": "A web-based chat interface with AI capabilities, voice interaction, image generation, and enhanced reasoning through Model Context Protocol (MCP) integration.",
   "main": "src/js/main.js",
+  "type": "module",
   "scripts": {
     "start": "live-server src",
+    "start:both": "node src/server/start-servers.js",
+    "start:http": "node src/server/mcp-http-server.js",
+    "start:mcp": "node src/server/mcp-server.js",
+    "dev": "live-server src --port=8080",
+    "dev:http": "node --watch src/server/mcp-http-server.js",
+    "dev:mcp": "node --watch src/server/mcp-server.js",
     "build": "echo 'Build step can be added here'"
   },
   "dependencies": {
     "axios": "^1.9.0",
-    "http-proxy": "^1.18.1"
+    "http-proxy": "^1.18.1",
+    "@modelcontextprotocol/sdk": "^0.4.0",
+    "express": "^4.18.2",
+    "cors": "^2.8.5"
   },
   "devDependencies": {
     "live-server": "^1.2.0"
@@ -18,8 +28,16 @@
     "chat",
     "llm",
     "image generation",
-    "roleplaying"
+    "roleplaying",
+    "mcp",
+    "model-context-protocol",
+    "sequential-thinking",
+    "reasoning",
+    "ai"
   ],
   "author": "Your Name",
-  "license": "MIT"
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  }
 }
