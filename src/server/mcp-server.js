@@ -119,8 +119,7 @@ class SequentialThinkingMCPServer {
             }
 
         } catch (error) {
-            const text = await response.text?.() || '';
-            console.error('🌐 MCP Server LLM call failed:', error, 'Response body:', text);
+            console.error('🌐 MCP Server LLM call failed:', error);
             throw error;
         }
     }

@@ -1,10 +1,29 @@
 if (typeof MCPClient === 'undefined') {
     window.MCPClient = class MCPClient {
         constructor(serverUrl = null) {
-            this.serverUrl = serverUrl || localStorage.getItem('mcpServerUrl') || 'http://localhost:3001';
+            this.serverUrl = serverUrl || localStorage.getItem('mcpServerUrl') || this.getDefaultServerUrl();
             this.isConnected = false;
             this.tools = [];
             this.serverProcess = null;
+        }
+
+        getDefaultServerUrl() {
+            // Auto-detect the correct MCP server URL based on current domain
+            const currentHost = window.location.hostname;
+            const currentProtocol = window.location.protocol;
+            
+            // If running on localhost, use local MCP server
+            if (currentHost === 'localhost' || currentHost === '127.0.0.1') {
+                return 'http://localhost:3001';
+            }
+            
+            // If running on hosted domain, use Cloudflare tunnel URL
+            if (currentHost.includes('veilstudio.io')) {
+                return 'https://mcp-veil.veilstudio.io';
+            }
+            
+            // Default fallback
+            return 'http://localhost:3001';
         }
 
         async connect() {
