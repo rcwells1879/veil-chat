@@ -652,7 +652,13 @@ Be logical, clear, and focused. Keep your response concise (2-3 sentences).`;
                 };
             }
 
-            // Format results
+            // If auto-summarize is enabled, call the search summarize function
+            if (autoSummarize) {
+                console.log('🤖 Auto-summarize enabled, calling search summarize function...');
+                return this.handleSearchSummarize({ query, searchSettings, llmSettings }, results);
+            }
+
+            // Format results normally without summarization
             const sections = results.map((result, index) => ({
                 heading: `${index + 1}. ${result.title}`,
                 text: `**URL:** ${result.url}\n\n${result.description || result.snippet}`,
@@ -663,7 +669,7 @@ Be logical, clear, and focused. Keep your response concise (2-3 sentences).`;
                 title: `Search Results: ${query}`,
                 subtitle: `Found ${results.length} results using ${provider}`,
                 sections: sections,
-                summary: autoSummarize ? 'Results ready for analysis and summarization.' : `Found ${results.length} results for "${query}"`
+                summary: `Found ${results.length} results for "${query}"`
             };
 
             return this.handleFormatMarkdown(markdownArgs);
@@ -694,19 +700,29 @@ Be logical, clear, and focused. Keep your response concise (2-3 sentences).`;
         });
     }
 
-    async handleSearchSummarize(args) {
+    async handleSearchSummarize(args, providedResults = null) {
         const { query, searchSettings = {}, llmSettings = null } = args;
         
         try {
-            // First, perform the search
-            const searchResult = await this.handleWebSearch({
-                query,
-                searchSettings: { ...searchSettings, autoSummarize: false },
-                llmSettings
-            });
+            let searchText;
+            
+            // If results are provided, use them directly
+            if (providedResults) {
+                // Format provided results for summarization
+                searchText = providedResults.map((result, index) => 
+                    `${index + 1}. ${result.title}\nURL: ${result.url}\n${result.description || result.snippet}\n`
+                ).join('\n');
+            } else {
+                // Otherwise, perform the search first
+                const searchResult = await this.handleWebSearch({
+                    query,
+                    searchSettings: { ...searchSettings, autoSummarize: false },
+                    llmSettings
+                });
 
-            // Extract search results text
-            const searchText = searchResult.content[0].text;
+                // Extract search results text
+                searchText = searchResult.content[0].text;
+            }
             
             // Generate summary using LLM
             const summaryPrompt = `Analyze and summarize these search results for the query: "${query}"

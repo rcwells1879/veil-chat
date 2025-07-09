@@ -3,7 +3,11 @@
     "allow": [
       "Bash(grep:*)",
       "Bash(cd:*)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(cd:*)",
+      "Bash(cd:*)",
+      "Bash(cd:*)",
+      "Bash(pkill:*)"
     ],
     "deny": []
   }
