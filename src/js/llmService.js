@@ -8,8 +8,8 @@ if (typeof LLMService === 'undefined') {
 
         // --- Easily Modifiable LLM Parameters ---
         // For Normal Chat
-        this.chatTemperature = 0.9;
-        this.chatMaxTokens = 600;
+        this.chatTemperature = 0.4;
+        this.chatMaxTokens = 800;
         this.chatPresencePenalty = 0.5;
         this.chatFrequencyPenalty = 0.5;
         this.chatTopP = null;

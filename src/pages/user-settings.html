@@ -63,6 +63,7 @@
                     <option value="claude3.7">claude3.7</option>
                     <option value="claude4">claude4</option>
                     <option value="gemini2.5-flash">gemini2.5-flash</option>
+                    <option value="Dark Muse">Dark Muse</option>
                 </select>
             </div>
             <div class="setting-item" id="api-key-item">
@@ -107,6 +108,74 @@
                         • "Reason through why the sky is blue"<br>
                         • "Analyze the benefits of renewable energy"<br>
                         • "Create a logical chain from fossil fuels to climate change"
+                    </p>
+                </div>
+            </details>
+
+            <!-- Web Search Settings -->
+            <details class="settings-group">
+                <summary class="settings-group-header">Web Search Settings</summary>
+                
+                <div class="setting-item">
+                    <label for="search-enabled">Enable Web Search</label>
+                    <input type="checkbox" id="search-enabled" style="width: auto; margin-left: 10px;">
+                    <span style="margin-left: 10px; font-size: 0.9em; color: #888;">
+                        Enable web search capabilities through MCP server
+                    </span>
+                </div>
+                
+                <div class="setting-item">
+                    <label for="search-provider">Search Provider</label>
+                    <select id="search-provider">
+                        <option value="brave">Brave Search (Recommended)</option>
+                        <option value="duckduckgo">DuckDuckGo</option>
+                        <option value="google">Google Custom Search</option>
+                        <option value="bing">Bing Search</option>
+                    </select>
+                </div>
+                
+                <div class="setting-item">
+                    <label for="search-api-key">API Key</label>
+                    <input type="password" id="search-api-key" placeholder="Enter search API key">
+                    <span style="font-size: 0.9em; color: #888; display: block; margin-top: 5px;">
+                        Provider-specific API key for search requests
+                    </span>
+                </div>
+                
+                <div class="setting-item">
+                    <label for="search-results-limit">Results Limit</label>
+                    <select id="search-results-limit">
+                        <option value="5">5 results</option>
+                        <option value="10" selected>10 results</option>
+                        <option value="20">20 results</option>
+                    </select>
+                </div>
+                
+                <div class="setting-item">
+                    <label for="search-auto-summarize">Auto-Summarize Results</label>
+                    <input type="checkbox" id="search-auto-summarize" checked style="width: auto; margin-left: 10px;">
+                    <span style="margin-left: 10px; font-size: 0.9em; color: #888;">
+                        Automatically summarize search results for better context
+                    </span>
+                </div>
+                
+                <div class="setting-item">
+                    <label for="search-time-filter">Time Filter</label>
+                    <select id="search-time-filter">
+                        <option value="any">Any time</option>
+                        <option value="day">Past 24 hours</option>
+                        <option value="week">Past week</option>
+                        <option value="month">Past month</option>
+                    </select>
+                </div>
+                
+                <div class="setting-item">
+                    <p style="font-size: 0.9em; color: #888; margin: 10px 0;">
+                        <strong>Usage Examples:</strong><br>
+                        • "Search for recent news about AI developments"<br>
+                        • "Find information about React 18 features"<br>
+                        • "Search and summarize climate change reports"<br>
+                        • "Look up current cryptocurrency prices"
                     </p>
                 </div>
             </details>

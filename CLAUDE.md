@@ -92,10 +92,36 @@ The application includes sophisticated MCP integration for enhanced reasoning:
 - **Step-by-Step Analysis**: Systematic topic analysis
 - **Logical Chain**: Premise-to-conclusion reasoning chains
 
+#### Web Search Integration
+The MCP server includes web search capabilities with multi-provider support:
+- **Search Providers**: Brave Search, DuckDuckGo, Google Custom Search, Bing
+- **Configurable API Keys**: User-provided API keys for different search services
+- **Search Result Processing**: Automatic summarization and relevance filtering
+- **Context Integration**: Search results automatically integrated into conversation context
+
+**Search Settings Configuration**:
+- **Search Provider**: Primary search service (Brave Search recommended)
+- **API Key**: Provider-specific API key for search requests
+- **Results Limit**: Maximum number of search results to retrieve (default: 10)
+- **Auto-Summarize**: Enable automatic summarization of search results
+- **Result Filtering**: Filter results by recency, relevance, or content type
+
+**Search Tool Usage**:
+- **web_search**: General web search with query and optional filters
+- **search_recent**: Search for recent information (last 24 hours, week, month)
+- **search_summarize**: Search and automatically summarize results for LLM context
+
+**Implementation Notes**:
+- Search results are processed through the MCP server's LLM integration
+- Results are automatically formatted for optimal LLM consumption
+- Search history is maintained for context continuity
+- Rate limiting and API quota management handled automatically
+
 ### Multi-Provider Support
 - **LLM Providers**: LiteLLM (default), OpenAI, LM Studio
 - **Image Providers**: Automatic1111, OpenAI DALL-E
 - **Voice Providers**: System TTS voices
+- **Search Providers**: Brave Search, DuckDuckGo, Google Custom Search, Bing
 
 ### Document Context
 - Supports PDF, DOCX, TXT, JSON, HTML, CSS, Markdown, XML, YAML, LOG files
@@ -129,6 +155,45 @@ The application includes sophisticated MCP integration for enhanced reasoning:
 2. **Image Provider**: Add new provider class to `imageService.js`
 3. **MCP Tools**: Add tool handlers to `mcp-server.js` and HTTP routes to `mcp-http-server.js`
 4. **Voice Features**: Extend `voiceService.js` for new voice capabilities
+5. **Search Provider**: Add new search provider to MCP server search handlers
+
+#### Adding Search Providers
+To add a new search provider to the MCP server:
+
+1. **Create Provider Class**: Add new provider class in `mcp-server.js`
+   ```javascript
+   class NewSearchProvider {
+     constructor(apiKey, options = {}) {
+       this.apiKey = apiKey;
+       this.baseUrl = 'https://api.newsearchprovider.com';
+       this.options = options;
+     }
+   
+     async search(query, options = {}) {
+       // Implementation specific to the provider
+     }
+   }
+   ```
+
+2. **Add to Search Handler**: Register in `handleWebSearch` method
+   ```javascript
+   case 'newsearch':
+     provider = new NewSearchProvider(apiKey, searchSettings);
+     break;
+   ```
+
+3. **Update UI Settings**: Add provider option to search settings dropdown
+   ```html
+   <option value="newsearch">New Search Provider</option>
+   ```
+
+4. **Configuration**: Add provider-specific settings to search settings section
+
+**Search Provider Requirements**:
+- Must implement `search(query, options)` method returning standardized results
+- Should handle API key validation and error responses
+- Must support basic filtering (time, type, relevance)
+- Should include rate limiting and quota management
 
 ### Mobile Optimization
 - All touch events handled with `addMobileCompatibleEvent()` helper

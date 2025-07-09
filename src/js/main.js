@@ -157,6 +157,13 @@ async function initializeApp() {
         // MCP
         mcpEnabled: mcpEnabled,
         mcpServerUrl: localStorage.getItem('mcpServerUrl') || 'http://localhost:3001',
+        // Search
+        searchEnabled: localStorage.getItem('searchEnabled') === 'true',
+        searchProvider: localStorage.getItem('searchProvider') || 'brave',
+        searchApiKey: localStorage.getItem('searchApiKey') || '',
+        searchResultsLimit: localStorage.getItem('searchResultsLimit') || '10',
+        searchAutoSummarize: localStorage.getItem('searchAutoSummarize') !== 'false',
+        searchTimeFilter: localStorage.getItem('searchTimeFilter') || 'any',
     };
 
     // --- Service Initialization ---
@@ -228,6 +235,83 @@ async function initializeApp() {
         }
     }
 
+    // --- Search Functions ---
+    function detectSearchKeywords(message) {
+        const lowerMessage = message.toLowerCase();
+        const searchKeywords = [
+            'search for',
+            'search',
+            'find',
+            'look up',
+            'look for',
+            'find information about',
+            'search about',
+            'lookup',
+            'find me',
+            'search the web for'
+        ];
+        
+        return searchKeywords.some(keyword => lowerMessage.includes(keyword));
+    }
+
+    function extractSearchQuery(message) {
+        const lowerMessage = message.toLowerCase();
+        
+        // Patterns to extract search queries
+        const patterns = [
+            /search for (.+)/i,
+            /search the web for (.+)/i,
+            /find information about (.+)/i,
+            /look up (.+)/i,
+            /look for (.+)/i,
+            /search about (.+)/i,
+            /find me (.+)/i,
+            /lookup (.+)/i,
+            /find (.+)/i,
+            /search (.+)/i  // Keep this last as it's most general
+        ];
+        
+        for (const pattern of patterns) {
+            const match = message.match(pattern);
+            if (match && match[1]) {
+                return match[1].trim();
+            }
+        }
+        
+        // Fallback: if no pattern matches, return the whole message
+        return message.trim();
+    }
+
+    async function performWebSearch(query) {
+        if (!mcpClient || !mcpClient.isConnected) {
+            console.log('⚠️ MCP Client not available for search');
+            return null;
+        }
+
+        try {
+            console.log('🔍 Performing web search for:', query);
+            
+            const searchSettings = {
+                provider: SETTINGS.searchProvider,
+                apiKey: SETTINGS.searchApiKey,
+                limit: parseInt(SETTINGS.searchResultsLimit),
+                timeFilter: SETTINGS.searchTimeFilter,
+                autoSummarize: SETTINGS.searchAutoSummarize
+            };
+
+            const searchResult = await mcpClient.callTool('web_search', {
+                query: query,
+                searchSettings: searchSettings
+            });
+
+            console.log('✅ Search completed:', searchResult);
+            return searchResult;
+        } catch (error) {
+            console.error('❌ Web search failed:', error);
+            return null;
+        }
+    }
+
     async function handleUserInput() {
         const message = userInput.value.trim();
         if (!message) return;
@@ -246,6 +330,37 @@ async function initializeApp() {
         }
         
         addMessage(message, 'user');
+
+        // Check for search keywords first (if search is enabled)
+        if (SETTINGS.searchEnabled && detectSearchKeywords(message)) {
+            console.log('🔍 Search keywords detected in message');
+            const searchQuery = extractSearchQuery(message);
+            console.log('📝 Extracted search query:', searchQuery);
+            
+            const searchResult = await performWebSearch(searchQuery);
+            
+            if (searchResult && searchResult.content && searchResult.content[0]) {
+                console.log('✅ Search result received, displaying to user');
+                await addMessage(searchResult.content[0].text, 'llm');
+                
+                // Add to conversation history
+                if (llmService) {
+                    llmService.conversationHistory.push({
+                        role: "user",
+                        content: message
+                    });
+                    llmService.conversationHistory.push({
+                        role: "assistant",
+                        content: searchResult.content[0].text
+                    });
+                    llmService.saveConversationHistory();
+                }
+                return; // Don't proceed with normal LLM processing
+            } else {
+                console.log('❌ Search failed, proceeding with normal LLM processing');
+                await addMessage('🔍 Search failed. Please check your search settings and try again.', 'system');
+            }
+        }
 
         // Prepare conversation context for MCP
         const conversationContext = llmService.conversationHistory
@@ -566,7 +681,13 @@ async function initializeApp() {
         openaiBackground: 'openai-background',
         ttsVoice: 'select-tts-voice',
         mcpEnabled: 'mcp-enabled',
-        mcpServerUrl: 'mcp-server-url'
+        mcpServerUrl: 'mcp-server-url',
+        searchEnabled: 'search-enabled',
+        searchProvider: 'search-provider',
+        searchApiKey: 'search-api-key',
+        searchResultsLimit: 'search-results-limit',
+        searchAutoSummarize: 'search-auto-summarize',
+        searchTimeFilter: 'search-time-filter'
     };
 
     function saveAllSettings() {

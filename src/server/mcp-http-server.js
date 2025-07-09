@@ -167,6 +167,128 @@ class MCPHTTPServer {
                         },
                         required: ['premise', 'conclusion']
                     }
+                },
+                {
+                    name: 'web_search',
+                    description: 'Search the web using various search providers (Brave, DuckDuckGo, Google, Bing)',
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            query: {
+                                type: 'string',
+                                description: 'The search query to execute'
+                            },
+                            searchSettings: {
+                                type: 'object',
+                                description: 'Search provider settings',
+                                properties: {
+                                    provider: {
+                                        type: 'string',
+                                        description: 'Search provider (brave, duckduckgo, google, bing)',
+                                        enum: ['brave', 'duckduckgo', 'google', 'bing'],
+                                        default: 'brave'
+                                    },
+                                    apiKey: {
+                                        type: 'string',
+                                        description: 'API key for the search provider'
+                                    },
+                                    limit: {
+                                        type: 'number',
+                                        description: 'Number of results to return (default: 10)',
+                                        default: 10
+                                    },
+                                    timeFilter: {
+                                        type: 'string',
+                                        description: 'Time filter for results',
+                                        enum: ['any', 'day', 'week', 'month'],
+                                        default: 'any'
+                                    },
+                                    autoSummarize: {
+                                        type: 'boolean',
+                                        description: 'Whether to auto-summarize results',
+                                        default: true
+                                    }
+                                }
+                            }
+                        },
+                        required: ['query']
+                    }
+                },
+                {
+                    name: 'search_recent',
+                    description: 'Search for recent information (last 24 hours)',
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            query: {
+                                type: 'string',
+                                description: 'The search query to execute'
+                            },
+                            searchSettings: {
+                                type: 'object',
+                                description: 'Search provider settings',
+                                properties: {
+                                    provider: {
+                                        type: 'string',
+                                        description: 'Search provider (brave, duckduckgo, google, bing)',
+                                        enum: ['brave', 'duckduckgo', 'google', 'bing'],
+                                        default: 'brave'
+                                    },
+                                    apiKey: {
+                                        type: 'string',
+                                        description: 'API key for the search provider'
+                                    },
+                                    limit: {
+                                        type: 'number',
+                                        description: 'Number of results to return (default: 10)',
+                                        default: 10
+                                    }
+                                }
+                            }
+                        },
+                        required: ['query']
+                    }
+                },
+                {
+                    name: 'search_summarize',
+                    description: 'Search the web and automatically summarize results for LLM context',
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            query: {
+                                type: 'string',
+                                description: 'The search query to execute'
+                            },
+                            searchSettings: {
+                                type: 'object',
+                                description: 'Search provider settings',
+                                properties: {
+                                    provider: {
+                                        type: 'string',
+                                        description: 'Search provider (brave, duckduckgo, google, bing)',
+                                        enum: ['brave', 'duckduckgo', 'google', 'bing'],
+                                        default: 'brave'
+                                    },
+                                    apiKey: {
+                                        type: 'string',
+                                        description: 'API key for the search provider'
+                                    },
+                                    limit: {
+                                        type: 'number',
+                                        description: 'Number of results to return (default: 10)',
+                                        default: 10
+                                    },
+                                    timeFilter: {
+                                        type: 'string',
+                                        description: 'Time filter for results',
+                                        enum: ['any', 'day', 'week', 'month'],
+                                        default: 'any'
+                                    }
+                                }
+                            }
+                        },
+                        required: ['query']
+                    }
                 }
             ];
             res.json({ tools });
@@ -194,6 +316,15 @@ class MCPHTTPServer {
                         break;
                     case 'logical_chain':
                         result = await this.mcpServer.handleLogicalChain(args, llmSettings);
+                        break;
+                    case 'web_search':
+                        result = await this.mcpServer.handleWebSearch(args, llmSettings);
+                        break;
+                    case 'search_recent':
+                        result = await this.mcpServer.handleSearchRecent(args, llmSettings);
+                        break;
+                    case 'search_summarize':
+                        result = await this.mcpServer.handleSearchSummarize(args, llmSettings);
                         break;
                     default:
                         return res.status(400).json({ error: `Unknown tool: ${tool}` });

@@ -4,6 +4,215 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 
+// Search Provider Classes
+class BraveSearchProvider {
+    constructor(apiKey, options = {}) {
+        this.apiKey = apiKey;
+        this.baseUrl = 'https://api.search.brave.com/res/v1/web/search';
+        this.options = options;
+    }
+
+    async search(query, options = {}) {
+        const params = new URLSearchParams({
+            q: query,
+            count: options.limit || 10,
+            freshness: options.timeFilter || 'any',
+            country: 'US',
+            lang: 'en'
+        });
+
+        const response = await fetch(`${this.baseUrl}?${params}`, {
+            headers: {
+                'X-Subscription-Token': this.apiKey,
+                'Accept': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`Brave Search API error: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        return this.formatResults(data);
+    }
+
+    formatResults(data) {
+        if (!data.web || !data.web.results) return [];
+        
+        return data.web.results.map(result => ({
+            title: result.title,
+            url: result.url,
+            description: result.description,
+            snippet: result.description,
+            published: result.age || null
+        }));
+    }
+}
+
+class DuckDuckGoSearchProvider {
+    constructor(apiKey, options = {}) {
+        this.apiKey = apiKey; // DuckDuckGo doesn't require API key for basic search
+        this.baseUrl = 'https://api.duckduckgo.com/';
+        this.options = options;
+    }
+
+    async search(query, options = {}) {
+        // DuckDuckGo instant answer API - free but limited
+        const params = new URLSearchParams({
+            q: query,
+            format: 'json',
+            no_html: '1',
+            skip_disambig: '1'
+        });
+
+        const response = await fetch(`${this.baseUrl}?${params}`);
+        
+        if (!response.ok) {
+            throw new Error(`DuckDuckGo API error: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        return this.formatResults(data, options.limit || 10);
+    }
+
+    formatResults(data, limit) {
+        const results = [];
+        
+        // Add abstract if available
+        if (data.Abstract && data.AbstractText) {
+            results.push({
+                title: data.Heading || 'Direct Answer',
+                url: data.AbstractURL || '',
+                description: data.AbstractText,
+                snippet: data.AbstractText,
+                published: null
+            });
+        }
+
+        // Add related topics
+        if (data.RelatedTopics && Array.isArray(data.RelatedTopics)) {
+            data.RelatedTopics.slice(0, limit - results.length).forEach(topic => {
+                if (topic.Text && topic.FirstURL) {
+                    results.push({
+                        title: topic.Text.split(' - ')[0] || 'Related Topic',
+                        url: topic.FirstURL,
+                        description: topic.Text,
+                        snippet: topic.Text,
+                        published: null
+                    });
+                }
+            });
+        }
+
+        return results.slice(0, limit);
+    }
+}
+
+class GoogleSearchProvider {
+    constructor(apiKey, options = {}) {
+        this.apiKey = apiKey;
+        this.cx = options.cx || options.searchEngineId; // Custom Search Engine ID
+        this.baseUrl = 'https://www.googleapis.com/customsearch/v1';
+        this.options = options;
+    }
+
+    async search(query, options = {}) {
+        if (!this.cx) {
+            throw new Error('Google Custom Search requires a Custom Search Engine ID (cx)');
+        }
+
+        const params = new URLSearchParams({
+            key: this.apiKey,
+            cx: this.cx,
+            q: query,
+            num: Math.min(options.limit || 10, 10), // Google API max is 10
+            dateRestrict: this.getDateRestrict(options.timeFilter)
+        });
+
+        const response = await fetch(`${this.baseUrl}?${params}`);
+        
+        if (!response.ok) {
+            throw new Error(`Google Search API error: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        return this.formatResults(data);
+    }
+
+    getDateRestrict(timeFilter) {
+        switch (timeFilter) {
+            case 'day': return 'd1';
+            case 'week': return 'w1';
+            case 'month': return 'm1';
+            default: return '';
+        }
+    }
+
+    formatResults(data) {
+        if (!data.items) return [];
+        
+        return data.items.map(item => ({
+            title: item.title,
+            url: item.link,
+            description: item.snippet,
+            snippet: item.snippet,
+            published: item.pagemap?.metatags?.[0]?.['article:published_time'] || null
+        }));
+    }
+}
+
+class BingSearchProvider {
+    constructor(apiKey, options = {}) {
+        this.apiKey = apiKey;
+        this.baseUrl = 'https://api.bing.microsoft.com/v7.0/search';
+        this.options = options;
+    }
+
+    async search(query, options = {}) {
+        const params = new URLSearchParams({
+            q: query,
+            count: options.limit || 10,
+            freshness: this.getFreshness(options.timeFilter),
+            mkt: 'en-US'
+        });
+
+        const response = await fetch(`${this.baseUrl}?${params}`, {
+            headers: {
+                'Ocp-Apim-Subscription-Key': this.apiKey,
+                'Accept': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`Bing Search API error: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        return this.formatResults(data);
+    }
+
+    getFreshness(timeFilter) {
+        switch (timeFilter) {
+            case 'day': return 'Day';
+            case 'week': return 'Week';
+            case 'month': return 'Month';
+            default: return '';
+        }
+    }
+
+    formatResults(data) {
+        if (!data.webPages || !data.webPages.value) return [];
+        
+        return data.webPages.value.map(result => ({
+            title: result.name,
+            url: result.url,
+            description: result.snippet,
+            snippet: result.snippet,
+            published: result.dateLastCrawled || null
+        }));
+    }
+}
+
 // Sequential Thinking MCP Server
 class SequentialThinkingMCPServer {
     constructor() {
@@ -140,6 +349,12 @@ class SequentialThinkingMCPServer {
                     return this.handleLogicalChain(args);
                 case 'format_markdown':
                     return this.handleFormatMarkdown(args);
+                case 'web_search':
+                    return this.handleWebSearch(args);
+                case 'search_recent':
+                    return this.handleSearchRecent(args);
+                case 'search_summarize':
+                    return this.handleSearchSummarize(args);
                 default:
                     throw new Error(`Unknown tool: ${name}`);
             }
@@ -387,6 +602,156 @@ Be logical, clear, and focused. Keep your response concise (2-3 sentences).`;
         return this.handleFormatMarkdown(markdownArgs);
     }
 
+    async handleWebSearch(args) {
+        const { query, searchSettings = {}, llmSettings = null } = args;
+        
+        if (!query) {
+            throw new Error('Search query is required');
+        }
+
+        try {
+            // Get search provider and settings
+            const provider = searchSettings.provider || 'brave';
+            const apiKey = searchSettings.apiKey;
+            const limit = parseInt(searchSettings.limit) || 10;
+            const timeFilter = searchSettings.timeFilter || 'any';
+            const autoSummarize = searchSettings.autoSummarize !== false;
+
+            console.log('🔍 Web search:', { query, provider, limit, timeFilter, autoSummarize });
+
+            // Create search provider instance
+            let searchProvider;
+            switch (provider) {
+                case 'brave':
+                    if (!apiKey) throw new Error('Brave Search requires an API key');
+                    searchProvider = new BraveSearchProvider(apiKey, searchSettings);
+                    break;
+                case 'duckduckgo':
+                    searchProvider = new DuckDuckGoSearchProvider(apiKey, searchSettings);
+                    break;
+                case 'google':
+                    if (!apiKey) throw new Error('Google Search requires an API key');
+                    searchProvider = new GoogleSearchProvider(apiKey, searchSettings);
+                    break;
+                case 'bing':
+                    if (!apiKey) throw new Error('Bing Search requires an API key');
+                    searchProvider = new BingSearchProvider(apiKey, searchSettings);
+                    break;
+                default:
+                    throw new Error(`Unknown search provider: ${provider}`);
+            }
+
+            // Perform search
+            const results = await searchProvider.search(query, { limit, timeFilter });
+            
+            if (!results || results.length === 0) {
+                return {
+                    content: [
+                        { type: 'text', text: `No search results found for query: "${query}"` }
+                    ]
+                };
+            }
+
+            // Format results
+            const sections = results.map((result, index) => ({
+                heading: `${index + 1}. ${result.title}`,
+                text: `**URL:** ${result.url}\n\n${result.description || result.snippet}`,
+                published: result.published
+            }));
+
+            const markdownArgs = {
+                title: `Search Results: ${query}`,
+                subtitle: `Found ${results.length} results using ${provider}`,
+                sections: sections,
+                summary: autoSummarize ? 'Results ready for analysis and summarization.' : `Found ${results.length} results for "${query}"`
+            };
+
+            return this.handleFormatMarkdown(markdownArgs);
+
+        } catch (error) {
+            console.error('🔍 Search error:', error);
+            return {
+                content: [
+                    { type: 'text', text: `Search failed: ${error.message}` }
+                ]
+            };
+        }
+    }
+
+    async handleSearchRecent(args) {
+        const { query, searchSettings = {}, llmSettings = null } = args;
+        
+        // Force recent time filter
+        const recentSettings = {
+            ...searchSettings,
+            timeFilter: 'day' // Default to last 24 hours
+        };
+
+        return this.handleWebSearch({
+            query,
+            searchSettings: recentSettings,
+            llmSettings
+        });
+    }
+
+    async handleSearchSummarize(args) {
+        const { query, searchSettings = {}, llmSettings = null } = args;
+        
+        try {
+            // First, perform the search
+            const searchResult = await this.handleWebSearch({
+                query,
+                searchSettings: { ...searchSettings, autoSummarize: false },
+                llmSettings
+            });
+
+            // Extract search results text
+            const searchText = searchResult.content[0].text;
+            
+            // Generate summary using LLM
+            const summaryPrompt = `Analyze and summarize these search results for the query: "${query}"
+
+${searchText}
+
+Please provide:
+1. A concise summary of the key findings
+2. Main themes and trends identified
+3. Most relevant and credible sources
+4. Any conflicting information or different perspectives
+5. Actionable insights based on the results
+
+Focus on accuracy, relevance, and practical value.`;
+
+            const summary = await this.callLLM(summaryPrompt, 0.7, 2000, llmSettings);
+            
+            const markdownArgs = {
+                title: `Search Summary: ${query}`,
+                subtitle: `Analyzed ${searchSettings.limit || 10} results`,
+                sections: [
+                    {
+                        heading: 'Summary',
+                        text: summary
+                    },
+                    {
+                        heading: 'Raw Results',
+                        text: searchText
+                    }
+                ],
+                summary: 'Search results have been analyzed and summarized for easy consumption.'
+            };
+
+            return this.handleFormatMarkdown(markdownArgs);
+
+        } catch (error) {
+            console.error('🔍 Search summarize error:', error);
+            return {
+                content: [
+                    { type: 'text', text: `Search summarization failed: ${error.message}` }
+                ]
+            };
+        }
+    }
+
     // Helper methods for generating content
     generateConsideration(problem, step) {
         const considerations = {
@@ -559,6 +924,128 @@ const tools = [
                 },
                 summary: { type: 'string', description: 'Summary or conclusion' }
             }
+        }
+    },
+    {
+        name: 'web_search',
+        description: 'Search the web using various search providers (Brave, DuckDuckGo, Google, Bing)',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                query: {
+                    type: 'string',
+                    description: 'The search query to execute'
+                },
+                searchSettings: {
+                    type: 'object',
+                    description: 'Search provider settings',
+                    properties: {
+                        provider: {
+                            type: 'string',
+                            description: 'Search provider (brave, duckduckgo, google, bing)',
+                            enum: ['brave', 'duckduckgo', 'google', 'bing'],
+                            default: 'brave'
+                        },
+                        apiKey: {
+                            type: 'string',
+                            description: 'API key for the search provider'
+                        },
+                        limit: {
+                            type: 'number',
+                            description: 'Number of results to return (default: 10)',
+                            default: 10
+                        },
+                        timeFilter: {
+                            type: 'string',
+                            description: 'Time filter for results',
+                            enum: ['any', 'day', 'week', 'month'],
+                            default: 'any'
+                        },
+                        autoSummarize: {
+                            type: 'boolean',
+                            description: 'Whether to auto-summarize results',
+                            default: true
+                        }
+                    }
+                }
+            },
+            required: ['query']
+        }
+    },
+    {
+        name: 'search_recent',
+        description: 'Search for recent information (last 24 hours)',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                query: {
+                    type: 'string',
+                    description: 'The search query to execute'
+                },
+                searchSettings: {
+                    type: 'object',
+                    description: 'Search provider settings',
+                    properties: {
+                        provider: {
+                            type: 'string',
+                            description: 'Search provider (brave, duckduckgo, google, bing)',
+                            enum: ['brave', 'duckduckgo', 'google', 'bing'],
+                            default: 'brave'
+                        },
+                        apiKey: {
+                            type: 'string',
+                            description: 'API key for the search provider'
+                        },
+                        limit: {
+                            type: 'number',
+                            description: 'Number of results to return (default: 10)',
+                            default: 10
+                        }
+                    }
+                }
+            },
+            required: ['query']
+        }
+    },
+    {
+        name: 'search_summarize',
+        description: 'Search the web and automatically summarize results for LLM context',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                query: {
+                    type: 'string',
+                    description: 'The search query to execute'
+                },
+                searchSettings: {
+                    type: 'object',
+                    description: 'Search provider settings',
+                    properties: {
+                        provider: {
+                            type: 'string',
+                            description: 'Search provider (brave, duckduckgo, google, bing)',
+                            enum: ['brave', 'duckduckgo', 'google', 'bing'],
+                            default: 'brave'
+                        },
+                        apiKey: {
+                            type: 'string',
+                            description: 'API key for the search provider'
+                        },
+                        limit: {
+                            type: 'number',
+                            description: 'Number of results to return (default: 10)',
+                            default: 10
+                        },
+                        timeFilter: {
+                            type: 'string',
+                            description: 'Time filter for results',
+                            enum: ['any', 'day', 'week', 'month'],
+                            default: 'any'
+                        }
+                    }
+                }
+            },
+            required: ['query']
         }
     }
 ];
