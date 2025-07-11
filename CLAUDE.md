@@ -64,6 +64,8 @@ VeilChat is a modern web-based chat interface with AI capabilities, built with v
 - Text-to-speech (TTS) with customizable voices
 - Continuous conversation support
 - Mobile-optimized voice interaction
+- **TTS Interruption**: User input automatically stops TTS to prevent blocking
+- **Selective TTS**: Search results and system messages can disable TTS to avoid delays
 
 ### ImageService (`src/js/imageService.js`)
 - Multi-provider image generation (Automatic1111, OpenAI DALL-E)
@@ -200,6 +202,12 @@ To add a new search provider to the MCP server:
 - Responsive design with CSS Grid and Flexbox
 - Optimized for iOS Safari and mobile browsers
 - Touch-friendly UI elements and gesture support
+
+### Text-to-Speech (TTS) Guidelines
+- **Avoid TTS for long content**: Search results, system messages, and lengthy responses should disable TTS using `addMessage(text, sender, false)`
+- **Conversation history blocking**: TTS operations can block conversation history updates - always complete history updates before starting TTS
+- **User interruption**: TTS automatically stops when user starts typing to prevent interface blocking
+- **Implementation**: Use `voiceService.stopSpeaking()` to cancel active TTS, and `enableTTS` parameter in `addMessage()` for selective TTS
 
 ## Testing
 

@@ -87,6 +87,13 @@ if (typeof VoiceService === 'undefined') {
         });
     }
 
+    stopSpeaking() {
+        if (this.isSynthesisSupported() && (this.synthesis.speaking || this.synthesis.pending)) {
+            console.log("VoiceService: Stopping TTS due to user input");
+            this.synthesis.cancel();
+        }
+    }
+
     _executeSpeech(textToSpeak, preferredVoiceKeyword, resolve, reject, isMobile) {
         if (this.synthesis.speaking || this.synthesis.pending) {
             console.log("VoiceService: Cancelling previous speech before speaking new utterance.");

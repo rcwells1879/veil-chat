@@ -187,7 +187,7 @@ async function initializeApp() {
     await initializeMCPClient();
 
     // --- Core Functions ---
-    async function addMessage(message, sender) {
+    async function addMessage(message, sender, enableTTS = true) {
         const messageElement = document.createElement('div');
         messageElement.classList.add('message', `${sender}-message`);
         let textToSpeak = null;
@@ -226,12 +226,16 @@ async function initializeApp() {
         chatWindow.appendChild(messageElement);
         chatWindow.scrollTop = chatWindow.scrollHeight;
 
-        if (textToSpeak && voiceService && voiceService.isSynthesisSupported()) {
+        if (enableTTS && textToSpeak && voiceService && voiceService.isSynthesisSupported()) {
             try {
+                console.log('🎤 Starting TTS for message');
                 await voiceService.speak(textToSpeak, SETTINGS.ttsVoice);
+                console.log('🎤 TTS completed');
             } catch (error) {
                 console.error("TTS Error:", error);
             }
+        } else if (!enableTTS && textToSpeak) {
+            console.log('🎤 TTS disabled for this message');
         }
     }
 
@@ -334,6 +338,16 @@ async function initializeApp() {
         // Check for search keywords first (if search is enabled)
         if (SETTINGS.searchEnabled && detectSearchKeywords(message)) {
             console.log('🔍 Search keywords detected in message');
+            
+            // Add user message to conversation history immediately for search
+            if (llmService) {
+                llmService.conversationHistory.push({
+                    role: "user",
+                    content: message
+                });
+                console.log('📝 User message added to conversation history for search:', message);
+            }
+            
             const searchQuery = extractSearchQuery(message);
             console.log('📝 Extracted search query:', searchQuery);
             
@@ -341,19 +355,30 @@ async function initializeApp() {
             
             if (searchResult && searchResult.content && searchResult.content[0]) {
                 console.log('✅ Search result received, displaying to user');
-                await addMessage(searchResult.content[0].text, 'llm');
+                console.log('🔄 About to call addMessage for search result (no TTS)');
+                try {
+                    await addMessage(searchResult.content[0].text, 'llm', false); // Disable TTS for search results
+                    console.log('✅ addMessage completed for search result');
+                } catch (error) {
+                    console.error('❌ addMessage failed for search result:', error);
+                }
                 
-                // Add to conversation history
+                // Add search result to conversation history (user message already added above)
+                console.log('🔍 About to add search result to conversation history');
+                console.log('- llmService exists:', !!llmService);
+                console.log('- llmService.conversationHistory exists:', !!(llmService && llmService.conversationHistory));
+                console.log('- Current history length:', llmService ? llmService.conversationHistory.length : 'N/A');
+                
                 if (llmService) {
-                    llmService.conversationHistory.push({
-                        role: "user",
-                        content: message
-                    });
                     llmService.conversationHistory.push({
                         role: "assistant",
                         content: searchResult.content[0].text
                     });
                     llmService.saveConversationHistory();
+                    console.log('🔍 Search result added to conversation history');
+                    console.log('- New history length:', llmService.conversationHistory.length);
+                } else {
+                    console.error('❌ llmService is null/undefined - cannot add search result to history!');
                 }
                 return; // Don't proceed with normal LLM processing
             } else {
@@ -366,6 +391,11 @@ async function initializeApp() {
         const conversationContext = llmService.conversationHistory
             .map(msg => `${msg.role}: ${msg.content}`)
             .join('\n');
+        
+        console.log('📚 Conversation context prepared:');
+        console.log('- History length:', llmService.conversationHistory.length, 'messages');
+        console.log('- Last 3 messages:', llmService.conversationHistory.slice(-3).map(msg => `${msg.role}: ${msg.content.substring(0, 100)}...`));
+        console.log('- Context preview:', conversationContext.substring(conversationContext.length - 500));
 
         // Check if MCP client should handle this message
         if (mcpClient && mcpClient.isConnected) {
@@ -377,21 +407,29 @@ async function initializeApp() {
                 console.log('📄 Full MCP Response Text:', mcpResult?.content?.[0]?.text);
                 if (mcpResult && mcpResult.content && mcpResult.content[0]) {
                     console.log('✅ MCP handled the message, displaying result');
-                    // MCP handled the message, display the result
-                    await addMessage(mcpResult.content[0].text, 'llm');
+                    
+                    // Add user message to conversation history for MCP (since it won't go through sendMessage)
                     if (llmService) {
                         llmService.conversationHistory.push({
                             role: "user",
                             content: message
                         });
+                        console.log('📝 User message added to conversation history for MCP:', message);
+                    }
+                    
+                    // MCP handled the message, display the result
+                    await addMessage(mcpResult.content[0].text, 'llm');
+                    // Add MCP result to conversation history (user message already added above)
+                    if (llmService) {
                         llmService.conversationHistory.push({
                             role: "assistant",
                             content: mcpResult.content[0].text
                         });
                         llmService.saveConversationHistory();
                         // Add logging for debugging
-                        console.log("Saving conversation history:", llmService.conversationHistory);
-                        console.log("Passing context to MCP:", conversationContext);
+                        console.log("🎯 MCP result added to conversation history");
+                        console.log("Current conversation history length:", llmService.conversationHistory.length);
+                        console.log("Conversation context used:", conversationContext);
                         // Re-render the full conversation in the UI
                         renderConversation(llmService.conversationHistory);
                     }
@@ -407,8 +445,21 @@ async function initializeApp() {
             console.log('⚠️ MCP Client not available or not connected');
         }
 
+        // Normal LLM processing - add user message to history first
+        if (llmService) {
+            llmService.conversationHistory.push({
+                role: "user",
+                content: message
+            });
+            console.log('📝 User message added to conversation history for normal LLM flow:', message);
+        }
+        
+        console.log('🤖 Processing with normal LLM flow');
+        console.log('- Current conversation history length:', llmService.conversationHistory.length);
+        console.log('- About to call sendMessage with message:', message.substring(0, 100) + '...');
+        
         const documentContext = contextService.getDocumentContext();
-        const response = await llmService.sendMessage(message, documentContext);
+        const response = await llmService.sendMessage(message, documentContext, true); // Skip adding user message
         
         if (response.type === 'image_request') {
             console.log("Image request detected, generating image...");
@@ -1141,13 +1192,24 @@ async function initializeApp() {
         }
         
         // Add event listeners for auto-resize
-        userInput.addEventListener('input', autoResize);
+        userInput.addEventListener('input', (e) => {
+            // Stop TTS when user starts typing
+            if (voiceService && voiceService.stopSpeaking) {
+                voiceService.stopSpeaking();
+            }
+            autoResize();
+        });
         userInput.addEventListener('paste', () => {
             setTimeout(autoResize, 50);
         });
         
         // Handle Enter key behavior
         userInput.addEventListener('keydown', (e) => {
+            // Stop TTS when user starts typing (except for Enter key which submits)
+            if (e.key !== 'Enter' && voiceService && voiceService.stopSpeaking) {
+                voiceService.stopSpeaking();
+            }
+            
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 handleUserInput();

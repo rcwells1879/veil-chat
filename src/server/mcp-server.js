@@ -738,7 +738,14 @@ Please provide:
 
 Focus on accuracy, relevance, and practical value.`;
 
-            const summary = await this.callLLM(summaryPrompt, 0.7, 2000, llmSettings);
+            let summary;
+            try {
+                summary = await this.callLLM(summaryPrompt, 0.7, 2000, llmSettings);
+                console.log('🔍 Search summarization completed successfully');
+            } catch (error) {
+                console.error('🔍 Search summarization failed, using fallback:', error.message);
+                summary = "Search summarization failed due to response length limits. Here are the raw search results instead.";
+            }
             
             const markdownArgs = {
                 title: `Search Summary: ${query}`,

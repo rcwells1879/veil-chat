@@ -258,7 +258,7 @@ Make sure the character you create embodies and follows the persona instructions
         }
     }
 
-    async sendMessage(message, documentContext = '') {
+    async sendMessage(message, documentContext = '', skipAddingUserMessage = false) {
         // Generate character profile on first message if not already done
         if (!this.characterInitialized) {
             try {
@@ -288,7 +288,8 @@ Make sure the character you create embodies and follows the persona instructions
                     role: "system",
                                     content: "You are an image prompt generator. Your ONLY job is to convert user requests into comma-separated lists of visual descriptive keywords for image generation. " +
                     "Unless the user asks you for a specific image outside the context of the roleplay, Include the character's physical appearance details: " +
-                    "gender, hair color and style, eye color, skin tone, height, build, clothing style, age, and whatever else is relevant to the current conversation. "
+                    "gender, hair color and style, eye color, skin tone, height, build, clothing style, age, and whatever else is relevant to the current conversation. " +
+                    "Do not include the character's name or more than one adjective per trait."
                 },
                 {
                     role: "user", 
@@ -348,8 +349,13 @@ Make sure the character you create embodies and follows the persona instructions
                 console.log("Document context being included in message:", documentContext.substring(0, 200) + "...");
             }
             
-            // Store original message without context in conversation history
-            this.conversationHistory.push({ role: "user", content: message });
+            // Store original message without context in conversation history (unless already added)
+            if (!skipAddingUserMessage) {
+                this.conversationHistory.push({ role: "user", content: message });
+                console.log('📝 sendMessage adding user message to history:', message);
+            } else {
+                console.log('📝 sendMessage skipping user message addition (already added)');
+            }
 
             // But send full message with context to LLM
             const messagesForAPI = [
