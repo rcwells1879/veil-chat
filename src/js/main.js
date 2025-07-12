@@ -154,6 +154,10 @@ async function initializeApp() {
         openaiBackground: localStorage.getItem('openaiBackground') || 'auto',
         // Voice & UI
         ttsVoice: localStorage.getItem('ttsVoice') || 'Sonia',
+        voiceSpeed: parseFloat(localStorage.getItem('voiceSpeed')) || 1.0,
+        voicePitch: parseFloat(localStorage.getItem('voicePitch')) || 1.0,
+        azureApiKey: localStorage.getItem('azureApiKey') || '',
+        azureRegion: localStorage.getItem('azureRegion') || 'eastus',
         // MCP
         mcpEnabled: mcpEnabled,
         mcpServerUrl: localStorage.getItem('mcpServerUrl') || 'http://localhost:3001',
@@ -181,6 +185,13 @@ async function initializeApp() {
     
     if (voiceService) {
         voiceService.finalAutoSendDelay = 500;
+        voiceService.setVoiceRate(SETTINGS.voiceSpeed);
+        voiceService.setVoicePitch(SETTINGS.voicePitch);
+        
+        // Initialize Azure TTS if API key is provided
+        if (SETTINGS.azureApiKey && SETTINGS.azureApiKey.trim()) {
+            voiceService.setAzureConfig(SETTINGS.azureApiKey, SETTINGS.azureRegion);
+        }
     }
 
     // Initialize MCP Client
@@ -731,6 +742,10 @@ async function initializeApp() {
         openaiOutputFormat: 'openai-output-format',
         openaiBackground: 'openai-background',
         ttsVoice: 'select-tts-voice',
+        voiceSpeed: 'slider-voice-speed',
+        voicePitch: 'slider-voice-pitch',
+        azureApiKey: 'azure-api-key',
+        azureRegion: 'azure-region',
         mcpEnabled: 'mcp-enabled',
         mcpServerUrl: 'mcp-server-url',
         searchEnabled: 'search-enabled',
@@ -801,6 +816,13 @@ async function initializeApp() {
         });
         if (voiceService) {
             voiceService.finalAutoSendDelay = parseInt(SETTINGS.sttFinalTimeout, 10);
+            voiceService.setVoiceRate(SETTINGS.voiceSpeed);
+            voiceService.setVoicePitch(SETTINGS.voicePitch);
+            
+            // Initialize Azure TTS if API key is provided
+            if (SETTINGS.azureApiKey && SETTINGS.azureApiKey.trim()) {
+                voiceService.setAzureConfig(SETTINGS.azureApiKey, SETTINGS.azureRegion);
+            }
         }
     }
 
@@ -896,6 +918,24 @@ async function initializeApp() {
                 settingsPanelContainer.querySelectorAll('input, select').forEach(el => {
                     el.addEventListener('change', saveAllSettings);
                 });
+
+                // Add specific event listeners for voice sliders to update display values
+                const voiceSpeedSlider = settingsPanelContainer.querySelector('#slider-voice-speed');
+                const voiceSpeedValue = settingsPanelContainer.querySelector('#voice-speed-value');
+                const voicePitchSlider = settingsPanelContainer.querySelector('#slider-voice-pitch');
+                const voicePitchValue = settingsPanelContainer.querySelector('#voice-pitch-value');
+
+                if (voiceSpeedSlider && voiceSpeedValue) {
+                    voiceSpeedSlider.addEventListener('input', () => {
+                        voiceSpeedValue.textContent = voiceSpeedSlider.value + 'x';
+                    });
+                }
+
+                if (voicePitchSlider && voicePitchValue) {
+                    voicePitchSlider.addEventListener('input', () => {
+                        voicePitchValue.textContent = voicePitchSlider.value;
+                    });
+                }
 
                 // Add event listeners for save/load conversation buttons
                 const saveButton = settingsPanelContainer.querySelector('#save-conversation-button');

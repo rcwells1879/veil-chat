@@ -4,6 +4,14 @@ if (typeof VoiceService === 'undefined') {
             this.voices = [];
             this.recognition = null;
             this.synthesis = window.speechSynthesis;
+            
+            // Voice settings with defaults
+            this.voiceRate = 1.0;  // Changed from 1.3 to 1.0 for mobile compatibility
+            this.voicePitch = 1.0;
+            
+            // Initialize Azure TTS service
+            this.azureTTS = null;
+            this.useAzureTTS = false;
         this.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
         this.sttResultCallback = sttResultCallback || function() {};
@@ -60,7 +68,20 @@ if (typeof VoiceService === 'undefined') {
     }
 
     speak(textToSpeak, preferredVoiceKeyword) {
-        return new Promise((resolve, reject) => { 
+        return new Promise(async (resolve, reject) => { 
+            // Try Azure TTS first if available
+            if (this.isAzureTTSEnabled()) {
+                try {
+                    await this.azureTTS.speak(textToSpeak, preferredVoiceKeyword);
+                    resolve();
+                    return;
+                } catch (error) {
+                    console.warn('VoiceService: Azure TTS failed, falling back to Web Speech API:', error);
+                    // Fall through to Web Speech API
+                }
+            }
+
+            // Fallback to Web Speech API
             if (!this.isSynthesisSupported()) {
                 console.warn('VoiceService: Speech Synthesis API not supported, cannot speak.');
                 resolve(); 
@@ -88,10 +109,76 @@ if (typeof VoiceService === 'undefined') {
     }
 
     stopSpeaking() {
+        // Stop Azure TTS if active
+        if (this.azureTTS) {
+            this.azureTTS.stopSpeaking();
+        }
+        
+        // Stop Web Speech API if active
         if (this.isSynthesisSupported() && (this.synthesis.speaking || this.synthesis.pending)) {
             console.log("VoiceService: Stopping TTS due to user input");
             this.synthesis.cancel();
         }
+    }
+
+    // Voice settings getters and setters
+    setVoiceRate(rate) {
+        // Clamp rate between 0.1 and 2.0 for cross-browser compatibility
+        this.voiceRate = Math.max(0.1, Math.min(2.0, parseFloat(rate) || 1.0));
+        
+        // Sync with Azure TTS if available
+        if (this.azureTTS) {
+            this.azureTTS.setVoiceRate(this.voiceRate);
+        }
+        
+        console.log(`VoiceService: Voice rate set to ${this.voiceRate}`);
+    }
+
+    getVoiceRate() {
+        return this.voiceRate;
+    }
+
+    setVoicePitch(pitch) {
+        // Clamp pitch between 0.5 and 2.0
+        this.voicePitch = Math.max(0.5, Math.min(2.0, parseFloat(pitch) || 1.0));
+        
+        // Sync with Azure TTS if available
+        if (this.azureTTS) {
+            this.azureTTS.setVoicePitch(this.voicePitch);
+        }
+        
+        console.log(`VoiceService: Voice pitch set to ${this.voicePitch}`);
+    }
+
+    getVoicePitch() {
+        return this.voicePitch;
+    }
+
+    // Azure TTS management methods
+    initializeAzureTTS(apiKey, region) {
+        if (typeof AzureTTSService !== 'undefined') {
+            this.azureTTS = new AzureTTSService(apiKey, region);
+            this.azureTTS.setVoiceRate(this.voiceRate);
+            this.azureTTS.setVoicePitch(this.voicePitch);
+            this.useAzureTTS = this.azureTTS.isConfigured();
+            console.log(`VoiceService: Azure TTS ${this.useAzureTTS ? 'enabled' : 'disabled'}`);
+        } else {
+            console.error('VoiceService: AzureTTSService not loaded');
+            this.useAzureTTS = false;
+        }
+    }
+
+    setAzureConfig(apiKey, region) {
+        if (this.azureTTS) {
+            this.azureTTS.updateConfig(apiKey, region);
+            this.useAzureTTS = this.azureTTS.isConfigured();
+        } else {
+            this.initializeAzureTTS(apiKey, region);
+        }
+    }
+
+    isAzureTTSEnabled() {
+        return this.useAzureTTS && this.azureTTS && this.azureTTS.isConfigured();
     }
 
     _executeSpeech(textToSpeak, preferredVoiceKeyword, resolve, reject, isMobile) {
@@ -169,8 +256,8 @@ if (typeof VoiceService === 'undefined') {
             console.warn("VoiceService: No suitable voice found after all checks. Using browser/system default voice for utterance.");
         }
         
-        utterance.pitch = 1;
-        utterance.rate = 1.3;
+        utterance.pitch = this.voicePitch;
+        utterance.rate = this.voiceRate;
 
         utterance.onstart = () => {
             console.log(`VoiceService: TTS Speech started: "${utterance.text.substring(0, 30)}..."`);
