@@ -344,7 +344,13 @@ async function initializeApp() {
             userInput.classList.remove('expanded');
         }
         
-        addMessage(message, 'user');
+        // Check if this is a "show me" image request - if so, don't add to conversation history
+        const isImageRequest = message.toLowerCase().includes("show me");
+        if (!isImageRequest) {
+            addMessage(message, 'user');
+        } else {
+            console.log('📸 Image request detected - excluding from conversation history:', message);
+        }
 
         // Check for search keywords first (if search is enabled)
         if (SETTINGS.searchEnabled && detectSearchKeywords(message)) {
@@ -456,21 +462,15 @@ async function initializeApp() {
             console.log('⚠️ MCP Client not available or not connected');
         }
 
-        // Normal LLM processing - add user message to history first
-        if (llmService) {
-            llmService.conversationHistory.push({
-                role: "user",
-                content: message
-            });
-            console.log('📝 User message added to conversation history for normal LLM flow:', message);
-        }
         
         console.log('🤖 Processing with normal LLM flow');
         console.log('- Current conversation history length:', llmService.conversationHistory.length);
         console.log('- About to call sendMessage with message:', message.substring(0, 100) + '...');
         
         const documentContext = contextService.getDocumentContext();
-        const response = await llmService.sendMessage(message, documentContext, true); // Skip adding user message
+        // Skip adding user message for image requests, allow for normal messages
+        const skipAddingUserMessage = isImageRequest;
+        const response = await llmService.sendMessage(message, documentContext, skipAddingUserMessage);
         
         if (response.type === 'image_request') {
             console.log("Image request detected, generating image...");
