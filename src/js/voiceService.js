@@ -12,6 +12,26 @@ if (typeof VoiceService === 'undefined') {
             // Initialize Azure TTS service
             this.azureTTS = null;
             this.useAzureTTS = false;
+            
+            // Persona voice management
+            this.personaVoice = null;
+            this.isPersonaVoiceActive = false;
+            
+            // Gender-based voice categorization
+            this.voicesByGender = {
+                female: [
+                    'Ava', 'Jenny', 'Emma', 'Sara', 'Aria', 'Ashley',  // US Female
+                    'Sonia', 'Libby', 'Olivia', 'Hollie',              // UK Female  
+                    'Natasha', 'Freya',                                 // AU Female
+                    'Clara'                                             // CA Female
+                ],
+                male: [
+                    'Andrew', 'Brian', 'Guy', 'Jason', 'Tony',         // US Male
+                    'Ryan', 'Alfie', 'Oliver',                         // UK Male
+                    'William', 'Neil',                                  // AU Male
+                    'Liam'                                              // CA Male
+                ]
+            };
         this.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
         this.sttResultCallback = sttResultCallback || function() {};
@@ -37,6 +57,9 @@ if (typeof VoiceService === 'undefined') {
         } else {
             console.warn('Speech Recognition API not supported in this browser.');
         }
+        
+        // Load saved persona voice
+        this.loadPersonaVoice();
     }
 
     // --- Speech Synthesis (TTS) Methods ---
@@ -69,15 +92,30 @@ if (typeof VoiceService === 'undefined') {
 
     speak(textToSpeak, preferredVoiceKeyword) {
         return new Promise(async (resolve, reject) => { 
+            // Use persona voice if active, otherwise use provided voice
+            const voiceToUse = this.getCurrentVoice() || preferredVoiceKeyword;
+            
+            if (this.getCurrentVoice()) {
+                console.log(`VoiceService: Using persona voice: ${this.getCurrentVoice()}`);
+            }
+            
             // Try Azure TTS first if available
             if (this.isAzureTTSEnabled()) {
                 try {
-                    await this.azureTTS.speak(textToSpeak, preferredVoiceKeyword);
+                    console.log(`VoiceService: Using Azure TTS with voice: ${voiceToUse}`);
+                    await this.azureTTS.speak(textToSpeak, voiceToUse);
                     resolve();
                     return;
                 } catch (error) {
                     console.warn('VoiceService: Azure TTS failed, falling back to Web Speech API:', error);
                     // Fall through to Web Speech API
+                }
+            } else {
+                console.log('VoiceService: Azure TTS not enabled, using Web Speech API');
+                console.log('Azure TTS configured:', !!this.azureTTS);
+                console.log('Azure TTS enabled:', this.useAzureTTS);
+                if (this.azureTTS) {
+                    console.log('Azure TTS is configured:', this.azureTTS.isConfigured());
                 }
             }
 
@@ -98,13 +136,13 @@ if (typeof VoiceService === 'undefined') {
                 if (this.voices.length === 0 && isMobile) {
                     setTimeout(() => {
                         this._populateVoiceList("mobile fallback");
-                        this._executeSpeech(textToSpeak, preferredVoiceKeyword, resolve, reject, isMobile);
+                        this._executeSpeech(textToSpeak, voiceToUse, resolve, reject, isMobile);
                     }, 1000);
                     return;
                 }
             }
             
-            this._executeSpeech(textToSpeak, preferredVoiceKeyword, resolve, reject, isMobile);
+            this._executeSpeech(textToSpeak, voiceToUse, resolve, reject, isMobile);
         });
     }
 
@@ -181,6 +219,181 @@ if (typeof VoiceService === 'undefined') {
         return this.useAzureTTS && this.azureTTS && this.azureTTS.isConfigured();
     }
 
+    // Persona voice management methods
+    detectGenderFromProfile(characterProfile) {
+        if (!characterProfile || typeof characterProfile !== 'string') {
+            console.log('VoiceService: No character profile provided for gender detection');
+            return 'unknown';
+        }
+
+        const profileLower = characterProfile.toLowerCase();
+        
+        // First, look for explicit structured gender declarations
+        if (profileLower.includes('**gender:** female') || profileLower.includes('gender: female')) {
+            console.log('VoiceService: Found explicit female gender declaration');
+            return 'female';
+        }
+        if (profileLower.includes('**gender:** male') || profileLower.includes('gender: male')) {
+            console.log('VoiceService: Found explicit male gender declaration');
+            return 'male';
+        }
+        
+        // Fallback to keyword scoring
+        const femaleKeywords = ['female', 'woman', 'girl', 'lady', 'she', 'her', 'herself'];
+        const maleKeywords = ['male', 'man', 'boy', 'guy', 'he', 'him', 'himself'];
+        
+        let femaleScore = 0;
+        let maleScore = 0;
+        
+        // Count occurrences of gender-specific keywords
+        femaleKeywords.forEach(keyword => {
+            const matches = (profileLower.match(new RegExp(keyword, 'g')) || []).length;
+            femaleScore += matches;
+        });
+        
+        maleKeywords.forEach(keyword => {
+            const matches = (profileLower.match(new RegExp(keyword, 'g')) || []).length;
+            maleScore += matches;
+        });
+        
+        // Determine gender based on scores
+        if (femaleScore > maleScore) {
+            console.log(`VoiceService: Detected female gender (score: ${femaleScore} vs ${maleScore})`);
+            return 'female';
+        } else if (maleScore > femaleScore) {
+            console.log(`VoiceService: Detected male gender (score: ${maleScore} vs ${femaleScore})`);
+            return 'male';
+        } else {
+            console.log(`VoiceService: Could not determine gender (tie: ${femaleScore} vs ${maleScore})`);
+            console.log('Profile excerpt for debugging:', profileLower.substring(0, 300));
+            return 'unknown';
+        }
+    }
+
+    selectRandomVoiceByGender(gender) {
+        const voices = this.voicesByGender[gender];
+        if (!voices || voices.length === 0) {
+            console.warn(`VoiceService: No voices available for gender: ${gender}`);
+            // Fallback to opposite gender if available
+            const fallbackGender = gender === 'male' ? 'female' : 'male';
+            const fallbackVoices = this.voicesByGender[fallbackGender];
+            if (fallbackVoices && fallbackVoices.length > 0) {
+                const selectedVoice = fallbackVoices[Math.floor(Math.random() * fallbackVoices.length)];
+                console.log(`VoiceService: Using fallback voice: ${selectedVoice} (${fallbackGender})`);
+                return selectedVoice;
+            }
+            return null;
+        }
+        
+        const selectedVoice = voices[Math.floor(Math.random() * voices.length)];
+        console.log(`VoiceService: Selected random ${gender} voice: ${selectedVoice}`);
+        return selectedVoice;
+    }
+
+    setPersonaVoice(characterProfile) {
+        const gender = this.detectGenderFromProfile(characterProfile);
+        const selectedVoice = this.selectRandomVoiceByGender(gender);
+        
+        if (selectedVoice) {
+            this.personaVoice = selectedVoice;
+            this.isPersonaVoiceActive = true;
+            
+            // Save to localStorage for persistence
+            localStorage.setItem('personaVoice', selectedVoice);
+            localStorage.setItem('isPersonaVoiceActive', 'true');
+            
+            console.log(`VoiceService: Persona voice set to: ${selectedVoice} (${gender})`);
+            return selectedVoice;
+        } else {
+            console.warn('VoiceService: Could not select persona voice, using default');
+            return null;
+        }
+    }
+
+    clearPersonaVoice() {
+        this.personaVoice = null;
+        this.isPersonaVoiceActive = false;
+        
+        // Clear from localStorage
+        localStorage.removeItem('personaVoice');
+        localStorage.removeItem('isPersonaVoiceActive');
+        
+        console.log('VoiceService: Persona voice cleared');
+    }
+
+    loadPersonaVoice() {
+        const savedPersonaVoice = localStorage.getItem('personaVoice');
+        const isActive = localStorage.getItem('isPersonaVoiceActive') === 'true';
+        
+        if (savedPersonaVoice && isActive) {
+            this.personaVoice = savedPersonaVoice;
+            this.isPersonaVoiceActive = true;
+            console.log(`VoiceService: Loaded persona voice: ${savedPersonaVoice}`);
+        }
+    }
+
+    getCurrentVoice() {
+        // Return persona voice if active, otherwise return null (will use user setting)
+        return this.isPersonaVoiceActive ? this.personaVoice : null;
+    }
+
+    // Map Azure voice names to Web Speech API voice names for fallback
+    mapToWebSpeechVoice(azureVoiceName) {
+        const webSpeechMap = {
+            // US Voices
+            'Ava': 'Microsoft Ava Online (Natural) - English (United States)',
+            'Jenny': 'Microsoft Jenny Online (Natural) - English (United States)', 
+            'Emma': 'Microsoft Emma Online (Natural) - English (United States)',
+            'Sara': 'Microsoft Sara Online (Natural) - English (United States)',
+            'Aria': 'Microsoft Aria Online (Natural) - English (United States)',
+            'Ashley': 'Microsoft Ashley Online (Natural) - English (United States)',
+            'Andrew': 'Microsoft Andrew Online (Natural) - English (United States)',
+            'Brian': 'Microsoft Brian Online (Natural) - English (United States)',
+            'Guy': 'Microsoft Guy Online (Natural) - English (United States)',
+            'Jason': 'Microsoft Jason Online (Natural) - English (United States)',
+            'Tony': 'Microsoft Tony Online (Natural) - English (United States)',
+            
+            // UK Voices
+            'Sonia': 'Microsoft Sonia Online (Natural) - English (United Kingdom)',
+            'Libby': 'Microsoft Libby Online (Natural) - English (United Kingdom)',
+            'Olivia': 'Microsoft Olivia Online (Natural) - English (United Kingdom)',
+            'Hollie': 'Microsoft Hollie Online (Natural) - English (United Kingdom)',
+            'Ryan': 'Microsoft Ryan Online (Natural) - English (United Kingdom)',
+            'Alfie': 'Microsoft Alfie Online (Natural) - English (United Kingdom)',
+            'Oliver': 'Microsoft Oliver Online (Natural) - English (United Kingdom)',
+            
+            // AU Voices
+            'Natasha': 'Microsoft Natasha Online (Natural) - English (Australia)',
+            'Freya': 'Microsoft Freya Online (Natural) - English (Australia)',
+            'William': 'Microsoft William Online (Natural) - English (Australia)',
+            'Neil': 'Microsoft Neil Online (Natural) - English (Australia)',
+            
+            // CA Voices
+            'Clara': 'Microsoft Clara Online (Natural) - English (Canada)',
+            'Liam': 'Microsoft Liam Online (Natural) - English (Canada)'
+        };
+        
+        const mappedVoice = webSpeechMap[azureVoiceName];
+        if (mappedVoice) {
+            console.log(`VoiceService: Mapped ${azureVoiceName} to Web Speech voice: ${mappedVoice}`);
+            return mappedVoice;
+        }
+        
+        // Fallback: try to find a voice containing the name
+        const fallbackVoice = this.voices.find(voice => 
+            voice.name.toLowerCase().includes(azureVoiceName.toLowerCase()) && 
+            voice.lang.startsWith('en')
+        );
+        
+        if (fallbackVoice) {
+            console.log(`VoiceService: Found fallback Web Speech voice for ${azureVoiceName}: ${fallbackVoice.name}`);
+            return fallbackVoice.name;
+        }
+        
+        console.warn(`VoiceService: No Web Speech voice mapping found for ${azureVoiceName}`);
+        return azureVoiceName; // Return original name as last resort
+    }
+
     _executeSpeech(textToSpeak, preferredVoiceKeyword, resolve, reject, isMobile) {
         if (this.synthesis.speaking || this.synthesis.pending) {
             console.log("VoiceService: Cancelling previous speech before speaking new utterance.");
@@ -192,33 +405,47 @@ if (typeof VoiceService === 'undefined') {
 
         if (this.voices.length > 0) {
             if (preferredVoiceKeyword && preferredVoiceKeyword !== "AUTO") {
-                const keyword = preferredVoiceKeyword.toLowerCase();
-                // Attempt to find a "Microsoft ... (Natural)" voice first
-                voiceToUse = this.voices.find(voice =>
-                    voice.lang.startsWith('en') &&
-                    voice.name.toLowerCase().includes("microsoft") &&
-                    voice.name.toLowerCase().includes("(natural)") &&
-                    voice.name.toLowerCase().includes(keyword)
-                );
-                // Fallback: Microsoft voice without (Natural)
+                // If this is a persona voice from our voice categories, try to map it to Web Speech API
+                if (this.isPersonaVoiceActive && this.personaVoice === preferredVoiceKeyword) {
+                    const mappedVoiceName = this.mapToWebSpeechVoice(preferredVoiceKeyword);
+                    voiceToUse = this.voices.find(voice => voice.name === mappedVoiceName);
+                    if (voiceToUse) {
+                        console.log(`VoiceService: Using mapped persona voice: ${voiceToUse.name}`);
+                    } else {
+                        console.log(`VoiceService: Mapped voice not found, falling back to keyword search for: ${preferredVoiceKeyword}`);
+                    }
+                }
+                
+                // Original keyword-based search if mapping didn't work
                 if (!voiceToUse) {
+                    const keyword = preferredVoiceKeyword.toLowerCase();
+                    // Attempt to find a "Microsoft ... (Natural)" voice first
                     voiceToUse = this.voices.find(voice =>
                         voice.lang.startsWith('en') &&
                         voice.name.toLowerCase().includes("microsoft") &&
+                        voice.name.toLowerCase().includes("(natural)") &&
                         voice.name.toLowerCase().includes(keyword)
                     );
-                }
-                // Fallback: Any voice with the keyword (ensure it's English)
-                if (!voiceToUse) {
-                    voiceToUse = this.voices.find(voice =>
-                        voice.lang.startsWith('en') &&
-                        voice.name.toLowerCase().includes(keyword)
-                    );
-                }
-                if (voiceToUse) {
-                    console.log(`VoiceService: Selected voice for keyword "${preferredVoiceKeyword}": ${voiceToUse.name}`);
-                } else {
-                    console.log(`VoiceService: No specific voice found for keyword "${preferredVoiceKeyword}". Will use default selection logic.`);
+                    // Fallback: Microsoft voice without (Natural)
+                    if (!voiceToUse) {
+                        voiceToUse = this.voices.find(voice =>
+                            voice.lang.startsWith('en') &&
+                            voice.name.toLowerCase().includes("microsoft") &&
+                            voice.name.toLowerCase().includes(keyword)
+                        );
+                    }
+                    // Fallback: Any voice with the keyword (ensure it's English)
+                    if (!voiceToUse) {
+                        voiceToUse = this.voices.find(voice =>
+                            voice.lang.startsWith('en') &&
+                            voice.name.toLowerCase().includes(keyword)
+                        );
+                    }
+                    if (voiceToUse) {
+                        console.log(`VoiceService: Selected voice for keyword "${preferredVoiceKeyword}": ${voiceToUse.name}`);
+                    } else {
+                        console.log(`VoiceService: No specific voice found for keyword "${preferredVoiceKeyword}". Will use default selection logic.`);
+                    }
                 }
             }
 

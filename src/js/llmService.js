@@ -117,6 +117,12 @@ if (typeof LLMService === 'undefined') {
         // Also clear any saved persona when clearing conversation history
         localStorage.removeItem('currentPersonaPrompt');
         
+        // Clear persona voice when clearing conversation history
+        if (window.voiceService && window.voiceService.clearPersonaVoice) {
+            window.voiceService.clearPersonaVoice();
+            console.log("LLMService: Cleared persona voice on conversation history clear");
+        }
+        
         console.log('Conversation history and saved persona cleared');
     }
 
@@ -240,6 +246,20 @@ Make sure the character you create embodies and follows the persona instructions
                 this.saveConversationHistory(); // Save after character generation
                 console.log("Character profile generated and added to conversation history:");
                 console.log(characterProfile);
+                
+                // Set persona voice based on character gender
+                if (window.voiceService && window.voiceService.setPersonaVoice) {
+                    console.log('LLMService: Setting persona voice based on character profile...');
+                    console.log('Character profile excerpt:', characterProfile.substring(0, 200) + '...');
+                    const selectedVoice = window.voiceService.setPersonaVoice(characterProfile);
+                    if (selectedVoice) {
+                        console.log(`✅ LLMService: Persona voice automatically selected: ${selectedVoice}`);
+                    } else {
+                        console.warn('❌ LLMService: Failed to select persona voice');
+                    }
+                } else {
+                    console.warn('❌ LLMService: voiceService.setPersonaVoice not available');
+                }
                 
                 return characterProfile;
             } else {
@@ -428,6 +448,13 @@ Make sure the character you create embodies and follows the persona instructions
         this.conversationHistory = this.conversationHistory.filter(msg => 
             !msg.content.includes('[INTERNAL CHARACTER PROFILE')
         );
+        
+        // Clear persona voice when resetting character
+        if (window.voiceService && window.voiceService.clearPersonaVoice) {
+            window.voiceService.clearPersonaVoice();
+            console.log("LLMService: Cleared persona voice on character reset");
+        }
+        
         console.log("Character profile reset. Will regenerate on next message.");
     }
 
@@ -472,6 +499,12 @@ Make sure the character you create embodies and follows the persona instructions
         // The character profile generation will happen in createPersona() or generateCharacterProfile()
         this.characterInitialized = false;
         
+        // Clear any existing persona voice since we're setting a new persona
+        if (window.voiceService && window.voiceService.clearPersonaVoice) {
+            window.voiceService.clearPersonaVoice();
+            console.log("LLMService: Cleared existing persona voice for new custom persona");
+        }
+        
         // Save the updated conversation history
         this.saveConversationHistory();
         
@@ -486,6 +519,13 @@ Make sure the character you create embodies and follows the persona instructions
             !msg.content.includes('[INTERNAL CHARACTER PROFILE') && 
             !msg.content.includes('[CUSTOM PERSONA')
         );
+        
+        // Clear persona voice when resetting persona
+        if (window.voiceService && window.voiceService.clearPersonaVoice) {
+            window.voiceService.clearPersonaVoice();
+            console.log("LLMService: Cleared persona voice on persona reset");
+        }
+        
         console.log("Persona reset. Will use default character generation on next message.");
     }
 

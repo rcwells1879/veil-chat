@@ -176,6 +176,8 @@ async function initializeApp() {
     let voiceService;
     try {
         voiceService = new VoiceService(handleSttResult, handleSttError, handleSttListeningState, handleSttAutoSend);
+        // Make voiceService available globally for persona voice integration
+        window.voiceService = voiceService;
     } catch (error) {
         console.warn('VoiceService failed to initialize:', error);
         voiceService = null;
@@ -240,7 +242,10 @@ async function initializeApp() {
         if (enableTTS && textToSpeak && voiceService && voiceService.isSynthesisSupported()) {
             try {
                 console.log('🎤 Starting TTS for message');
-                await voiceService.speak(textToSpeak, SETTINGS.ttsVoice);
+                // Use persona voice if active, otherwise use user setting
+                const voiceToUse = voiceService.getCurrentVoice() || SETTINGS.ttsVoice;
+                console.log(`🎤 Voice selection - Persona: ${voiceService.getCurrentVoice()}, Settings: ${SETTINGS.ttsVoice}, Using: ${voiceToUse}`);
+                await voiceService.speak(textToSpeak, voiceToUse);
                 console.log('🎤 TTS completed');
             } catch (error) {
                 console.error("TTS Error:", error);
