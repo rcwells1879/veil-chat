@@ -117,12 +117,6 @@ if (typeof LLMService === 'undefined') {
         // Also clear any saved persona when clearing conversation history
         localStorage.removeItem('currentPersonaPrompt');
         
-        // Clear persona voice when clearing conversation history
-        if (window.voiceService && window.voiceService.clearPersonaVoice) {
-            window.voiceService.clearPersonaVoice();
-            console.log("LLMService: Cleared persona voice on conversation history clear");
-        }
-        
         console.log('Conversation history and saved persona cleared');
     }
 
@@ -171,11 +165,12 @@ if (typeof LLMService === 'undefined') {
                     content: `Create a detailed internal character profile based on these specific persona instructions: "${customPersonaText}"
 
 Please create a character that follows these instructions and include: 
-- Your name, age, physical appearance (hair color, eye color, height, build, style)
+- Your name, gender (man or woman), age, physical appearance (hair color, eye color, height, build, style)
 - Personality traits that match the persona description
 - Any special abilities or background mentioned
 - Backstory and current circumstances that align with the persona
 - Any other details that fit the persona requirements
+- The setting: a description of where you are from
 
 Make sure the character you create embodies and follows the persona instructions provided. Write this as a third-person character description for internal reference.`
                 }
@@ -247,18 +242,18 @@ Make sure the character you create embodies and follows the persona instructions
                 console.log("Character profile generated and added to conversation history:");
                 console.log(characterProfile);
                 
-                // Set persona voice based on character gender
-                if (window.voiceService && window.voiceService.setPersonaVoice) {
-                    console.log('LLMService: Setting persona voice based on character profile...');
+                // Update user voice setting based on character gender
+                if (window.voiceService && window.voiceService.updateUserVoiceSetting && window.SETTINGS) {
+                    console.log('LLMService: Updating user voice setting based on character profile...');
                     console.log('Character profile excerpt:', characterProfile.substring(0, 200) + '...');
-                    const selectedVoice = window.voiceService.setPersonaVoice(characterProfile);
+                    const selectedVoice = window.voiceService.updateUserVoiceSetting(characterProfile, window.SETTINGS);
                     if (selectedVoice) {
-                        console.log(`✅ LLMService: Persona voice automatically selected: ${selectedVoice}`);
+                        console.log(`✅ LLMService: User voice setting updated to: ${selectedVoice}`);
                     } else {
-                        console.warn('❌ LLMService: Failed to select persona voice');
+                        console.warn('❌ LLMService: Failed to update user voice setting');
                     }
                 } else {
-                    console.warn('❌ LLMService: voiceService.setPersonaVoice not available');
+                    console.warn('❌ LLMService: voiceService.updateUserVoiceSetting or SETTINGS not available');
                 }
                 
                 return characterProfile;
@@ -306,15 +301,16 @@ Make sure the character you create embodies and follows the persona instructions
             const imageGenMessagesForApiCall = [
                 {
                     role: "system",
-                                    content: "You are an image prompt generator. Your ONLY job is to convert user requests into comma-separated lists of visual descriptive keywords for image generation. " +
-                    "Unless the user asks you for a specific image outside the context of the roleplay, Include the character's physical appearance details: " +
-                    "gender, hair color and style, eye color, skin tone, height, build, clothing style, age, and whatever else is relevant to the current conversation. " +
+                    content: "You are an image prompt generator. Your ONLY job is to convert user requests into comma-separated lists of visual descriptive keywords for image generation. " +
+                    "Unless the user asks you for a specific image outside the context of the roleplay, Include your persona's physical appearance details: " +
+                    "gender ('man' or 'woman'), hair color and style, eye color, skin tone, height, build, clothing style, age, and whatever else is relevant to the current conversation. " +
                     "Do not include the character's name or more than one adjective per trait."
                 },
                 {
                     role: "user", 
                     content: "Convert this request into ONLY a comma-separated list of image generation keywords: \"" + message + "\". If your persona is in the image, " +
-                    "Include Physical character details from the conversation: " + (this.getCharacterProfile() || 'person') + ". Output format: keyword1, keyword2, keyword3, etc. " +
+                    "Include Physical character details from the conversation: " + (this.getCharacterProfile() || 'person') +
+                    ". Output format: (man or woman), hair color, style, eye color, skin tone, height, build, setting, keyword1, keyword2, keyword3, etc. " +
                     "Setting the scene is important, so include the setting of the image in the keywords, and any other details that are relevant to the current conversation. " +
                     "If the user asks you to send them an image of something or a place outside of the current conversation, do not include any character details in the keywords."
                 }
@@ -449,12 +445,6 @@ Make sure the character you create embodies and follows the persona instructions
             !msg.content.includes('[INTERNAL CHARACTER PROFILE')
         );
         
-        // Clear persona voice when resetting character
-        if (window.voiceService && window.voiceService.clearPersonaVoice) {
-            window.voiceService.clearPersonaVoice();
-            console.log("LLMService: Cleared persona voice on character reset");
-        }
-        
         console.log("Character profile reset. Will regenerate on next message.");
     }
 
@@ -499,12 +489,6 @@ Make sure the character you create embodies and follows the persona instructions
         // The character profile generation will happen in createPersona() or generateCharacterProfile()
         this.characterInitialized = false;
         
-        // Clear any existing persona voice since we're setting a new persona
-        if (window.voiceService && window.voiceService.clearPersonaVoice) {
-            window.voiceService.clearPersonaVoice();
-            console.log("LLMService: Cleared existing persona voice for new custom persona");
-        }
-        
         // Save the updated conversation history
         this.saveConversationHistory();
         
@@ -519,12 +503,6 @@ Make sure the character you create embodies and follows the persona instructions
             !msg.content.includes('[INTERNAL CHARACTER PROFILE') && 
             !msg.content.includes('[CUSTOM PERSONA')
         );
-        
-        // Clear persona voice when resetting persona
-        if (window.voiceService && window.voiceService.clearPersonaVoice) {
-            window.voiceService.clearPersonaVoice();
-            console.log("LLMService: Cleared persona voice on persona reset");
-        }
         
         console.log("Persona reset. Will use default character generation on next message.");
     }
@@ -542,13 +520,18 @@ Make sure the character you create embodies and follows the persona instructions
                 },
                 {
                     role: "system",
-                                    content: "Generate a comma-separated list of image prompt keywords based on the character profile. " +
-                    "Output ONLY the comma-separated list."
+                    content: "You are an image prompt generator. Your ONLY job is to convert user requests into comma-separated lists of visual descriptive keywords for image generation. " +
+                    "Unless the user asks you for a specific image outside the context of the roleplay, Include your persona's physical appearance details: " +
+                    "gender ('man' or 'woman'), hair color and style, eye color, skin tone, height, build, clothing style, age, and whatever else is relevant to the current conversation. " +
+                    "Do not include the character's name or more than one adjective per trait."
                 },
                 {
                     role: "user",
-                                    content: "Based on the character profile above, create a comma-separated list of visual keywords for image generation. " +
-                    "Include the character's physical appearance details: gender, hair color and style, eye color, skin tone, height, build, clothing style, age"
+                    content: "Convert this request into ONLY a comma-separated list of image generation keywords." +
+                    "Include Physical character details from the conversation: " + (this.getCharacterProfile() || 'person') +
+                    ". Output format: (man or woman), hair color, style, eye color, skin tone, height, build, setting, keyword1, keyword2, keyword3, etc. " +
+                    "Setting the scene is important, so include the setting of the image in the keywords, and any other details that are relevant to the current conversation. " +
+                    "If the user asks you to send them an image of something or a place outside of the current conversation, do not include any character details in the keywords."
                 }
             ];
             

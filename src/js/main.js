@@ -183,12 +183,18 @@ async function initializeApp() {
         voiceService = null;
     }
     
+    // Make SETTINGS available globally for voice setting updates
+    window.SETTINGS = SETTINGS;
+    
     const contextService = new ContextService();
     
     if (voiceService) {
         voiceService.finalAutoSendDelay = 500;
         voiceService.setVoiceRate(SETTINGS.voiceSpeed);
         voiceService.setVoicePitch(SETTINGS.voicePitch);
+        
+        // Set callback for updating voice dropdown when persona voice is selected
+        voiceService.setVoiceDropdownCallback(updateVoiceDropdown);
         
         // Initialize Azure TTS if API key is provided
         if (SETTINGS.azureApiKey && SETTINGS.azureApiKey.trim()) {
@@ -198,6 +204,19 @@ async function initializeApp() {
 
     // Initialize MCP Client
     await initializeMCPClient();
+
+    // --- Helper Functions ---
+    function updateVoiceDropdown(selectedVoice) {
+        const voiceDropdown = document.getElementById('select-tts-voice');
+        if (voiceDropdown) {
+            voiceDropdown.value = selectedVoice;
+            // Also update the SETTINGS object to keep it in sync
+            SETTINGS.ttsVoice = selectedVoice;
+            console.log(`Voice dropdown updated to: ${selectedVoice}`);
+        } else {
+            console.warn('Voice dropdown not found, cannot update UI');
+        }
+    }
 
     // --- Core Functions ---
     async function addMessage(message, sender, enableTTS = true) {
@@ -243,9 +262,8 @@ async function initializeApp() {
             try {
                 console.log('🎤 Starting TTS for message');
                 // Use persona voice if active, otherwise use user setting
-                const voiceToUse = voiceService.getCurrentVoice() || SETTINGS.ttsVoice;
-                console.log(`🎤 Voice selection - Persona: ${voiceService.getCurrentVoice()}, Settings: ${SETTINGS.ttsVoice}, Using: ${voiceToUse}`);
-                await voiceService.speak(textToSpeak, voiceToUse);
+                console.log(`🎤 Voice selection - Using: ${SETTINGS.ttsVoice}`);
+                await voiceService.speak(textToSpeak, SETTINGS.ttsVoice);
                 console.log('🎤 TTS completed');
             } catch (error) {
                 console.error("TTS Error:", error);

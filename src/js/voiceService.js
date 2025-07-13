@@ -13,9 +13,8 @@ if (typeof VoiceService === 'undefined') {
             this.azureTTS = null;
             this.useAzureTTS = false;
             
-            // Persona voice management
-            this.personaVoice = null;
-            this.isPersonaVoiceActive = false;
+            // Voice settings update callback (set by main.js)
+            this.updateVoiceDropdownCallback = null;
             
             // Gender-based voice categorization
             this.voicesByGender = {
@@ -57,9 +56,6 @@ if (typeof VoiceService === 'undefined') {
         } else {
             console.warn('Speech Recognition API not supported in this browser.');
         }
-        
-        // Load saved persona voice
-        this.loadPersonaVoice();
     }
 
     // --- Speech Synthesis (TTS) Methods ---
@@ -92,12 +88,7 @@ if (typeof VoiceService === 'undefined') {
 
     speak(textToSpeak, preferredVoiceKeyword) {
         return new Promise(async (resolve, reject) => { 
-            // Use persona voice if active, otherwise use provided voice
-            const voiceToUse = this.getCurrentVoice() || preferredVoiceKeyword;
-            
-            if (this.getCurrentVoice()) {
-                console.log(`VoiceService: Using persona voice: ${this.getCurrentVoice()}`);
-            }
+            const voiceToUse = preferredVoiceKeyword;
             
             // Try Azure TTS first if available
             if (this.isAzureTTSEnabled()) {
@@ -228,13 +219,23 @@ if (typeof VoiceService === 'undefined') {
 
         const profileLower = characterProfile.toLowerCase();
         
-        // First, look for explicit structured gender declarations
+        // First, look for explicit structured gender declarations - prioritize new man/woman format
+        if (profileLower.includes('**gender:** woman') || profileLower.includes('gender: woman')) {
+            console.log('VoiceService: Found explicit woman gender declaration');
+            return 'female';
+        }
+        if (profileLower.includes('**gender:** man') || profileLower.includes('gender: man')) {
+            console.log('VoiceService: Found explicit man gender declaration');
+            return 'male';
+        }
+        
+        // Fallback to original male/female format for backward compatibility
         if (profileLower.includes('**gender:** female') || profileLower.includes('gender: female')) {
-            console.log('VoiceService: Found explicit female gender declaration');
+            console.log('VoiceService: Found explicit female gender declaration (legacy format)');
             return 'female';
         }
         if (profileLower.includes('**gender:** male') || profileLower.includes('gender: male')) {
-            console.log('VoiceService: Found explicit male gender declaration');
+            console.log('VoiceService: Found explicit male gender declaration (legacy format)');
             return 'male';
         }
         
@@ -290,51 +291,31 @@ if (typeof VoiceService === 'undefined') {
         return selectedVoice;
     }
 
-    setPersonaVoice(characterProfile) {
+    updateUserVoiceSetting(characterProfile, settingsObject) {
         const gender = this.detectGenderFromProfile(characterProfile);
         const selectedVoice = this.selectRandomVoiceByGender(gender);
         
         if (selectedVoice) {
-            this.personaVoice = selectedVoice;
-            this.isPersonaVoiceActive = true;
+            // Update user settings directly
+            settingsObject.ttsVoice = selectedVoice;
+            localStorage.setItem('ttsVoice', selectedVoice);
             
-            // Save to localStorage for persistence
-            localStorage.setItem('personaVoice', selectedVoice);
-            localStorage.setItem('isPersonaVoiceActive', 'true');
+            // Update the voice dropdown in UI if callback is available
+            if (this.updateVoiceDropdownCallback) {
+                this.updateVoiceDropdownCallback(selectedVoice);
+            }
             
-            console.log(`VoiceService: Persona voice set to: ${selectedVoice} (${gender})`);
+            console.log(`VoiceService: User voice setting updated to: ${selectedVoice} (${gender})`);
             return selectedVoice;
         } else {
-            console.warn('VoiceService: Could not select persona voice, using default');
+            console.warn('VoiceService: Could not select voice for persona, keeping current setting');
             return null;
         }
     }
 
-    clearPersonaVoice() {
-        this.personaVoice = null;
-        this.isPersonaVoiceActive = false;
-        
-        // Clear from localStorage
-        localStorage.removeItem('personaVoice');
-        localStorage.removeItem('isPersonaVoiceActive');
-        
-        console.log('VoiceService: Persona voice cleared');
-    }
-
-    loadPersonaVoice() {
-        const savedPersonaVoice = localStorage.getItem('personaVoice');
-        const isActive = localStorage.getItem('isPersonaVoiceActive') === 'true';
-        
-        if (savedPersonaVoice && isActive) {
-            this.personaVoice = savedPersonaVoice;
-            this.isPersonaVoiceActive = true;
-            console.log(`VoiceService: Loaded persona voice: ${savedPersonaVoice}`);
-        }
-    }
-
-    getCurrentVoice() {
-        // Return persona voice if active, otherwise return null (will use user setting)
-        return this.isPersonaVoiceActive ? this.personaVoice : null;
+    // Set callback function for updating voice dropdown in UI
+    setVoiceDropdownCallback(callback) {
+        this.updateVoiceDropdownCallback = callback;
     }
 
     // Map Azure voice names to Web Speech API voice names for fallback
@@ -379,11 +360,20 @@ if (typeof VoiceService === 'undefined') {
             return mappedVoice;
         }
         
-        // Fallback: try to find a voice containing the name
-        const fallbackVoice = this.voices.find(voice => 
+        // Fallback: try to find a voice containing the name, prefer Microsoft voices
+        let fallbackVoice = this.voices.find(voice => 
             voice.name.toLowerCase().includes(azureVoiceName.toLowerCase()) && 
+            voice.name.toLowerCase().includes('microsoft') &&
             voice.lang.startsWith('en')
         );
+        
+        // If no Microsoft voice found, try any voice with the name
+        if (!fallbackVoice) {
+            fallbackVoice = this.voices.find(voice => 
+                voice.name.toLowerCase().includes(azureVoiceName.toLowerCase()) && 
+                voice.lang.startsWith('en')
+            );
+        }
         
         if (fallbackVoice) {
             console.log(`VoiceService: Found fallback Web Speech voice for ${azureVoiceName}: ${fallbackVoice.name}`);
@@ -405,18 +395,35 @@ if (typeof VoiceService === 'undefined') {
 
         if (this.voices.length > 0) {
             if (preferredVoiceKeyword && preferredVoiceKeyword !== "AUTO") {
-                // If this is a persona voice from our voice categories, try to map it to Web Speech API
-                if (this.isPersonaVoiceActive && this.personaVoice === preferredVoiceKeyword) {
-                    const mappedVoiceName = this.mapToWebSpeechVoice(preferredVoiceKeyword);
-                    voiceToUse = this.voices.find(voice => voice.name === mappedVoiceName);
-                    if (voiceToUse) {
-                        console.log(`VoiceService: Using mapped persona voice: ${voiceToUse.name}`);
+                // Try to find voice by exact name match from mapping
+                const mappedVoiceName = this.mapToWebSpeechVoice(preferredVoiceKeyword);
+                voiceToUse = this.voices.find(voice => voice.name === mappedVoiceName);
+                
+                if (voiceToUse) {
+                    console.log(`VoiceService: Using exact mapped voice: ${voiceToUse.name}`);
+                } else {
+                    // Try to find voice by direct fallback search within mapToWebSpeechVoice
+                    // Check if mapToWebSpeechVoice already found a fallback voice name
+                    if (mappedVoiceName !== preferredVoiceKeyword) {
+                        console.log(`VoiceService: Exact mapped voice "${mappedVoiceName}" not found, but fallback was attempted`);
+                    }
+                    
+                    // Debug: show available voices that contain the keyword
+                    const availableVoicesWithKeyword = this.voices.filter(voice => 
+                        voice.name.toLowerCase().includes(preferredVoiceKeyword.toLowerCase()) && voice.lang.startsWith('en')
+                    );
+                    console.log(`VoiceService: Available voices containing "${preferredVoiceKeyword}":`, availableVoicesWithKeyword.map(v => v.name));
+                    
+                    // Use the first available voice with the keyword if mapToWebSpeechVoice found one
+                    if (availableVoicesWithKeyword.length > 0) {
+                        voiceToUse = availableVoicesWithKeyword[0];
+                        console.log(`VoiceService: Using first available voice with keyword: ${voiceToUse.name}`);
                     } else {
-                        console.log(`VoiceService: Mapped voice not found, falling back to keyword search for: ${preferredVoiceKeyword}`);
+                        console.log(`VoiceService: No voices found containing "${preferredVoiceKeyword}", falling back to keyword search`);
                     }
                 }
                 
-                // Original keyword-based search if mapping didn't work
+                // Keyword-based search if mapping didn't work
                 if (!voiceToUse) {
                     const keyword = preferredVoiceKeyword.toLowerCase();
                     // Attempt to find a "Microsoft ... (Natural)" voice first
