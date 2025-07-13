@@ -52,13 +52,47 @@ if (typeof AzureTTSService === 'undefined') {
         mapVoiceKeywordToAzure(voiceKeyword) {
             const voiceMap = {
                 'AUTO': 'en-US-JennyNeural',
+                
+                // US Female Voices
                 'Ava': 'en-US-AvaNeural',
-                'Emily': 'en-GB-LibbyNeural',  // Map Emily to UK Libby since no Emily in Azure
-                'Libby': 'en-GB-LibbyNeural',
-                'Sonia': 'en-GB-SoniaNeural',
                 'Jenny': 'en-US-JennyNeural',
+                'Emma': 'en-US-EmmaNeural',
+                'Sara': 'en-US-SaraNeural',
+                'Aria': 'en-US-AriaNeural',
+                'Ashley': 'en-US-AshleyNeural',
+                
+                // US Male Voices
+                'Andrew': 'en-US-AndrewNeural',
+                'Brian': 'en-US-BrianNeural',
                 'Guy': 'en-US-GuyNeural',
-                'Ryan': 'en-GB-RyanNeural'
+                'Jason': 'en-US-JasonNeural',
+                'Tony': 'en-US-TonyNeural',
+                
+                // UK Female Voices
+                'Sonia': 'en-GB-SoniaNeural',
+                'Libby': 'en-GB-LibbyNeural',
+                'Olivia': 'en-GB-OliviaNeural',
+                'Hollie': 'en-GB-HollieNeural',
+                
+                // UK Male Voices
+                'Ryan': 'en-GB-RyanNeural',
+                'Alfie': 'en-GB-AlfieNeural',
+                'Oliver': 'en-GB-OliverNeural',
+                
+                // AU Female Voices
+                'Natasha': 'en-AU-NatashaNeural',
+                'Freya': 'en-AU-FreyaNeural',
+                
+                // AU Male Voices
+                'William': 'en-AU-WilliamNeural',
+                'Neil': 'en-AU-NeilNeural',
+                
+                // CA Voices
+                'Clara': 'en-CA-ClaraNeural',
+                'Liam': 'en-CA-LiamNeural',
+                
+                // Legacy mappings for backward compatibility
+                'Emily': 'en-GB-LibbyNeural'  // Map Emily to UK Libby since no Emily in Azure
             };
             
             return voiceMap[voiceKeyword] || 'en-US-JennyNeural';
