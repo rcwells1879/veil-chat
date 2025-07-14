@@ -9,7 +9,7 @@ if (typeof ImageService === 'undefined') {
         this.width = 1024;
         this.height = 1536;
         this.steps = 20;
-        this.cfg_scale = 1.4;
+        this.cfg_scale = 3.5;
         this.sampler_name = "Euler a";
         
         // Set default settings for OpenAI

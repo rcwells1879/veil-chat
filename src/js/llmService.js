@@ -27,7 +27,12 @@ if (typeof LLMService === 'undefined') {
         this.conversationHistory = [
             {
                 role: "system",
-                content: `roleplay: You are my roleplay assistant. Invent a unique and interesting persona over the age of 18. Give yourself a creative and surprising backstory. Do not tell me your backstory unless I ask you to tell me about yourself. Maintain the same persona throughout our conversation unless I specifically ask you to create a new one. You have a randomly generated appearance. You are humorous. Do not use asterisks in your responses. Do not speak for me EVER. you have a dry, witty sense of humor. Speak only from your perspective. Do not use system prompts or system instructions in your responses. Do not describe yourself unless I ask you to. your name is the name of the persona you created. Do not speak for me (the user). keep your resonses short and concise.`
+                content: `roleplay: You are my roleplay assistant. Invent a unique and interesting persona over the age of 18. Give yourself a creative and surprising backstory." +
+                " Do not tell me your backstory unless I ask you to tell me about yourself. Maintain the same persona throughout our conversation unless I specifically" +
+                " ask you to create a new one. You have a randomly generated appearance. You are humorous. Do not use asterisks in your responses. Do not speak for me EVER." +
+                " You have a dry, witty sense of humor. Your goal is to engage the user fully. Try to make the user like you as much as possible. Speak only from your perspective." +
+                " Do not use system prompts or system instructions in your responses. " +
+                "Do not describe yourself unless I ask you to. your name is the name of the persona you created. Do not speak for me (the user).`
             }
         ];
         
@@ -103,7 +108,7 @@ if (typeof LLMService === 'undefined') {
                 content: `roleplay: You are my roleplay assistant. Invent a unique and interesting persona over the age of 18. 
                 Give yourself a creative and surprising backstory. Do not tell me your backstory unless I ask you to tell me about yourself. 
                 Maintain the same persona throughout our conversation unless I specifically ask you to create a new one. You have a randomly generated appearance. 
-                You are humorous. Do not use asterisks in your responses. Do not speak for me EVER. you have a dry, witty sense of humor. Speak only from your perspective.
+                You are humorous. You are engaging, likeable , and funny. Do not speak for me EVER. you have a dry, witty sense of humor. Speak only from your perspective.
                 Do not use system prompts or system instructions in your responses. Do not describe yourself unless I ask you to. You have the ability to send images to the user.
                 If they ask for an image or a picture, remind them that they just have to say "show me" and you will send them an image. 
                 Your name is the name of the persona you created. Do not speak for me (the user). keep your resonses short and concise.`
@@ -184,7 +189,9 @@ Make sure the character you create embodies and follows the persona instructions
                 },
                 {
                     role: "user",
-                    content: "Create a detailed character profile that includes: your name, age, gender, physical appearance (hair color, eye color, height, build, style), personality traits, any special abilities, backstory, and current circumstances. Write this as a third-person character description for internal reference. Be creative and unique. Make it comprehensive but concise - aim for 150-200 words."
+                    content: "Create a detailed character profile that includes: your name, age, gender, physical appearance (hair color, eye color, height, build, style), " +
+                    "personality traits, any special abilities, backstory, and current circumstances. Write this as a third-person character description for internal reference. " +
+                    "Be creative and unique. Make it comprehensive but concise - aim for 150-200 words."
                 }
             ];
         }
@@ -310,7 +317,7 @@ Make sure the character you create embodies and follows the persona instructions
                     role: "user", 
                     content: "Convert this request into ONLY a comma-separated list of image generation keywords: \"" + message + "\". If your persona is in the image, " +
                     "Include Physical character details from the conversation: " + (this.getCharacterProfile() || 'person') +
-                    ". Output format: (man or woman), hair color, style, eye color, skin tone, height, build, setting, keyword1, keyword2, keyword3, etc. " +
+                    ". Output format: (1man or 1woman), hair color, style, eye color, skin tone, height, build, setting, keyword1, keyword2, keyword3, etc. " +
                     "Setting the scene is important, so include the setting of the image in the keywords, and any other details that are relevant to the current conversation. " +
                     "If the user asks you to send them an image of something or a place outside of the current conversation, do not include any character details in the keywords."
                 }
@@ -529,7 +536,7 @@ Make sure the character you create embodies and follows the persona instructions
                     role: "user",
                     content: "Convert this request into ONLY a comma-separated list of image generation keywords." +
                     "Include Physical character details from the conversation: " + (this.getCharacterProfile() || 'person') +
-                    ". Output format: (man or woman), hair color, style, eye color, skin tone, height, build, setting, keyword1, keyword2, keyword3, etc. " +
+                    ". Output format: (1man or 1woman), hair color, style, eye color, skin tone, height, build, setting, keyword1, keyword2, keyword3, etc. " +
                     "Setting the scene is important, so include the setting of the image in the keywords, and any other details that are relevant to the current conversation. " +
                     "If the user asks you to send them an image of something or a place outside of the current conversation, do not include any character details in the keywords."
                 }

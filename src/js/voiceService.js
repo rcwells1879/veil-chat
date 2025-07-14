@@ -456,9 +456,28 @@ if (typeof VoiceService === 'undefined') {
                 }
             }
 
-            // If no voice selected by keyword, or keyword was "AUTO", use default logic
+            // Determine gender of requested voice for appropriate fallback
+            let requestedGender = 'unknown';
+            if (preferredVoiceKeyword && preferredVoiceKeyword !== "AUTO") {
+                if (this.voicesByGender.female.includes(preferredVoiceKeyword)) {
+                    requestedGender = 'female';
+                } else if (this.voicesByGender.male.includes(preferredVoiceKeyword)) {
+                    requestedGender = 'male';
+                }
+            }
+
+            // If no voice selected by keyword, or keyword was "AUTO", use gender-aware default logic
             if (!voiceToUse) {
-                const defaultKeywords = ['sonia', 'ava', 'jenny', 'emily', 'libby', 'zira', 'susan', 'hazel', 'linda', 'female'];
+                
+                // Use gender-appropriate default keywords
+                const defaultFemaleKeywords = ['sonia', 'ava', 'jenny', 'emily', 'libby'];
+                const defaultMaleKeywords = ['ryan', 'andrew', 'brian', 'guy', 'oliver'];
+                
+                const defaultKeywords = requestedGender === 'male' ? defaultMaleKeywords : 
+                                       requestedGender === 'female' ? defaultFemaleKeywords : 
+                                       defaultFemaleKeywords; // fallback to female if unknown
+                
+                console.log(`VoiceService: Using ${requestedGender} fallback keywords:`, defaultKeywords);
                 for (const key of defaultKeywords) {
                     // Prefer Microsoft Natural voices
                     voiceToUse = this.voices.find(v => v.lang.startsWith('en') && v.name.toLowerCase().includes("microsoft") && v.name.toLowerCase().includes("(natural)") && v.name.toLowerCase().includes(key) && !v.name.toLowerCase().includes('david'));
@@ -472,14 +491,20 @@ if (typeof VoiceService === 'undefined') {
                         if (voiceToUse) break;
                     }
                 }
-                // Broader fallbacks if still no voice
-                if (!voiceToUse) voiceToUse = this.voices.find(v => v.lang.startsWith('en') && v.localService && v.name.toLowerCase().includes("microsoft") && !v.name.toLowerCase().includes('david'));
-                if (!voiceToUse) voiceToUse = this.voices.find(v => v.lang.startsWith('en') && v.localService && !v.name.toLowerCase().includes('david'));
-                if (!voiceToUse) voiceToUse = this.voices.find(v => v.lang.startsWith('en') && v.localService); // Any local English voice
-                if (!voiceToUse) voiceToUse = this.voices.find(v => v.lang.startsWith('en')); // Any English voice
-                
+                // If gender-aware selection found a voice, log it
                 if (voiceToUse) {
-                    console.log(`VoiceService: Default/Auto voice selection: ${voiceToUse.name}`);
+                    console.log(`VoiceService: Gender-aware fallback voice selection (${requestedGender}): ${voiceToUse.name}`);
+                } else {
+                    // Broader fallbacks if still no voice - these ignore gender
+                    console.log(`VoiceService: No gender-appropriate voice found, using broader fallback (may not match gender)`);
+                    if (!voiceToUse) voiceToUse = this.voices.find(v => v.lang.startsWith('en') && v.localService && v.name.toLowerCase().includes("microsoft") && !v.name.toLowerCase().includes('david'));
+                    if (!voiceToUse) voiceToUse = this.voices.find(v => v.lang.startsWith('en') && v.localService && !v.name.toLowerCase().includes('david'));
+                    if (!voiceToUse) voiceToUse = this.voices.find(v => v.lang.startsWith('en') && v.localService); // Any local English voice
+                    if (!voiceToUse) voiceToUse = this.voices.find(v => v.lang.startsWith('en')); // Any English voice
+                    
+                    if (voiceToUse) {
+                        console.log(`VoiceService: Broader fallback voice selection: ${voiceToUse.name}`);
+                    }
                 }
             }
         }
