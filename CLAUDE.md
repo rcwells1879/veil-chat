@@ -113,6 +113,30 @@ The MCP server includes web search capabilities with multi-provider support:
 - **search_recent**: Search for recent information (last 24 hours, week, month)
 - **search_summarize**: Search and automatically summarize results for LLM context
 
+#### Persona-Driven Search Design Philosophy
+
+**Core Principle**: Search results should feel like natural conversation, not technical data dumps.
+
+**Key Design Requirements**:
+1. **Persona Integration**: All search responses must be delivered in the current persona's voice and character
+2. **Natural Conversation Flow**: Eliminate technical preambles like "According to my search" or "Based on the search results"
+3. **Contextual Awareness**: Search responses should consider the ongoing conversation context
+4. **Content Over Metadata**: Focus on actual information content, not search result descriptions or website metadata
+
+**Implementation Standards**:
+- **Brave Search**: Uses Brave's AI Summarizer API for enhanced content synthesis, then processes through persona lens
+- **Content Extraction**: When needed, extract actual webpage content rather than relying on search result snippets
+- **LLM Processing**: All search content passes through persona-aware LLM processing for natural delivery
+- **Fallback Handling**: Graceful degradation when advanced features (like summarizers) are unavailable
+
+**Response Format Guidelines**:
+- ✅ **Natural**: "Here's what's happening today: [actual headlines]"
+- ❌ **Technical**: "Search Summary: Analyzed 5 results. Summary: The search results show..."
+- ✅ **Contextual**: Responses that build on previous conversation
+- ❌ **Generic**: One-size-fits-all technical summaries
+
+**Future Web Tools**: Any new web search or content extraction tools should follow this persona-driven, conversational approach rather than returning raw technical data.
+
 **Implementation Notes**:
 - Search results are processed through the MCP server's LLM integration
 - Results are automatically formatted for optimal LLM consumption

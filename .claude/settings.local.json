@@ -18,6 +18,10 @@
       "WebFetch(domain:docs.microsoft.com)",
       "WebFetch(domain:learn.microsoft.com)",
       "WebFetch(domain:docs.coqui.ai)",
+      "Bash(cd:*)",
+      "WebFetch(domain:brave.com)",
+      "WebFetch(domain:api.search.brave.com)",
+      "Bash(cd:*)",
       "Bash(cd:*)"
     ],
     "deny": []

@@ -9,6 +9,7 @@ class BraveSearchProvider {
     constructor(apiKey, options = {}) {
         this.apiKey = apiKey;
         this.baseUrl = 'https://api.search.brave.com/res/v1/web/search';
+        this.summarizerUrl = 'https://api.search.brave.com/res/v1/summarizer/search';
         this.options = options;
     }
 
@@ -20,6 +21,11 @@ class BraveSearchProvider {
             country: 'US',
             lang: 'en'
         });
+
+        // Add summary parameter if requested
+        if (options.enableSummarizer) {
+            params.append('summary', '1');
+        }
 
         const response = await fetch(`${this.baseUrl}?${params}`, {
             headers: {
@@ -33,7 +39,91 @@ class BraveSearchProvider {
         }
 
         const data = await response.json();
-        return this.formatResults(data);
+        // console.log('🔍 Brave Search raw response:', JSON.stringify(data, null, 2));
+        const results = this.formatResults(data);
+        
+        // Return both results and summarizer key if available
+        return {
+            results,
+            summarizer: data.summarizer || null
+        };
+    }
+
+    async getSummary(summarizerKey) {
+        const params = new URLSearchParams({
+            key: summarizerKey,
+            entity_info: '1'
+        });
+
+        const response = await fetch(`${this.summarizerUrl}?${params}`, {
+            headers: {
+                'X-Subscription-Token': this.apiKey,
+                'Accept': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`Brave Summarizer API error: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        return this.formatSummary(data);
+    }
+
+    formatSummary(data) {
+        if (!data.summary || !data.summary.length) {
+            return null;
+        }
+
+        // Extract text from summary tokens
+        const summaryText = data.summary
+            .map(token => token.text || '')
+            .join('')
+            .trim();
+
+        return {
+            summary: summaryText,
+            entities: data.entities || [],
+            infobox: data.infobox || null
+        };
+    }
+
+    async searchWithSummarizer(query, options = {}) {
+        console.log(`🔍 Brave Search: Searching with summarizer for "${query}"`);
+        
+        // Step 1: Get search results with summarizer key
+        const searchResponse = await this.search(query, { 
+            ...options, 
+            enableSummarizer: true 
+        });
+        
+        // Step 2: If summarizer key exists, get AI summary
+        if (searchResponse.summarizer?.key) {
+            console.log('📝 Brave Search: Summarizer key found, getting AI summary...');
+            try {
+                const summaryData = await this.getSummary(searchResponse.summarizer.key);
+                
+                if (summaryData?.summary) {
+                    return {
+                        results: searchResponse.results,
+                        summary: summaryData.summary,
+                        entities: summaryData.entities,
+                        infobox: summaryData.infobox
+                    };
+                }
+            } catch (error) {
+                console.warn('⚠️ Brave Search: Summarizer failed, falling back to regular results:', error.message);
+            }
+        }
+        
+        // Fallback to regular search results
+        console.log('📄 Brave Search: No summarizer available, returning regular results');
+        return {
+            results: searchResponse.results,
+            summary: null,
+            entities: [],
+            infobox: null
+        };
     }
 
     formatResults(data) {
@@ -273,6 +363,16 @@ class SequentialThinkingMCPServer {
                 max_tokens: maxTokens,
                 stream: false
             };
+
+            // Handle Gemini-specific parameters to disable reasoning
+            if (model && model.toLowerCase().includes('gemini')) {
+                console.log('🤖 Applying Gemini-specific settings to disable reasoning...');
+                payload.thinkingBudget = 0;
+                payload.thinkingConfig = {
+                    thinkingBudget: 0
+                };
+                payload.reasoning_effort = "low";
+            }
 
             const headers = {
                 'Content-Type': 'application/json',
@@ -641,10 +741,36 @@ Be logical, clear, and focused. Keep your response concise (2-3 sentences).`;
                     throw new Error(`Unknown search provider: ${provider}`);
             }
 
-            // Perform search
+            // For Brave Search with auto-summarize, use the enhanced summarizer
+            if (provider === 'brave' && autoSummarize) {
+                console.log('🤖 Using Brave Search with enhanced summarizer...');
+                
+                const searchResponse = await searchProvider.searchWithSummarizer(query, {
+                    limit,
+                    timeFilter
+                });
+
+                if (searchResponse.summary) {
+                    // Use Brave's AI summary for persona-driven summarization
+                    console.log('📝 Brave summarizer provided content, creating persona-driven summary...');
+                    return this.handlePersonaSearchSummarize({ 
+                        query, 
+                        searchSettings, 
+                        llmSettings 
+                    }, searchResponse);
+                } else {
+                    console.log('📄 No Brave summary available, falling back to regular summarization...');
+                    return this.handleSearchSummarize({ query, searchSettings, llmSettings }, searchResponse.results);
+                }
+            }
+
+            // Perform regular search for other providers or non-summarized requests
             const results = await searchProvider.search(query, { limit, timeFilter });
             
-            if (!results || results.length === 0) {
+            // Handle the response based on provider type
+            const searchResults = results.results || results;
+
+            if (!searchResults || searchResults.length === 0) {
                 return {
                     content: [
                         { type: 'text', text: `No search results found for query: "${query}"` }
@@ -655,11 +781,11 @@ Be logical, clear, and focused. Keep your response concise (2-3 sentences).`;
             // If auto-summarize is enabled, call the search summarize function
             if (autoSummarize) {
                 console.log('🤖 Auto-summarize enabled, calling search summarize function...');
-                return this.handleSearchSummarize({ query, searchSettings, llmSettings }, results);
+                return this.handleSearchSummarize({ query, searchSettings, llmSettings }, searchResults);
             }
 
             // Format results normally without summarization
-            const sections = results.map((result, index) => ({
+            const sections = searchResults.map((result, index) => ({
                 heading: `${index + 1}. ${result.title}`,
                 text: `**URL:** ${result.url}\n\n${result.description || result.snippet}`,
                 published: result.published
@@ -667,9 +793,9 @@ Be logical, clear, and focused. Keep your response concise (2-3 sentences).`;
 
             const markdownArgs = {
                 title: `Search Results: ${query}`,
-                subtitle: `Found ${results.length} results using ${provider}`,
+                subtitle: `Found ${searchResults.length} results using ${provider}`,
                 sections: sections,
-                summary: `Found ${results.length} results for "${query}"`
+                summary: `Found ${searchResults.length} results for "${query}"`
             };
 
             return this.handleFormatMarkdown(markdownArgs);
@@ -700,6 +826,47 @@ Be logical, clear, and focused. Keep your response concise (2-3 sentences).`;
         });
     }
 
+    async handlePersonaSearchSummarize(args, searchResponse) {
+        const { query, searchSettings = {}, llmSettings = null } = args;
+        
+        try {
+            console.log('🎭 Generating persona-driven summary from Brave summarizer content...');
+            
+            // Use Brave's AI summary as the primary content
+            const braveContent = searchResponse.summary;
+            const entities = searchResponse.entities || [];
+            const infobox = searchResponse.infobox || null;
+            
+            // Prepare enhanced prompt for persona-driven summarization
+            const summaryPrompt = `You are responding as your current persona in a natural conversation. The user asked: "${query}"
+
+Here's the information I found:
+
+${braveContent}
+
+${entities.length > 0 ? `\nKey entities: ${entities.map(e => e.title || e.name || e.text).join(', ')}` : ''}
+
+${infobox ? `\nAdditional info: ${infobox.long_desc || infobox.short_desc || ''}` : ''}
+
+Please provide a natural, conversational response about this information. Stay in character as your persona, be engaging and helpful, and present the information in a way that feels like a natural conversation. Don't start with phrases like "According to my search" or "Based on the search results" - just naturally share what you found.`;
+
+            console.log('🤖 Generating persona-driven summary...');
+            const summary = await this.callLLM(summaryPrompt, 0.7, 2000, llmSettings);
+            
+            return {
+                content: [
+                    { type: 'text', text: summary }
+                ]
+            };
+
+        } catch (error) {
+            console.error('🎭 Persona search summarize error:', error);
+            
+            // Fallback to regular summarization if LLM fails
+            return this.handleSearchSummarize(args, searchResponse.results);
+        }
+    }
+
     async handleSearchSummarize(args, providedResults = null) {
         const { query, searchSettings = {}, llmSettings = null } = args;
         
@@ -724,46 +891,31 @@ Be logical, clear, and focused. Keep your response concise (2-3 sentences).`;
                 searchText = searchResult.content[0].text;
             }
             
-            // Generate summary using LLM
-            const summaryPrompt = `Analyze and summarize these search results for the query: "${query}"
+            // Generate persona-driven summary using LLM
+            const summaryPrompt = `You are responding as your current persona in a natural conversation. The user asked: "${query}"
+
+Based on the search information I found:
 
 ${searchText}
 
-Please provide:
-1. A concise summary of the key findings
-2. Main themes and trends identified
-3. Most relevant and credible sources
-4. Any conflicting information or different perspectives
-5. Actionable insights based on the results
-
-Focus on accuracy, relevance, and practical value.`;
+Please provide a natural, conversational response about this information. Stay in character as your persona, be engaging and helpful, and present the information in a way that feels like a natural conversation. Don't start with phrases like "According to my search" or "Based on the search results" - just naturally share what you found.`;
 
             let summary;
             try {
+                console.log('🎭 Generating persona-driven fallback summary...');
                 summary = await this.callLLM(summaryPrompt, 0.7, 2000, llmSettings);
                 console.log('🔍 Search summarization completed successfully');
             } catch (error) {
                 console.error('🔍 Search summarization failed, using fallback:', error.message);
-                summary = "Search summarization failed due to response length limits. Here are the raw search results instead.";
+                summary = "I found some search results, but I'm having trouble processing them right now. Let me know if you'd like me to try a different search approach.";
             }
             
-            const markdownArgs = {
-                title: `Search Summary: ${query}`,
-                subtitle: `Analyzed ${searchSettings.limit || 10} results`,
-                sections: [
-                    {
-                        heading: 'Summary',
-                        text: summary
-                    },
-                    {
-                        heading: 'Raw Results',
-                        text: searchText
-                    }
-                ],
-                summary: 'Search results have been analyzed and summarized for easy consumption.'
+            // Return persona-driven response directly
+            return {
+                content: [
+                    { type: 'text', text: summary }
+                ]
             };
-
-            return this.handleFormatMarkdown(markdownArgs);
 
         } catch (error) {
             console.error('🔍 Search summarize error:', error);
