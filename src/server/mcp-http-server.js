@@ -233,6 +233,91 @@ class MCPHTTPServer {
                         },
                         required: ['query']
                     }
+                },
+                {
+                    name: 'extract_web_content',
+                    description: 'Extract full content from a web page using intelligent method detection (Cheerio for static, Puppeteer for dynamic)',
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            url: {
+                                type: 'string',
+                                description: 'The URL to extract content from'
+                            },
+                            options: {
+                                type: 'object',
+                                description: 'Extraction options',
+                                properties: {
+                                    maxLength: {
+                                        type: 'number',
+                                        description: 'Maximum content length'
+                                    },
+                                    includeImages: {
+                                        type: 'boolean',
+                                        description: 'Whether to include images'
+                                    }
+                                }
+                            }
+                        },
+                        required: ['url']
+                    }
+                },
+                {
+                    name: 'extract_for_summary',
+                    description: 'Extract web content optimized for LLM summarization (shorter, focused content)',
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            url: {
+                                type: 'string',
+                                description: 'The URL to extract content from'
+                            },
+                            options: {
+                                type: 'object',
+                                description: 'Extraction options',
+                                properties: {
+                                    maxLength: {
+                                        type: 'number',
+                                        description: 'Maximum content length (default: 4000)',
+                                        default: 4000
+                                    }
+                                }
+                            }
+                        },
+                        required: ['url']
+                    }
+                },
+                {
+                    name: 'extract_multiple_urls',
+                    description: 'Extract content from multiple URLs in batch (useful for comparing articles or gathering information from multiple sources)',
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            urls: {
+                                type: 'array',
+                                items: {
+                                    type: 'string'
+                                },
+                                description: 'Array of URLs to extract content from'
+                            },
+                            options: {
+                                type: 'object',
+                                description: 'Extraction options',
+                                properties: {
+                                    maxConcurrent: {
+                                        type: 'number',
+                                        description: 'Maximum concurrent extractions (default: 3)',
+                                        default: 3
+                                    },
+                                    maxLength: {
+                                        type: 'number',
+                                        description: 'Maximum content length per URL'
+                                    }
+                                }
+                            }
+                        },
+                        required: ['urls']
+                    }
                 }
             ];
             res.json({ tools });
@@ -269,6 +354,15 @@ class MCPHTTPServer {
                         break;
                     case 'search_summarize':
                         result = await this.mcpServer.handleSearchSummarize(args, llmSettings);
+                        break;
+                    case 'extract_web_content':
+                        result = await this.mcpServer.handleExtractWebContent(args, llmSettings);
+                        break;
+                    case 'extract_for_summary':
+                        result = await this.mcpServer.handleExtractForSummary(args, llmSettings);
+                        break;
+                    case 'extract_multiple_urls':
+                        result = await this.mcpServer.handleExtractMultipleUrls(args, llmSettings);
                         break;
                     default:
                         return res.status(400).json({ error: `Unknown tool: ${tool}` });
@@ -333,6 +427,12 @@ class MCPHTTPServer {
 
 // Run the server if this file is executed directly
 if (import.meta.url.includes('mcp-http-server.js')) {
+    // Set Chrome path environment variable for Windows (if not already set)
+    if (!process.env.CHROME_PATH) {
+        process.env.CHROME_PATH = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
+        console.log('🤖 Setting CHROME_PATH:', process.env.CHROME_PATH);
+    }
+    
     const server = new MCPHTTPServer();
     server.start().catch(console.error);
 

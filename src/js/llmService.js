@@ -721,7 +721,9 @@ Make sure the character you create embodies and follows the persona instructions
         // Only add stop sequences if requested AND the model supports them (not Gemini)
         if (includeStop && !isGemini) {
             payload.stop = ["Human:", "User:", "###", "\n\nUser:"];
-        }        return payload;
+        }
+        
+        return payload;
     }
 }
 }

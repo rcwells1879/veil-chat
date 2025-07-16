@@ -4,6 +4,9 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 
+// Web extraction functionality
+import WebExtractor from './extractors/web-extractor.js';
+
 // Search Provider Classes
 class BraveSearchProvider {
     constructor(apiKey, options = {}) {
@@ -320,6 +323,9 @@ class SequentialThinkingMCPServer {
             }
         );
 
+        // Initialize web extractor
+        this.webExtractor = new WebExtractor();
+
         this.setupToolHandlers();
         this.setupErrorHandlers();
     }
@@ -455,6 +461,12 @@ class SequentialThinkingMCPServer {
                     return this.handleSearchRecent(args);
                 case 'search_summarize':
                     return this.handleSearchSummarize(args);
+                case 'extract_web_content':
+                    return this.handleExtractWebContent(args);
+                case 'extract_for_summary':
+                    return this.handleExtractForSummary(args);
+                case 'extract_multiple_urls':
+                    return this.handleExtractMultipleUrls(args);
                 default:
                     throw new Error(`Unknown tool: ${name}`);
             }
@@ -976,6 +988,118 @@ Please provide a natural, conversational response about this information. Stay i
         return intermediateSteps[stepNumber - 1] || `Bridge the gap between premise and conclusion through logical progression`;
     }
 
+    // Web Content Extraction Handlers
+    async handleExtractWebContent(args) {
+        const { url, options = {} } = args;
+        
+        if (!url) {
+            throw new Error('URL is required for web content extraction');
+        }
+
+        try {
+            console.log(`🔍 MCP Server: Extracting content from ${url}`);
+            const extractedData = await this.webExtractor.extract(url, options);
+            
+            return {
+                content: [
+                    {
+                        type: 'text',
+                        text: `# ${extractedData.title}\n\n**URL:** ${extractedData.url}\n**Extracted:** ${extractedData.extractedAt}\n**Method:** ${extractedData.extractionMethod}\n\n${extractedData.content}`
+                    }
+                ]
+            };
+        } catch (error) {
+            console.error(`❌ MCP Server: Web extraction failed for ${url}:`, error.message);
+            return {
+                content: [
+                    {
+                        type: 'text',
+                        text: `⚠️ Failed to extract content from ${url}: ${error.message}`
+                    }
+                ]
+            };
+        }
+    }
+
+    async handleExtractForSummary(args) {
+        const { url, options = {} } = args;
+        
+        if (!url) {
+            throw new Error('URL is required for web content extraction');
+        }
+
+        try {
+            console.log(`📝 MCP Server: Extracting content for summarization from ${url}`);
+            const extractedData = await this.webExtractor.extractForSummarization(url, options);
+            
+            // Format for LLM consumption
+            return {
+                content: [
+                    {
+                        type: 'text',
+                        text: `**${extractedData.title}**\n\nSource: ${extractedData.url}\n\n${extractedData.content}`
+                    }
+                ]
+            };
+        } catch (error) {
+            console.error(`❌ MCP Server: Web extraction for summary failed for ${url}:`, error.message);
+            return {
+                content: [
+                    {
+                        type: 'text',
+                        text: `⚠️ Failed to extract content from ${url}: ${error.message}`
+                    }
+                ]
+            };
+        }
+    }
+
+    async handleExtractMultipleUrls(args) {
+        const { urls, options = {} } = args;
+        
+        if (!urls || !Array.isArray(urls) || urls.length === 0) {
+            throw new Error('URLs array is required for batch extraction');
+        }
+
+        try {
+            console.log(`🔍 MCP Server: Batch extracting content from ${urls.length} URLs`);
+            const results = await this.webExtractor.extractBatch(urls, options);
+            
+            let combinedContent = '# Batch Web Content Extraction\n\n';
+            let successCount = 0;
+            
+            results.forEach((result, index) => {
+                if (result.success) {
+                    successCount++;
+                    combinedContent += `## ${result.data.title}\n\n**URL:** ${result.url}\n**Method:** ${result.data.extractionMethod}\n\n${result.data.content}\n\n---\n\n`;
+                } else {
+                    combinedContent += `## ❌ Failed: ${result.url}\n\n**Error:** ${result.error}\n\n---\n\n`;
+                }
+            });
+            
+            combinedContent += `\n**Summary:** Successfully extracted ${successCount}/${urls.length} URLs`;
+            
+            return {
+                content: [
+                    {
+                        type: 'text',
+                        text: combinedContent
+                    }
+                ]
+            };
+        } catch (error) {
+            console.error(`❌ MCP Server: Batch web extraction failed:`, error.message);
+            return {
+                content: [
+                    {
+                        type: 'text',
+                        text: `⚠️ Batch extraction failed: ${error.message}`
+                    }
+                ]
+            };
+        }
+    }
+
     setupErrorHandlers() {
         this.server.onerror = (error) => {
             console.error('MCP Server Error:', error);
@@ -1221,6 +1345,109 @@ const tools = [
                 }
             },
             required: ['query']
+        }
+    },
+    {
+        name: 'extract_web_content',
+        description: 'Extract full content from a web page using intelligent method detection (Cheerio for static, Puppeteer for dynamic)',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                url: {
+                    type: 'string',
+                    description: 'The URL to extract content from'
+                },
+                options: {
+                    type: 'object',
+                    description: 'Extraction options',
+                    properties: {
+                        maxLength: {
+                            type: 'number',
+                            description: 'Maximum content length in characters',
+                            default: 10000
+                        },
+                        includeImages: {
+                            type: 'boolean',
+                            description: 'Whether to include image information',
+                            default: true
+                        },
+                        blockResources: {
+                            type: 'boolean',
+                            description: 'Block images/CSS for faster loading (Puppeteer only)',
+                            default: false
+                        }
+                    }
+                }
+            },
+            required: ['url']
+        }
+    },
+    {
+        name: 'extract_for_summary',
+        description: 'Extract web content optimized for LLM summarization (shorter, focused content)',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                url: {
+                    type: 'string',
+                    description: 'The URL to extract content from'
+                },
+                options: {
+                    type: 'object',
+                    description: 'Extraction options',
+                    properties: {
+                        maxLength: {
+                            type: 'number',
+                            description: 'Maximum content length in characters',
+                            default: 4000
+                        },
+                        blockResources: {
+                            type: 'boolean',
+                            description: 'Block images/CSS for faster loading',
+                            default: true
+                        }
+                    }
+                }
+            },
+            required: ['url']
+        }
+    },
+    {
+        name: 'extract_multiple_urls',
+        description: 'Extract content from multiple URLs in batch (useful for comparing articles or gathering information from multiple sources)',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                urls: {
+                    type: 'array',
+                    description: 'Array of URLs to extract content from',
+                    items: {
+                        type: 'string'
+                    }
+                },
+                options: {
+                    type: 'object',
+                    description: 'Extraction options',
+                    properties: {
+                        maxLength: {
+                            type: 'number',
+                            description: 'Maximum content length per URL',
+                            default: 4000
+                        },
+                        maxConcurrent: {
+                            type: 'number',
+                            description: 'Maximum concurrent extractions',
+                            default: 3
+                        },
+                        blockResources: {
+                            type: 'boolean',
+                            description: 'Block images/CSS for faster loading',
+                            default: true
+                        }
+                    }
+                }
+            },
+            required: ['urls']
         }
     }
 ];

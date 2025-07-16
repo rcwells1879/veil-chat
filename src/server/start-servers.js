@@ -10,10 +10,15 @@ const parentDir = join(__dirname, '..', '..'); // Go up two levels to reach llm-
 
 console.log('🚀 Starting both servers...\n');
 
+// Set Chrome path environment variable for Windows
+process.env.CHROME_PATH = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
+console.log('🤖 Setting CHROME_PATH:', process.env.CHROME_PATH);
+
 // Start MCP HTTP Server (port 3001)
 const mcpServer = spawn('node', ['mcp-http-server.js'], {
     cwd: __dirname,
-    stdio: 'pipe'
+    stdio: 'pipe',
+    env: { ...process.env, CHROME_PATH: process.env.CHROME_PATH } // Pass environment variables
 });
 
 mcpServer.stdout.on('data', (data) => {

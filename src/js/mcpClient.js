@@ -202,6 +202,121 @@ if (typeof MCPClient === 'undefined') {
             return await this.callTool('logical_chain', { premise, conclusion, steps });
         }
 
+        // Web extraction helper methods
+        async extractWebContent(url, options = {}) {
+            return await this.callTool('extract_web_content', { url, options });
+        }
+
+        async extractForSummary(url, options = {}) {
+            return await this.callTool('extract_for_summary', { url, options });
+        }
+
+        async extractMultipleUrls(urls, options = {}) {
+            return await this.callTool('extract_multiple_urls', { urls, options });
+        }
+
+        // URL detection and extraction utilities
+        extractUrlsFromText(text) {
+            const urlRegex = /https?:\/\/[^\s\)]+/g;
+            return text.match(urlRegex) || [];
+        }
+
+        extractUrlsFromMarkdown(markdownText) {
+            // Extract URLs from markdown links [text](url)
+            const markdownLinkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
+            const urls = [];
+            let match;
+            
+            while ((match = markdownLinkRegex.exec(markdownText)) !== null) {
+                urls.push({
+                    text: match[1],
+                    url: match[2]
+                });
+            }
+            
+            // Also extract plain URLs
+            const plainUrls = this.extractUrlsFromText(markdownText);
+            plainUrls.forEach(url => {
+                if (!urls.some(item => item.url === url)) {
+                    urls.push({
+                        text: url,
+                        url: url
+                    });
+                }
+            });
+            
+            return urls;
+        }
+
+        findUrlsInConversationHistory(llmService, searchTerms = []) {
+            if (!llmService || !llmService.conversationHistory) {
+                return [];
+            }
+
+            const urls = [];
+            const recentMessages = llmService.conversationHistory.slice(-10); // Look at last 10 messages
+            
+            for (const message of recentMessages) {
+                if (message.role === 'assistant') {
+                    const extractedUrls = this.extractUrlsFromMarkdown(message.content);
+                    extractedUrls.forEach(item => {
+                        // Add context about which search produced this URL
+                        urls.push({
+                            ...item,
+                            context: message.content.substring(0, 100) + '...',
+                            messageIndex: llmService.conversationHistory.indexOf(message)
+                        });
+                    });
+                }
+            }
+            
+            return urls;
+        }
+
+        // Smart URL matching for user requests
+        matchUrlToRequest(userMessage, availableUrls) {
+            const lowerMessage = userMessage.toLowerCase();
+            
+            // Look for ordinal references (first, second, #1, #2, etc.)
+            const ordinalMatches = [
+                /(?:the\s+)?first|#1|1st/i,
+                /(?:the\s+)?second|#2|2nd/i,
+                /(?:the\s+)?third|#3|3rd/i,
+                /(?:the\s+)?fourth|#4|4th/i,
+                /(?:the\s+)?fifth|#5|5th/i
+            ];
+            
+            for (let i = 0; i < ordinalMatches.length && i < availableUrls.length; i++) {
+                if (ordinalMatches[i].test(lowerMessage)) {
+                    return availableUrls[i];
+                }
+            }
+            
+            // Look for keywords that match the URL text or domain
+            for (const urlItem of availableUrls) {
+                const urlText = urlItem.text.toLowerCase();
+                const domain = urlItem.url.toLowerCase();
+                
+                // Check if message contains words from the URL text
+                const urlWords = urlText.split(/\s+/).filter(word => word.length > 3);
+                for (const word of urlWords) {
+                    if (lowerMessage.includes(word.toLowerCase())) {
+                        return urlItem;
+                    }
+                }
+                
+                // Check for domain mentions (e.g., "the BBC article", "Wikipedia page")
+                if (domain.includes('bbc') && lowerMessage.includes('bbc')) return urlItem;
+                if (domain.includes('wikipedia') && lowerMessage.includes('wikipedia')) return urlItem;
+                if (domain.includes('cnn') && lowerMessage.includes('cnn')) return urlItem;
+                if (domain.includes('reddit') && lowerMessage.includes('reddit')) return urlItem;
+                if (domain.includes('github') && lowerMessage.includes('github')) return urlItem;
+                // Add more domain mappings as needed
+            }
+            
+            return null;
+        }
+
         getAvailableTools() {
             return this.tools.map(tool => ({
                 name: tool.name,
@@ -219,16 +334,22 @@ if (typeof MCPClient === 'undefined') {
         }
 
         // Integration helper for the chat interface
-        async integrateWithChat(message, context = '') {
+        async integrateWithChat(message, context = '', llmService = null) {
             if (!this.isConnected) {
                 console.log('❌ MCP Client not connected');
                 return null;
             }
 
             console.log('🔍 MCP Client checking message for keywords:', message);
-            // Check if the message contains keywords that suggest sequential thinking
             const lowerMessage = message.toLowerCase();
             
+            // Check for web extraction keywords first
+            const webExtractionResult = await this.handleWebExtractionRequests(message, llmService);
+            if (webExtractionResult) {
+                return webExtractionResult;
+            }
+            
+            // Check for sequential thinking keywords
             if (lowerMessage.includes('break down') || lowerMessage.includes('analyze step by step')) {
                 console.log('✅ Detected "break down" keyword, calling breakDownProblem');
                 return await this.breakDownProblem(message, context);
@@ -255,6 +376,119 @@ if (typeof MCPClient === 'undefined') {
 
             console.log('❌ No MCP keywords detected in message');
             return null;
+        }
+
+        // Handle web extraction requests intelligently
+        async handleWebExtractionRequests(message, llmService) {
+            const lowerMessage = message.toLowerCase();
+            
+            // Check for direct URL in message - PRIORITY: always use direct URL if found
+            const directUrls = this.extractUrlsFromText(message);
+            if (directUrls.length > 0) {
+                console.log('✅ Found direct URL(s) in message:', directUrls);
+                console.log('🔍 Using direct URL, skipping conversation history matching');
+                
+                // Determine extraction type based on keywords
+                let result;
+                if (lowerMessage.includes('extract') || lowerMessage.includes('get content') || lowerMessage.includes('full details')) {
+                    console.log('✅ Detected extract content request for direct URL');
+                    result = await this.extractWebContent(directUrls[0]);
+                } else {
+                    // Default to summary extraction for any direct URL request
+                    console.log('✅ Using summary extraction for direct URL');
+                    result = await this.extractForSummary(directUrls[0]);
+                }
+                
+                // Mark for LLM processing so main.js knows to send through LLM
+                if (result && result.content) {
+                    result.needsLLMProcessing = true;
+                    result.originalUrl = directUrls[0];
+                }
+                return result;
+            }
+            
+            // Check for extraction keywords that might reference previous search results
+            const extractionKeywords = [
+                'tell me more about',
+                'more details about',
+                'more information about',
+                'get more details',
+                'extract content from',
+                'summarize',
+                'what does',
+                'dive deeper',
+                'more info',
+                'full article',
+                'read more'
+            ];
+            
+            const hasExtractionKeyword = extractionKeywords.some(keyword => lowerMessage.includes(keyword));
+            
+            if (hasExtractionKeyword) {
+                console.log('✅ Detected web extraction keywords');
+                
+                // Find URLs from recent conversation history
+                const availableUrls = this.findUrlsInConversationHistory(llmService);
+                console.log('📚 Found URLs in conversation history:', availableUrls.length);
+                
+                if (availableUrls.length > 0) {
+                    // Try to match the user's request to a specific URL
+                    const matchedUrl = this.matchUrlToRequest(message, availableUrls);
+                    
+                    if (matchedUrl) {
+                        console.log('✅ Matched user request to URL:', matchedUrl.url);
+                        
+                        // Determine extraction type based on keywords
+                        let result;
+                        if (lowerMessage.includes('summarize') || lowerMessage.includes('summary') || lowerMessage.includes('tell me about')) {
+                            result = await this.extractForSummary(matchedUrl.url);
+                        } else {
+                            result = await this.extractWebContent(matchedUrl.url);
+                        }
+                        
+                        // Mark for LLM processing
+                        if (result && result.content) {
+                            result.needsLLMProcessing = true;
+                            result.originalUrl = matchedUrl.url;
+                        }
+                        return result;
+                    } else if (availableUrls.length === 1) {
+                        // If there's only one URL in recent history, assume that's what they want
+                        console.log('✅ Single URL in history, using that:', availableUrls[0].url);
+                        const result = await this.extractForSummary(availableUrls[0].url);
+                        
+                        // Mark for LLM processing
+                        if (result && result.content) {
+                            result.needsLLMProcessing = true;
+                            result.originalUrl = availableUrls[0].url;
+                        }
+                        return result;
+                    } else {
+                        // Multiple URLs but no clear match - could enhance this with LLM disambiguation
+                        console.log('⚠️ Multiple URLs available but no clear match');
+                        // For now, return null and let normal LLM handle it
+                    }
+                }
+            }
+            
+            // Check for batch extraction requests
+            if (lowerMessage.includes('compare') && (lowerMessage.includes('article') || lowerMessage.includes('url') || lowerMessage.includes('link'))) {
+                const availableUrls = this.findUrlsInConversationHistory(llmService);
+                if (availableUrls.length >= 2) {
+                    console.log('✅ Detected compare request, using multiple URLs');
+                    const urls = availableUrls.slice(0, 3).map(item => item.url); // Limit to 3 for performance
+                    const result = await this.extractMultipleUrls(urls);
+                    
+                    // Mark for LLM processing
+                    if (result && result.content) {
+                        result.needsLLMProcessing = true;
+                        result.originalUrl = urls.join(', ');
+                    }
+                    return result;
+                }
+            }
+            
+            return null; // No web extraction needed
         }
     }
 } 

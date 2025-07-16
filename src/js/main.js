@@ -417,6 +417,19 @@ async function initializeApp() {
                     llmService.saveConversationHistory();
                     console.log('🔍 Search result added to conversation history');
                     console.log('- New history length:', llmService.conversationHistory.length);
+                    
+                    // Add subtle suggestion for deeper exploration (only if auto-summarize is disabled)
+                    const autoSummarize = localStorage.getItem('search-auto-summarize') === 'true';
+                    if (!autoSummarize && mcpClient && mcpClient.isConnected) {
+                        // Check if there are URLs in the search results
+                        const urls = mcpClient.extractUrlsFromMarkdown(searchResult.content[0].text);
+                        if (urls.length > 0) {
+                            console.log('💡 Adding subtle suggestion for web extraction');
+                            setTimeout(() => {
+                                addMessage('💡 *Tip: You can ask me to "tell me more about" any of these articles for detailed information.*', 'system', false);
+                            }, 1000); // Small delay to let search results display first
+                        }
+                    }
                 } else {
                     console.error('❌ llmService is null/undefined - cannot add search result to history!');
                 }
@@ -429,12 +442,18 @@ async function initializeApp() {
 
         // Prepare conversation context for MCP
         const conversationContext = llmService.conversationHistory
-            .map(msg => `${msg.role}: ${msg.content}`)
+            .map(msg => {
+                const content = typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content);
+                return `${msg.role}: ${content}`;
+            })
             .join('\n');
         
         console.log('📚 Conversation context prepared:');
         console.log('- History length:', llmService.conversationHistory.length, 'messages');
-        console.log('- Last 3 messages:', llmService.conversationHistory.slice(-3).map(msg => `${msg.role}: ${msg.content.substring(0, 100)}...`));
+        console.log('- Last 3 messages:', llmService.conversationHistory.slice(-3).map(msg => {
+            const content = typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content);
+            return `${msg.role}: ${content.substring(0, 100)}...`;
+        }));
         console.log('- Context preview:', conversationContext.substring(conversationContext.length - 500));
 
         // Check if MCP client should handle this message
@@ -442,11 +461,11 @@ async function initializeApp() {
             console.log('🔍 MCP Client is connected, checking if message should be handled...');
             console.log('📝 Message:', message);
             try {
-                const mcpResult = await mcpClient.integrateWithChat(message, conversationContext);
+                const mcpResult = await mcpClient.integrateWithChat(message, conversationContext, llmService);
                 console.log('🎯 MCP Integration Result:', mcpResult);
                 console.log('📄 Full MCP Response Text:', mcpResult?.content?.[0]?.text);
                 if (mcpResult && mcpResult.content && mcpResult.content[0]) {
-                    console.log('✅ MCP handled the message, displaying result');
+                    console.log('✅ MCP handled the message');
                     
                     // Add user message to conversation history for MCP (since it won't go through sendMessage)
                     if (llmService) {
@@ -457,22 +476,85 @@ async function initializeApp() {
                         console.log('📝 User message added to conversation history for MCP:', message);
                     }
                     
-                    // MCP handled the message, display the result
-                    await addMessage(mcpResult.content[0].text, 'llm');
-                    // Add MCP result to conversation history (user message already added above)
-                    if (llmService) {
-                        llmService.conversationHistory.push({
-                            role: "assistant",
-                            content: mcpResult.content[0].text
-                        });
-                        llmService.saveConversationHistory();
-                        // Add logging for debugging
-                        console.log("🎯 MCP result added to conversation history");
-                        console.log("Current conversation history length:", llmService.conversationHistory.length);
-                        console.log("Conversation context used:", conversationContext);
-                        // Re-render the full conversation in the UI
-                        renderConversation(llmService.conversationHistory);
+                    // Check if this needs LLM processing for persona-driven response
+                    if (mcpResult.needsLLMProcessing) {
+                        console.log('🤖 Raw extraction result needs LLM processing for persona response');
+                        console.log('📄 Raw content length:', mcpResult.content[0].text.length);
+                        
+                        // Check if extraction failed
+                        const extractedText = mcpResult.content[0].text;
+                        if (extractedText.includes('⚠️ Failed to extract content') || extractedText.includes('Unable to extract')) {
+                            console.log('❌ Web extraction failed, showing error message to user');
+                            
+                            // Add user message to history
+                            if (llmService) {
+                                llmService.conversationHistory.push({
+                                    role: "assistant",
+                                    content: `I wasn't able to extract content from that website (${mcpResult.originalUrl}). The site might require special handling or have access restrictions. You could try asking me to search for information about the topic instead.`
+                                });
+                                llmService.saveConversationHistory();
+                            }
+                            
+                            // Show user-friendly error message
+                            await addMessage(`I wasn't able to extract content from that website. The site might require special handling or have access restrictions. You could try asking me to search for information about the topic instead.`, 'llm');
+                            return;
+                        }
+                        
+                        // Add raw extraction to conversation history (for LLM context)
+                        if (llmService) {
+                            llmService.conversationHistory.push({
+                                role: "assistant",
+                                content: `[Web extraction from ${mcpResult.originalUrl}]\n\n${extractedText}`
+                            });
+                        }
+                        
+                        // Create prompt for LLM to process the extracted content
+                        const extractionPrompt = `I extracted some content from a website for you. Please provide a natural, conversational summary of this information in your persona voice. Don't mention that this is extracted content - just naturally share what you found interesting about it.
+
+Extracted content:
+${extractedText}
+
+Please respond naturally as your persona would, focusing on the most interesting and relevant information.`;
+
+                        // Send to LLM for persona-driven processing
+                        console.log('🤖 Sending extracted content to LLM for persona processing...');
+                        try {
+                            const llmResponse = await llmService.sendMessage(extractionPrompt, null, false); // Don't add to history yet
+                            console.log('✅ LLM response received:', llmResponse.substring(0, 100) + '...');
+                            
+                            // Display the LLM's persona-driven response to user
+                            await addMessage(llmResponse, 'llm');
+                            console.log('✅ LLM response displayed to user');
+                            
+                            // Add LLM's response to conversation history
+                            if (llmService) {
+                                llmService.conversationHistory.push({
+                                    role: "assistant", 
+                                    content: llmResponse
+                                });
+                                llmService.saveConversationHistory();
+                                console.log("🎯 LLM-processed web extraction added to conversation history");
+                            }
+                        } catch (error) {
+                            console.error('❌ Error processing extraction through LLM:', error);
+                            await addMessage('I extracted the content but had trouble processing it. Please try again.', 'llm');
+                        }
+                    } else {
+                        // Direct MCP result (like reasoning tools) - display as-is
+                        console.log('✅ Direct MCP result, displaying as-is');
+                        await addMessage(mcpResult.content[0].text, 'llm');
+                        
+                        // Add MCP result to conversation history
+                        if (llmService) {
+                            llmService.conversationHistory.push({
+                                role: "assistant",
+                                content: mcpResult.content[0].text
+                            });
+                            llmService.saveConversationHistory();
+                            console.log("🎯 Direct MCP result added to conversation history");
+                        }
                     }
+                    
                     return; // Don't proceed with normal LLM processing
                 } else {
                     console.log('❌ MCP did not handle the message, proceeding with normal LLM processing');
