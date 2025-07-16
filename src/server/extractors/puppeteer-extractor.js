@@ -10,7 +10,7 @@ class PuppeteerExtractor extends BaseExtractor {
         super();
         this.browser = null;
         this.browserPromise = null;
-        this.timeout = 45000; // Longer timeout for dynamic content
+        this.timeout = 10000; // Optimized timeout for better performance
     }
 
     /**
@@ -75,7 +75,12 @@ class PuppeteerExtractor extends BaseExtractor {
         const browser = await puppeteer.launch({
             headless: 'new',
             executablePath: chromePath,
-            ignoreDefaultArgs: ['--disable-extensions'], // Allow some default args but override path
+            ignoreDefaultArgs: false, // Don't ignore default args
+            env: {
+                ...process.env,
+                PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: 'true', // Force use of system Chrome
+                PUPPETEER_EXECUTABLE_PATH: chromePath
+            },
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
@@ -181,7 +186,7 @@ class PuppeteerExtractor extends BaseExtractor {
             while (navigationAttempts < maxAttempts) {
                 try {
                     await page.goto(url, { 
-                        waitUntil: ['domcontentloaded', 'networkidle0'],
+                        waitUntil: ['domcontentloaded', 'networkidle2'],
                         timeout: this.timeout 
                     });
                     break;
@@ -189,7 +194,7 @@ class PuppeteerExtractor extends BaseExtractor {
                     navigationAttempts++;
                     console.log(`🤖 Navigation attempt ${navigationAttempts} failed:`, navError.message);
                     if (navigationAttempts >= maxAttempts) throw navError;
-                    await page.waitForDelay(2000);
+                    await new Promise(resolve => setTimeout(resolve, 2000));
                 }
             }
 
@@ -197,13 +202,13 @@ class PuppeteerExtractor extends BaseExtractor {
             console.log(`🤖 PuppeteerExtractor: Waiting for dynamic content...`);
             
             // Wait for initial content
-            await page.waitForDelay(3000);
+            await new Promise(resolve => setTimeout(resolve, 3000));
             
             // Handle lazy loading by scrolling
             await this.handleLazyLoading(page);
             
             // Wait for any final dynamic content
-            await page.waitForDelay(2000);
+            await new Promise(resolve => setTimeout(resolve, 2000));
 
             // Platform-specific extraction logic
             const domain = new URL(url).hostname.toLowerCase();
@@ -520,7 +525,7 @@ class PuppeteerExtractor extends BaseExtractor {
             }
             
             // Additional wait for dynamic content
-            await page.waitForDelay(3000);
+            await new Promise(resolve => setTimeout(resolve, 3000));
             
             const data = await page.evaluate(() => {
                 const result = {
@@ -605,7 +610,7 @@ class PuppeteerExtractor extends BaseExtractor {
                 await page.evaluate('window.scrollTo(0, document.body.scrollHeight)');
                 
                 // Wait for new content to load
-                await page.waitForDelay(1000);
+                await new Promise(resolve => setTimeout(resolve, 1000));
                 
                 // Check if page height changed (new content loaded)
                 const newHeight = await page.evaluate('document.body.scrollHeight');
@@ -620,7 +625,7 @@ class PuppeteerExtractor extends BaseExtractor {
             
             // Scroll back to top
             await page.evaluate('window.scrollTo(0, 0)');
-            await page.waitForDelay(500);
+            await new Promise(resolve => setTimeout(resolve, 500));
             
         } catch (error) {
             console.log('🤖 PuppeteerExtractor: Lazy loading handling failed:', error.message);

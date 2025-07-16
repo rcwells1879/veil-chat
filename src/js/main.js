@@ -520,17 +520,17 @@ Please respond naturally as your persona would, focusing on the most interesting
                         console.log('🤖 Sending extracted content to LLM for persona processing...');
                         try {
                             const llmResponse = await llmService.sendMessage(extractionPrompt, null, false); // Don't add to history yet
-                            console.log('✅ LLM response received:', llmResponse.substring(0, 100) + '...');
+                            console.log('✅ LLM response received:', llmResponse.content.substring(0, 100) + '...');
                             
                             // Display the LLM's persona-driven response to user
-                            await addMessage(llmResponse, 'llm');
+                            await addMessage(llmResponse.content, 'llm');
                             console.log('✅ LLM response displayed to user');
                             
                             // Add LLM's response to conversation history
                             if (llmService) {
                                 llmService.conversationHistory.push({
                                     role: "assistant", 
-                                    content: llmResponse
+                                    content: llmResponse.content
                                 });
                                 llmService.saveConversationHistory();
                                 console.log("🎯 LLM-processed web extraction added to conversation history");

@@ -20,7 +20,8 @@
       "Bash(npx puppeteer browsers:*)",
       "Bash(curl -X POST http://localhost:3001/api/mcp/call -H \"Content-Type: application/json\" -d '{\"\"tool\"\": \"\"extract_for_summary\"\", \"\"arguments\"\": {\"\"url\"\": \"\"https://www.bbc.com/news\"\"}}')",
       "WebFetch(domain:modelcontextprotocol.io)",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:pptr.dev)"
     ],
     "deny": []
   }
