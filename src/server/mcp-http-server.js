@@ -375,6 +375,126 @@ class MCPHTTPServer {
             }
         });
 
+        // Agent Memory Management Endpoints
+        
+        // Start new agent task
+        this.app.post('/api/agent/start-task', async (req, res) => {
+            try {
+                const { goal, options } = req.body;
+                
+                if (!goal) {
+                    return res.status(400).json({ error: 'Goal is required' });
+                }
+
+                const taskId = this.mcpServer.startAgentTask(goal, options || {});
+                res.json({ taskId, message: 'Agent task started successfully' });
+            } catch (error) {
+                console.error('Start task error:', error);
+                res.status(500).json({ error: error.message });
+            }
+        });
+
+        // Write to agent task memory
+        this.app.post('/api/agent/memory/write', async (req, res) => {
+            try {
+                const { taskId, key, value } = req.body;
+                
+                if (!taskId || !key) {
+                    return res.status(400).json({ error: 'taskId and key are required' });
+                }
+
+                const result = this.mcpServer.writeToMemory(taskId, key, value);
+                res.json({ success: result, message: 'Memory updated successfully' });
+            } catch (error) {
+                console.error('Write memory error:', error);
+                if (error.message.includes('not found')) {
+                    return res.status(404).json({ error: error.message });
+                }
+                res.status(500).json({ error: error.message });
+            }
+        });
+
+        // Read from agent task memory
+        this.app.get('/api/agent/memory/read', async (req, res) => {
+            try {
+                const { taskId, key } = req.query;
+                
+                if (!taskId) {
+                    return res.status(400).json({ error: 'taskId is required' });
+                }
+
+                const memory = this.mcpServer.readFromMemory(taskId, key);
+                res.json({ memory });
+            } catch (error) {
+                console.error('Read memory error:', error);
+                if (error.message.includes('not found')) {
+                    return res.status(404).json({ error: error.message });
+                }
+                res.status(500).json({ error: error.message });
+            }
+        });
+
+        // End agent task
+        this.app.delete('/api/agent/end-task', async (req, res) => {
+            try {
+                const { taskId } = req.body;
+                
+                if (!taskId) {
+                    return res.status(400).json({ error: 'taskId is required' });
+                }
+
+                const result = this.mcpServer.endAgentTask(taskId);
+                res.json({ success: result, message: 'Agent task ended successfully' });
+            } catch (error) {
+                console.error('End task error:', error);
+                if (error.message.includes('not found')) {
+                    return res.status(404).json({ error: error.message });
+                }
+                res.status(500).json({ error: error.message });
+            }
+        });
+
+        // Get agent task status
+        this.app.get('/api/agent/task-status', async (req, res) => {
+            try {
+                const { taskId } = req.query;
+                
+                if (!taskId) {
+                    return res.status(400).json({ error: 'taskId is required' });
+                }
+
+                const status = this.mcpServer.getTaskStatus(taskId);
+                if (!status) {
+                    return res.status(404).json({ error: 'Task not found' });
+                }
+                
+                res.json({ status });
+            } catch (error) {
+                console.error('Get task status error:', error);
+                res.status(500).json({ error: error.message });
+            }
+        });
+
+        // Execute agent workflow
+        this.app.post('/api/agent/execute-workflow', async (req, res) => {
+            try {
+                const { taskId, options } = req.body;
+                
+                if (!taskId) {
+                    return res.status(400).json({ error: 'taskId is required' });
+                }
+
+                const result = await this.mcpServer.executeAgentWorkflow(taskId, options || {});
+                res.json(result);
+            } catch (error) {
+                console.error('Execute workflow error:', error);
+                if (error.message.includes('not found')) {
+                    return res.status(404).json({ error: error.message });
+                }
+                res.status(500).json({ error: error.message });
+            }
+        });
+
         // Serve the main chat interface
         this.app.get('/', (req, res) => {
             res.sendFile('index.html', { root: '.' });

@@ -326,19 +326,151 @@ class SequentialThinkingMCPServer {
         // Initialize web extractor
         this.webExtractor = new WebExtractor();
 
+        // Initialize memory management system
+        this.initializeMemorySystem();
+
         this.setupToolHandlers();
         this.setupErrorHandlers();
     }
 
-    // LLM Integration method
+    // Memory Management System
+    initializeMemorySystem() {
+        // Store for active agent tasks
+        this.agentTasks = new Map();
+        
+        // Maximum number of concurrent tasks
+        this.maxTasks = 100;
+        
+        // Task timeout (30 minutes)
+        this.taskTimeout = 30 * 60 * 1000;
+        
+        // Start cleanup interval (every 5 minutes)
+        this.cleanupInterval = setInterval(() => {
+            this.cleanupExpiredTasks();
+        }, 5 * 60 * 1000);
+        
+        console.log('🧠 Memory management system initialized');
+    }
+
+    // Generate unique task ID
+    generateTaskId() {
+        return 'task_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    }
+
+    // Create new agent task
+    startAgentTask(goal, options = {}) {
+        // Check if we're at capacity
+        if (this.agentTasks.size >= this.maxTasks) {
+            throw new Error('Maximum number of concurrent tasks reached');
+        }
+
+        const taskId = this.generateTaskId();
+        const task = {
+            taskId,
+            created: Date.now(),
+            lastAccessed: Date.now(),
+            memory: {
+                goal,
+                plan: [],
+                urls_to_visit: [],
+                extracted_content: {},
+                failed_urls: [],
+                current_step: 'initialized',
+                ...options
+            }
+        };
+
+        this.agentTasks.set(taskId, task);
+        console.log(`🧠 Started agent task: ${taskId}`);
+        
+        return taskId;
+    }
+
+    // Write to agent task memory
+    writeToMemory(taskId, key, value) {
+        const task = this.agentTasks.get(taskId);
+        if (!task) {
+            throw new Error(`Task ${taskId} not found`);
+        }
+
+        task.memory[key] = value;
+        task.lastAccessed = Date.now();
+        
+        console.log(`🧠 Updated memory for task ${taskId}: ${key}`);
+        return true;
+    }
+
+    // Read from agent task memory
+    readFromMemory(taskId, key = null) {
+        const task = this.agentTasks.get(taskId);
+        if (!task) {
+            throw new Error(`Task ${taskId} not found`);
+        }
+
+        task.lastAccessed = Date.now();
+        
+        if (key === null) {
+            return task.memory;
+        }
+        
+        return task.memory[key];
+    }
+
+    // End agent task and cleanup
+    endAgentTask(taskId) {
+        const task = this.agentTasks.get(taskId);
+        if (!task) {
+            throw new Error(`Task ${taskId} not found`);
+        }
+
+        this.agentTasks.delete(taskId);
+        console.log(`🧠 Ended agent task: ${taskId}`);
+        
+        return true;
+    }
+
+    // Clean up expired tasks
+    cleanupExpiredTasks() {
+        const now = Date.now();
+        let cleaned = 0;
+
+        for (const [taskId, task] of this.agentTasks) {
+            if (now - task.lastAccessed > this.taskTimeout) {
+                this.agentTasks.delete(taskId);
+                cleaned++;
+            }
+        }
+
+        if (cleaned > 0) {
+            console.log(`🧠 Cleaned up ${cleaned} expired agent tasks`);
+        }
+    }
+
+    // Get task status
+    getTaskStatus(taskId) {
+        const task = this.agentTasks.get(taskId);
+        if (!task) {
+            return null;
+        }
+
+        return {
+            taskId: task.taskId,
+            created: task.created,
+            lastAccessed: task.lastAccessed,
+            currentStep: task.memory.current_step,
+            memoryKeys: Object.keys(task.memory)
+        };
+    }
+
+    // Enhanced LLM Integration method with persona-aware prompting
     async callLLM(prompt, temperature = 0.7, maxTokens = 2000, llmSettings = null) {
         try {
             // Log all incoming settings and prompt
-            console.log('callLLM called with:', {
-                prompt,
+            console.log('🧠 MCP Server callLLM:', {
+                promptLength: prompt.length,
                 temperature,
                 maxTokens,
-                llmSettings
+                hasLlmSettings: !!llmSettings
             });
 
             // Use provided settings or defaults
@@ -351,11 +483,14 @@ class SequentialThinkingMCPServer {
             // Log the endpoint, model, and key (mask the key for safety)
             console.log('🌐 MCP Server calling LLM:', endpoint, 'Model:', model, 'Key:', apiKey ? apiKey.slice(0, 6) + '...' : '(none)');
 
+            // Enhanced system message for agent tasks
+            const systemMessage = {
+                role: "system",
+                content: "You are an intelligent research assistant helping to process information for a conversational AI. Provide clear, accurate, and well-structured responses that can be seamlessly integrated into natural conversation. Focus on being helpful, precise, and maintaining high information quality."
+            };
+
             const messages = [
-                {
-                    role: "system",
-                    content: "You are a helpful assistant that provides detailed, practical analysis and insights. Be specific, actionable, and thorough in your responses."
-                },
+                systemMessage,
                 {
                     role: "user",
                     content: prompt
@@ -1104,6 +1239,448 @@ Please provide a natural, conversational response about this information. Stay i
         this.server.onerror = (error) => {
             console.error('MCP Server Error:', error);
         };
+    }
+
+    // Agent Workflow Engine with State Machine
+    async executeAgentWorkflow(taskId, options = {}) {
+        console.log(`🤖 Agent Workflow: Starting execution for task ${taskId}`);
+        
+        const task = this.agentTasks.get(taskId);
+        if (!task) {
+            throw new Error(`Task ${taskId} not found`);
+        }
+        
+        try {
+            // Update task status to running
+            this.writeToMemory(taskId, 'current_step', 'running');
+            
+            // Execute the workflow steps
+            await this.executeSearchPhase(taskId, options);
+            await this.executeAnalysisPhase(taskId, options);
+            await this.executeExtractionPhase(taskId, options);
+            await this.executeSynthesisPhase(taskId, options);
+            
+            // Mark task as completed
+            this.writeToMemory(taskId, 'current_step', 'completed');
+            
+            console.log(`✅ Agent Workflow: Task ${taskId} completed successfully`);
+            
+            return {
+                success: true,
+                message: 'Agent workflow completed successfully',
+                taskId: taskId,
+                results: this.readFromMemory(taskId)
+            };
+            
+        } catch (error) {
+            console.error(`❌ Agent Workflow: Task ${taskId} failed:`, error);
+            this.writeToMemory(taskId, 'current_step', 'failed');
+            this.writeToMemory(taskId, 'error', error.message);
+            
+            return {
+                success: false,
+                message: `Agent workflow failed: ${error.message}`,
+                taskId: taskId,
+                error: error.message
+            };
+        }
+    }
+    
+    // Phase 1: Search for relevant websites
+    async executeSearchPhase(taskId, options = {}) {
+        console.log(`🔍 Agent Workflow: Executing search phase for task ${taskId}`);
+        
+        const task = this.agentTasks.get(taskId);
+        const goal = task.memory.goal;
+        
+        this.writeToMemory(taskId, 'current_step', 'searching');
+        
+        // Create search query from goal
+        const rawSearchQuery = await this.generateSearchQuery(goal, options.llmSettings);
+        // Remove quotes that LLM might add despite instructions
+        const searchQuery = rawSearchQuery.replace(/^["']|["']$/g, '');
+        console.log(`🔍 Generated search query: ${searchQuery} (cleaned from: ${rawSearchQuery})`);
+        
+        // Execute raw web search to get actual search results instead of formatted markdown
+        const rawSearchResults = await this.executeRawWebSearch(searchQuery, options.searchSettings);
+        
+        // Extract URLs directly from raw search results
+        const urls = this.extractUrlsFromRawSearchResults(rawSearchResults);
+        console.log(`🔍 Found ${urls.length} URLs to process:`, urls);
+        
+        // Store URLs and search results in memory
+        this.writeToMemory(taskId, 'search_query', searchQuery);
+        this.writeToMemory(taskId, 'search_results', rawSearchResults);
+        this.writeToMemory(taskId, 'urls_to_visit', urls);
+        
+        return urls;
+    }
+    
+    // Phase 2: Analyze which URLs are most relevant
+    async executeAnalysisPhase(taskId, options = {}) {
+        console.log(`🧠 Agent Workflow: Executing analysis phase for task ${taskId}`);
+        
+        const task = this.agentTasks.get(taskId);
+        const goal = task.memory.goal;
+        const urls = task.memory.urls_to_visit || [];
+        
+        this.writeToMemory(taskId, 'current_step', 'analyzing');
+        
+        if (urls.length === 0) {
+            console.log('🧠 No URLs to analyze, skipping analysis phase');
+            return [];
+        }
+        
+        // Use LLM to analyze and prioritize URLs
+        const analysisPrompt = `I need to prioritize which websites to extract content from based on relevance to the user's goal.
+
+Goal: ${goal}
+        
+Available URLs to analyze:
+${urls.map((url, i) => `${i + 1}. ${url}`).join('\n')}
+
+Please analyze these URLs and determine their relevance to the goal. Consider:
+- Domain authority and reliability
+- URL structure indicating content type
+- Likely content quality and depth
+- Relevance to the specific goal
+
+Prioritize URLs that are likely to contain:
+- Authoritative, well-researched information
+- Current and up-to-date content
+- Comprehensive coverage of the topic
+- Practical, actionable insights
+
+Respond in JSON format:
+{
+    "prioritized_urls": [
+        {
+            "url": "https://example.com",
+            "priority": 1,
+            "relevance_score": 0.9,
+            "reasoning": "Official documentation/news source with comprehensive coverage"
+        }
+    ]
+}
+
+Order by priority (1 = highest). Include all URLs but rank them by expected value.`;
+        
+        const analysisResponse = await this.callLLM(analysisPrompt, 0.3, 1000, options.llmSettings);
+        
+        let prioritizedUrls = [];
+        try {
+            const analysis = JSON.parse(analysisResponse);
+            prioritizedUrls = analysis.prioritized_urls || [];
+            console.log(`🧠 Analysis complete. Prioritized ${prioritizedUrls.length} URLs`);
+        } catch (error) {
+            console.warn('🧠 Failed to parse analysis response, using original URL order');
+            prioritizedUrls = urls.map((url, i) => ({ 
+                url, 
+                priority: i + 1, 
+                relevance_score: 0.5, 
+                reasoning: 'Default ordering' 
+            }));
+        }
+        
+        // Store analysis results
+        this.writeToMemory(taskId, 'url_analysis', prioritizedUrls);
+        
+        return prioritizedUrls;
+    }
+    
+    // Phase 3: Extract content from prioritized URLs
+    async executeExtractionPhase(taskId, options = {}) {
+        console.log(`📄 Agent Workflow: Executing extraction phase for task ${taskId}`);
+        
+        const task = this.agentTasks.get(taskId);
+        const prioritizedUrls = task.memory.url_analysis || [];
+        
+        this.writeToMemory(taskId, 'current_step', 'extracting');
+        
+        if (prioritizedUrls.length === 0) {
+            console.log('📄 No URLs to extract, skipping extraction phase');
+            return {};
+        }
+        
+        const extractedContent = {};
+        const failedUrls = [];
+        
+        // Extract content from URLs in priority order
+        for (const urlInfo of prioritizedUrls) {
+            const url = urlInfo.url;
+            
+            try {
+                console.log(`📄 Extracting content from: ${url}`);
+                
+                // Choose extraction method intelligently
+                const extractionResult = await this.extractWithIntelligentMethod(url, {
+                    maxLength: 4000,
+                    blockResources: true
+                });
+                
+                if (extractionResult && extractionResult.content) {
+                    extractedContent[url] = {
+                        ...extractionResult,
+                        priority: urlInfo.priority,
+                        relevance_score: urlInfo.relevance_score,
+                        reasoning: urlInfo.reasoning
+                    };
+                    console.log(`✅ Successfully extracted ${extractionResult.content.length} characters from ${url}`);
+                } else {
+                    console.warn(`⚠️ No content extracted from ${url}`);
+                    failedUrls.push(url);
+                }
+                
+            } catch (error) {
+                console.error(`❌ Extraction failed for ${url}:`, error.message);
+                failedUrls.push(url);
+            }
+        }
+        
+        // Store extraction results
+        this.writeToMemory(taskId, 'extracted_content', extractedContent);
+        this.writeToMemory(taskId, 'failed_urls', failedUrls);
+        
+        console.log(`📄 Extraction complete. Success: ${Object.keys(extractedContent).length}, Failed: ${failedUrls.length}`);
+        
+        return extractedContent;
+    }
+    
+    // Phase 4: Synthesize information into final response
+    async executeSynthesisPhase(taskId, options = {}) {
+        console.log(`🎯 Agent Workflow: Executing synthesis phase for task ${taskId}`);
+        
+        const task = this.agentTasks.get(taskId);
+        const goal = task.memory.goal;
+        const extractedContent = task.memory.extracted_content || {};
+        
+        this.writeToMemory(taskId, 'current_step', 'synthesizing');
+        
+        if (Object.keys(extractedContent).length === 0) {
+            console.log('🎯 No content to synthesize');
+            const fallbackSynthesis = `I searched for information about "${goal}" but was unable to extract content from the websites found. Please try refining your search query or check if the topic requires more specific search terms.`;
+            
+            this.writeToMemory(taskId, 'final_synthesis', fallbackSynthesis);
+            return fallbackSynthesis;
+        }
+        
+        // Prepare content for synthesis
+        const contentSummary = Object.entries(extractedContent)
+            .map(([url, data]) => {
+                // Handle both string and array content formats
+                let contentText = '';
+                if (typeof data.content === 'string') {
+                    contentText = data.content;
+                } else if (Array.isArray(data.content) && data.content[0]?.text) {
+                    contentText = data.content[0].text;
+                } else if (data.content) {
+                    contentText = JSON.stringify(data.content);
+                } else {
+                    contentText = 'No content available';
+                }
+                
+                return `
+Source: ${url}
+Priority: ${data.priority}
+Title: ${data.title || 'No title'}
+Content: ${contentText.substring(0, 1000)}...
+`;
+            }).join('\n---\n');
+        
+        const synthesisPrompt = `You are responding as your current persona in a natural conversation. The user asked about: "${goal}"
+
+I've gathered information from ${Object.keys(extractedContent).length} different sources to help answer their question:
+
+${contentSummary}
+
+Please provide a natural, conversational response about this information. Stay in character as your persona, be engaging and helpful, and present the information in a way that feels like a natural conversation. 
+
+Key guidelines:
+- Don't start with phrases like "According to my research" or "Based on the information I found"
+- Present the information as if you naturally know about this topic
+- Synthesize insights from multiple sources into a cohesive narrative
+- Be accurate to the source material but conversational in tone
+- Provide actionable insights where relevant
+- If there are conflicting viewpoints in the sources, acknowledge them naturally
+
+Focus on being genuinely helpful while maintaining your persona's voice and style.`;
+        
+        const synthesis = await this.callLLM(synthesisPrompt, 0.7, 2000, options.llmSettings);
+        
+        console.log(`🎯 Synthesis complete. Generated ${synthesis.length} characters`);
+        
+        // Store final synthesis
+        this.writeToMemory(taskId, 'final_synthesis', synthesis);
+        
+        return synthesis;
+    }
+    
+    // Helper method to generate search query from goal
+    async generateSearchQuery(goal, llmSettings) {
+        const prompt = `You're helping to search for information. Convert this goal into an effective web search query:
+        
+Goal: ${goal}
+
+Analyze the goal and create 1-3 search queries that would find the most relevant, current information. Consider:
+- Key terms and concepts
+- Synonyms and related terms
+- Specific vs. general search strategies
+- Potential information sources
+
+IMPORTANT: Do NOT include specific years (like 2024, 2025, etc.) in your search query. Date filtering is handled separately by user settings.
+
+Respond with just the best search query (no quotes, no additional text). Make it specific enough to get quality results but broad enough to capture relevant information.
+
+Examples:
+Goal: "Tell me about electric vehicle charging infrastructure" → "electric vehicle charging stations infrastructure"
+Goal: "How do I start a small business?" → "small business startup guide requirements"
+Goal: "Latest developments in renewable energy" → "latest renewable energy developments"`;
+        
+        return await this.callLLM(prompt, 0.3, 150, llmSettings);
+    }
+    
+    // Helper method to extract URLs from search results
+    // Execute raw web search without markdown formatting
+    async executeRawWebSearch(query, searchSettings = {}) {
+        const provider = searchSettings.provider || 'brave';
+        const apiKey = searchSettings.apiKey;
+        const limit = parseInt(searchSettings.limit) || 10;
+        const timeFilter = searchSettings.timeFilter || 'any';
+
+        console.log('🔍 Raw web search:', { query, provider, limit, timeFilter });
+        console.log('🔍 Raw web search - Full searchSettings:', searchSettings);
+
+        // Create search provider instance (same as handleWebSearch)
+        let searchProvider;
+        switch (provider) {
+            case 'brave':
+                if (!apiKey) throw new Error('Brave Search requires an API key');
+                searchProvider = new BraveSearchProvider(apiKey, searchSettings);
+                break;
+            case 'duckduckgo':
+                searchProvider = new DuckDuckGoSearchProvider(apiKey, searchSettings);
+                break;
+            case 'google':
+                if (!apiKey) throw new Error('Google Search requires an API key');
+                searchProvider = new GoogleSearchProvider(apiKey, searchSettings);
+                break;
+            case 'bing':
+                if (!apiKey) throw new Error('Bing Search requires an API key');
+                searchProvider = new BingSearchProvider(apiKey, searchSettings);
+                break;
+            default:
+                throw new Error(`Unknown search provider: ${provider}`);
+        }
+
+        // Get raw search results
+        const results = await searchProvider.search(query, { limit, timeFilter });
+        const searchResults = results.results || results;
+
+        console.log('🔍 Raw search results received:', JSON.stringify(searchResults, null, 2));
+        console.log('🔍 Search results type:', typeof searchResults, 'Array?', Array.isArray(searchResults), 'Length:', searchResults?.length);
+
+        return searchResults;
+    }
+
+    // Extract URLs directly from raw search results
+    extractUrlsFromRawSearchResults(rawSearchResults) {
+        console.log('🔍 URL Extraction - Input rawSearchResults:', typeof rawSearchResults, Array.isArray(rawSearchResults), rawSearchResults?.length);
+        console.log('🔍 URL Extraction - First result sample:', rawSearchResults?.[0]);
+        
+        const urls = [];
+        
+        if (rawSearchResults && Array.isArray(rawSearchResults)) {
+            // Extract URLs directly from search result objects
+            for (const result of rawSearchResults) {
+                console.log('🔍 URL Extraction - Processing result:', { url: result.url, title: result.title });
+                if (result.url && result.url.startsWith('http')) {
+                    urls.push(result.url);
+                    console.log('🔍 URL Extraction - Added URL:', result.url);
+                }
+            }
+        } else {
+            console.log('🔍 URL Extraction - rawSearchResults is not an array or is empty');
+        }
+        
+        // Remove duplicates and limit to top 5 URLs
+        const uniqueUrls = [...new Set(urls)]
+            .filter(url => url && url.startsWith('http'))
+            .slice(0, 5); // Limit to top 5 URLs
+        
+        console.log('🔍 URL Extraction - Final URLs extracted:', uniqueUrls);
+        return uniqueUrls;
+    }
+
+    // Legacy method kept for backwards compatibility
+    extractUrlsFromSearchResults(searchResults) {
+        const urls = [];
+        
+        if (searchResults && searchResults.content) {
+            // Parse markdown content to extract URLs
+            const content = searchResults.content;
+            
+            for (const item of content) {
+                if (item.type === 'text' && item.text) {
+                    // Look for URL patterns in the text
+                    const urlMatches = item.text.match(/https?:\/\/[^\s\)]+/g);
+                    if (urlMatches) {
+                        urls.push(...urlMatches);
+                    }
+                }
+            }
+        }
+        
+        // Remove duplicates and clean URLs
+        const uniqueUrls = [...new Set(urls)]
+            .filter(url => url && url.startsWith('http'))
+            .slice(0, 5); // Limit to top 5 URLs
+        
+        return uniqueUrls;
+    }
+    
+    // Helper method for intelligent extraction method selection
+    async extractWithIntelligentMethod(url, options = {}) {
+        const domain = new URL(url).hostname.toLowerCase();
+        
+        // Dynamic sites that typically need Puppeteer
+        const dynamicSites = [
+            'reddit.com',
+            'twitter.com',
+            'facebook.com',
+            'linkedin.com',
+            'instagram.com',
+            'youtube.com',
+            'maps.google.com',
+            'yelp.com',
+            'tripadvisor.com'
+        ];
+        
+        const needsPuppeteer = dynamicSites.some(site => domain.includes(site));
+        
+        try {
+            if (needsPuppeteer) {
+                console.log(`🤖 Using Puppeteer for dynamic site: ${domain}`);
+                return await this.handleExtractWebContent({ url, options });
+            } else {
+                console.log(`⚡ Using Cheerio for static site: ${domain}`);
+                // Try Cheerio first for speed
+                return await this.handleExtractForSummary({ url, options });
+            }
+        } catch (error) {
+            console.log(`⚠️ Primary extraction failed, trying fallback method for ${url}`);
+            
+            // Fallback to the other method
+            try {
+                if (needsPuppeteer) {
+                    return await this.handleExtractForSummary({ url, options });
+                } else {
+                    return await this.handleExtractWebContent({ url, options });
+                }
+            } catch (fallbackError) {
+                console.error(`❌ Both extraction methods failed for ${url}:`, fallbackError.message);
+                throw fallbackError;
+            }
+        }
     }
 
     async run() {

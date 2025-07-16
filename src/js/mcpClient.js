@@ -215,6 +215,216 @@ if (typeof MCPClient === 'undefined') {
             return await this.callTool('extract_multiple_urls', { urls, options });
         }
 
+        // Agent Workflow Methods
+        async startAgentTask(goal, options = {}) {
+            console.log('🤖 MCP Client: Starting agent task with goal:', goal);
+            
+            try {
+                const response = await fetch(`${this.serverUrl}/api/agent/start-task`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        goal: goal,
+                        options: {
+                            ...options,
+                            searchSettings: this.getSearchSettings(),
+                            llmSettings: this.getLLMSettings()
+                        }
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const result = await response.json();
+                console.log('🤖 Agent task started:', result);
+                return result;
+            } catch (error) {
+                console.error('❌ Failed to start agent task:', error);
+                throw error;
+            }
+        }
+
+        async executeAgentWorkflow(taskId, options = {}) {
+            console.log('🚀 MCP Client: Executing agent workflow for task:', taskId);
+            
+            try {
+                const response = await fetch(`${this.serverUrl}/api/agent/execute-workflow`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        taskId: taskId,
+                        options: {
+                            ...options,
+                            searchSettings: this.getSearchSettings(),
+                            llmSettings: this.getLLMSettings()
+                        }
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const result = await response.json();
+                console.log('🎯 Agent workflow completed:', result);
+                return result;
+            } catch (error) {
+                console.error('❌ Agent workflow execution failed:', error);
+                throw error;
+            }
+        }
+
+        async getAgentTaskStatus(taskId) {
+            try {
+                const response = await fetch(`${this.serverUrl}/api/agent/task-status?taskId=${taskId}`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const result = await response.json();
+                return result.status;
+            } catch (error) {
+                console.error('❌ Failed to get agent task status:', error);
+                throw error;
+            }
+        }
+
+        async readAgentMemory(taskId, key = null) {
+            try {
+                let url = `${this.serverUrl}/api/agent/memory/read?taskId=${taskId}`;
+                if (key) {
+                    url += `&key=${encodeURIComponent(key)}`;
+                }
+
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const result = await response.json();
+                return result.memory;
+            } catch (error) {
+                console.error('❌ Failed to read agent memory:', error);
+                throw error;
+            }
+        }
+
+        async endAgentTask(taskId) {
+            try {
+                const response = await fetch(`${this.serverUrl}/api/agent/end-task`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        taskId: taskId
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const result = await response.json();
+                console.log('🏁 Agent task ended:', result);
+                return result;
+            } catch (error) {
+                console.error('❌ Failed to end agent task:', error);
+                throw error;
+            }
+        }
+
+        // Helper methods for agent workflow
+        getSearchSettings() {
+            const settings = {
+                provider: localStorage.getItem('searchProvider') || 'brave',
+                apiKey: localStorage.getItem('searchApiKey') || '',
+                limit: parseInt(localStorage.getItem('searchLimit')) || 10,
+                timeFilter: localStorage.getItem('searchTimeFilter') || 'any',
+                autoSummarize: localStorage.getItem('searchAutoSummarize') !== 'false'
+            };
+            console.log('🔍 MCPClient: Agent workflow search settings:', settings);
+            return settings;
+        }
+
+        getLLMSettings() {
+            return {
+                apiBaseUrl: localStorage.getItem('customLlmApiUrl') || 'https://litellm-veil.veilstudio.io',
+                apiKey: localStorage.getItem('customLlmApiKey') || 'sk-DSHSfgTh65Fvd',
+                model: localStorage.getItem('customLlmModelIdentifier') || 'gemini2.5-flash'
+            };
+        }
+
+        // Execute a complete research workflow
+        async executeResearchWorkflow(goal, options = {}) {
+            console.log('🔬 Starting complete research workflow for goal:', goal);
+            
+            try {
+                // Step 1: Start the agent task
+                const taskResult = await this.startAgentTask(goal, options);
+                const taskId = taskResult.taskId;
+                
+                console.log('📋 Task created with ID:', taskId);
+                
+                // Step 2: Execute the workflow
+                const workflowResult = await this.executeAgentWorkflow(taskId, options);
+                
+                if (workflowResult.success) {
+                    // Step 3: Get the final results
+                    const finalResults = await this.readAgentMemory(taskId);
+                    
+                    // Step 4: Clean up the task
+                    await this.endAgentTask(taskId);
+                    
+                    console.log('✅ Research workflow completed successfully');
+                    
+                    return {
+                        success: true,
+                        goal: goal,
+                        synthesis: finalResults.final_synthesis,
+                        searchQuery: finalResults.search_query,
+                        urlsFound: finalResults.urls_to_visit?.length || 0,
+                        extractedContent: Object.keys(finalResults.extracted_content || {}).length,
+                        taskId: taskId
+                    };
+                } else {
+                    console.error('❌ Workflow execution failed:', workflowResult.message);
+                    await this.endAgentTask(taskId);
+                    
+                    return {
+                        success: false,
+                        error: workflowResult.message,
+                        taskId: taskId
+                    };
+                }
+                
+            } catch (error) {
+                console.error('❌ Research workflow failed:', error);
+                return {
+                    success: false,
+                    error: error.message
+                };
+            }
+        }
+
         // URL detection and extraction utilities
         extractUrlsFromText(text) {
             const urlRegex = /https?:\/\/[^\s\)]+/g;
@@ -343,7 +553,13 @@ if (typeof MCPClient === 'undefined') {
             console.log('🔍 MCP Client checking message for keywords:', message);
             const lowerMessage = message.toLowerCase();
             
-            // Check for web extraction keywords first
+            // Check for agent workflow keywords first (research, investigate, find out about)
+            const agentResult = await this.handleAgentWorkflowRequests(message, context);
+            if (agentResult) {
+                return agentResult;
+            }
+            
+            // Check for web extraction keywords
             const webExtractionResult = await this.handleWebExtractionRequests(message, llmService);
             if (webExtractionResult) {
                 return webExtractionResult;
@@ -375,6 +591,85 @@ if (typeof MCPClient === 'undefined') {
             }
 
             console.log('❌ No MCP keywords detected in message');
+            return null;
+        }
+
+        // Handle agent workflow requests
+        async handleAgentWorkflowRequests(message, context = '') {
+            const lowerMessage = message.toLowerCase();
+            
+            // Agent workflow trigger keywords
+            const agentKeywords = [
+                'research',
+                'investigate',
+                'find out about',
+                'look into',
+                'gather information about',
+                'what can you tell me about',
+                'I want to know about',
+                'learn about',
+                'find information about',
+                'search for information about'
+            ];
+            
+            const hasAgentKeyword = agentKeywords.some(keyword => lowerMessage.includes(keyword));
+            
+            // Additional patterns that indicate comprehensive research needs
+            const needsResearch = 
+                lowerMessage.includes('latest') ||
+                lowerMessage.includes('current') ||
+                lowerMessage.includes('recent') ||
+                lowerMessage.includes('comprehensive') ||
+                lowerMessage.includes('detailed') ||
+                (lowerMessage.includes('what') && (lowerMessage.includes('happening') || lowerMessage.includes('new'))) ||
+                (lowerMessage.includes('tell me') && lowerMessage.length > 30); // Longer requests likely need research
+            
+            if (hasAgentKeyword || needsResearch) {
+                console.log('🤖 Detected agent workflow request');
+                
+                try {
+                    // Execute the research workflow
+                    const result = await this.executeResearchWorkflow(message);
+                    
+                    if (result.success) {
+                        console.log('✅ Agent workflow completed successfully');
+                        
+                        // Return the synthesis in a format the chat interface expects
+                        return {
+                            content: [{
+                                type: 'text',
+                                text: result.synthesis
+                            }],
+                            isAgentResult: true,
+                            metadata: {
+                                searchQuery: result.searchQuery,
+                                urlsFound: result.urlsFound,
+                                extractedContent: result.extractedContent,
+                                taskId: result.taskId
+                            }
+                        };
+                    } else {
+                        console.error('❌ Agent workflow failed:', result.error);
+                        
+                        // Return a fallback message
+                        return {
+                            content: [{
+                                type: 'text',
+                                text: `I tried to research that for you, but encountered an issue: ${result.error}. Let me try to help with what I know.`
+                            }],
+                            isAgentResult: false,
+                            fallback: true
+                        };
+                    }
+                    
+                } catch (error) {
+                    console.error('❌ Agent workflow exception:', error);
+                    
+                    // Return null so the normal LLM processing continues
+                    return null;
+                }
+            }
+            
             return null;
         }
 
