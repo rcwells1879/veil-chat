@@ -89,6 +89,8 @@ body {
     border-radius: 5px;
     margin-top: 10px;
     cursor: pointer; /* Add this to indicate images are clickable */
+    flex-shrink: 0; /* Prevent images from affecting other elements' flex calculations */
+    display: block; /* Ensure images don't interfere with inline layout */
 }
 
 /* --- Fullscreen Image Viewer --- */
@@ -303,11 +305,14 @@ input:checked + .slider:before {
         0 10px 20px rgba(0, 0, 0, 0.3),
         0 5px 10px rgba(0, 0, 0, 0.2);
     max-width: 50%;
+    min-width: 200px; /* Prevent compression below this width */
+    width: fit-content; /* Use content-based sizing */
     align-self: center;
     position: relative;
     overflow: hidden;
     transform: translateY(-5px);
     border: 1px solid rgba(255, 255, 255, 0.1);
+    flex-shrink: 0; /* Prevent flex container from shrinking this element */
 }
 
 /* Add hover effect for more floating feel */
