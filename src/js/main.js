@@ -229,8 +229,10 @@ async function initializeApp() {
         if (typeof message === 'string') {
             if (sender === 'llm' && window.marked) {
                 const cleanMessage = stripMarkdownCodeBlock(message);
-                messageElement.innerHTML = marked.parse(cleanMessage);
-                textToSpeak = cleanMessage;
+                const htmlContent = marked.parse(cleanMessage);
+                messageElement.innerHTML = htmlContent;
+                // Extract plain text from HTML for TTS while preserving display formatting
+                textToSpeak = messageElement.textContent || messageElement.innerText;
             } else {
                 messageElement.textContent = message;
                 if (sender === 'llm') textToSpeak = message;
@@ -249,8 +251,10 @@ async function initializeApp() {
         } else if (message.text) {
             if (sender === 'llm' && window.marked) {
                 const cleanMessage = stripMarkdownCodeBlock(message.text);
-                messageElement.innerHTML = marked.parse(cleanMessage);
-                textToSpeak = cleanMessage;
+                const htmlContent = marked.parse(cleanMessage);
+                messageElement.innerHTML = htmlContent;
+                // Extract plain text from HTML for TTS while preserving display formatting
+                textToSpeak = messageElement.textContent || messageElement.innerText;
             } else {
                 messageElement.textContent = message.text;
                 if (sender === 'llm') textToSpeak = message.text;
@@ -458,8 +462,8 @@ async function initializeApp() {
                     
                     // Handle different result types
                     if (mcpResult.isAgentResult) {
-                        // Agent workflow result - display directly with TTS disabled for search-based content
-                        await addMessage(mcpResult.content[0].text, 'llm', false);
+                        // Agent workflow result - display directly with TTS enabled for synthesized content
+                        await addMessage(mcpResult.content[0].text, 'llm', true);
                         console.log('🤖 Agent workflow result displayed');
                         
                         // Add to conversation history
@@ -489,7 +493,7 @@ async function initializeApp() {
                         // Continue to normal LLM processing
                     } else {
                         // Regular MCP tool result (sequential thinking, etc.)
-                        await addMessage(mcpResult.content[0].text, 'mcp');
+                        await addMessage(mcpResult.content[0].text, 'llm');
                         console.log('🔧 MCP tool result displayed');
                         
                         // Add to conversation history
@@ -1582,3 +1586,4 @@ function stripMarkdownCodeBlock(text) {
     }
     return text;
 }
+

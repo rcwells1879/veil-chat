@@ -114,7 +114,9 @@ if (typeof AzureTTSService === 'undefined') {
                 }
 
                 try {
-                    console.log(`AzureTTSService: Starting TTS for text: "${textToSpeak.substring(0, 50)}..."`);
+                    // Clean the text for TTS (should already be cleaned by main.js, but ensure it's clean)
+                    const cleanedText = textToSpeak.trim();
+                    console.log(`AzureTTSService: Starting TTS for text: "${cleanedText.substring(0, 50)}..."`);
                     
                     // Map voice keyword to Azure voice
                     const azureVoice = preferredVoiceKeyword ? 
@@ -122,12 +124,12 @@ if (typeof AzureTTSService === 'undefined') {
                         this.currentVoice;
 
                     // Get audio buffer from Azure
-                    const audioBuffer = await this.synthesize(textToSpeak, azureVoice);
+                    const audioBuffer = await this.synthesize(cleanedText, azureVoice);
                     
                     // Play audio using HTML Audio Element
                     await this.playAudio(audioBuffer);
                     
-                    console.log(`AzureTTSService: TTS completed for text: "${textToSpeak.substring(0, 30)}..."`);
+                    console.log(`AzureTTSService: TTS completed for text: "${cleanedText.substring(0, 30)}..."`);
                     resolve();
                     
                 } catch (error) {
