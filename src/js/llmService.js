@@ -214,8 +214,7 @@ Make sure the character you create embodies and follows the persona instructions
             const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: headers,
-                body: JSON.stringify(payload),
-                credentials: 'include'
+                body: JSON.stringify(payload)
             });
 
             if (!response.ok) {
@@ -340,8 +339,7 @@ Make sure the character you create embodies and follows the persona instructions
             const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: headers,
-                body: JSON.stringify(payload),
-                credentials: 'include'
+                body: JSON.stringify(payload)
             });
 
             if (!response.ok) {
@@ -408,8 +406,7 @@ Make sure the character you create embodies and follows the persona instructions
                     method: 'POST',
                     headers: headers,
                     body: JSON.stringify(payload),
-                    credentials: 'include'
-                });
+                    });
 
                 if (!response.ok) {
                     const errorData = await response.json().catch(() => response.text());
@@ -558,7 +555,6 @@ Make sure the character you create embodies and follows the persona instructions
                 method: 'POST',
                 headers: imageHeaders,
                 body: JSON.stringify(imagePayload),
-                credentials: 'include'
             });
 
             let imagePrompt = null;
@@ -609,7 +605,6 @@ Make sure the character you create embodies and follows the persona instructions
                 method: 'POST',
                 headers: greetingHeaders,
                 body: JSON.stringify(greetingPayload),
-                credentials: 'include'
             });
 
             let greeting = "Hello there! What's your name?";
