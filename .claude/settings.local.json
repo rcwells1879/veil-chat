@@ -22,7 +22,8 @@
       "WebFetch(domain:modelcontextprotocol.io)",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:pptr.dev)",
-      "WebFetch(domain:raw.githubusercontent.com)"
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:docs.anthropic.com)"
     ],
     "deny": []
   }
