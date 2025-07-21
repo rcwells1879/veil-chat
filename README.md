@@ -382,7 +382,7 @@ CHROME_PATH=/usr/bin/google-chrome
 ### Azure TTS Configuration
 
 ```javascript
-{
+{ 
   "azureApiKey": "your-azure-key",
   "azureRegion": "eastus",
   "ttsVoice": "Sonia",                 // Auto-selected based on persona

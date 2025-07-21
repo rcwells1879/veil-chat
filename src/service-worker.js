@@ -75,6 +75,11 @@ self.addEventListener('fetch', event => {
   const { request } = event;
   const url = new URL(request.url);
   
+  // Skip service worker for external API calls (let them go directly)
+  if (isExternalAPI(request)) {
+    return; // Don't intercept external API calls
+  }
+  
   // Handle static assets with cache-first strategy
   if (isStaticAsset(request)) {
     event.respondWith(
@@ -161,6 +166,16 @@ function isStaticAsset(request) {
     request.url.includes('.json') ||
     request.url.includes('cdnjs.cloudflare.com') ||
     request.url.includes('cdn.jsdelivr.net')
+  );
+}
+
+function isExternalAPI(request) {
+  return (
+    request.url.includes('veilstudio.io') ||
+    request.url.includes('openai.com') ||
+    request.url.includes('litellm') ||
+    request.url.includes('a1111-veil') ||
+    request.url.includes('mcp-veil')
   );
 }
 

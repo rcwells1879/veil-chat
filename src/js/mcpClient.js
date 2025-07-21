@@ -12,17 +12,22 @@ if (typeof MCPClient === 'undefined') {
             const currentHost = window.location.hostname;
             const currentProtocol = window.location.protocol;
             
+            console.log('MCP Client: Auto-detecting server URL for host:', currentHost);
+            
             // If running on localhost, use local MCP server
             if (currentHost === 'localhost' || currentHost === '127.0.0.1') {
+                console.log('MCP Client: Using localhost server');
                 return 'http://localhost:3001';
             }
             
             // If running on hosted domain, use Cloudflare tunnel URL
             if (currentHost.includes('veilstudio.io')) {
+                console.log('MCP Client: Using veilstudio.io server');
                 return 'https://mcp-veil.veilstudio.io';
             }
             
             // Default fallback
+            console.log('MCP Client: Using default localhost server');
             return 'http://localhost:3001';
         }
 

@@ -47,4 +47,6 @@ npm run build
 
 VeilChat is a modern web-based chat interface with AI capabilities, built with vanilla JavaScript and Node.js. The application uses a **HTTP REST API architecture** for browser compatibility and mobile/PWA support.
 
-[... rest of the existing content remains unchanged ...]
+## Deployment Configuration
+
+- CORS settings are handled in my Cloudflare tunnel dashboard 
