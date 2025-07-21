@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Icon Generator for VeilChat PWA</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .icon-preview { margin: 10px; display: inline-block; }
+        canvas { border: 1px solid #ccc; margin: 5px; }
+    </style>
+</head>
+<body>
+    <h1>VeilChat PWA Icon Generator</h1>
+    <p>This page generates placeholder icons. Replace with proper designed icons.</p>
+    
+    <div id="icons-container"></div>
+    
+    <button onclick="downloadAll()">Download All Icons</button>
+    
+    <script>
+        const sizes = [16, 32, 48, 96, 144, 192, 256, 512, 180]; // 180 for Apple touch icon
+        const container = document.getElementById('icons-container');
+        
+        function createIcon(size) {
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            
+            // Background
+            ctx.fillStyle = '#2d2d2d';
+            ctx.fillRect(0, 0, size, size);
+            
+            // Simple chat bubble design
+            ctx.fillStyle = '#4CAF50';
+            const bubbleSize = size * 0.6;
+            const x = (size - bubbleSize) / 2;
+            const y = (size - bubbleSize) / 2;
+            
+            // Rounded rectangle for chat bubble
+            ctx.beginPath();
+            ctx.roundRect(x, y, bubbleSize, bubbleSize * 0.7, size * 0.1);
+            ctx.fill();
+            
+            // Small tail for bubble
+            ctx.beginPath();
+            ctx.moveTo(x + bubbleSize * 0.2, y + bubbleSize * 0.7);
+            ctx.lineTo(x + bubbleSize * 0.1, y + bubbleSize * 0.9);
+            ctx.lineTo(x + bubbleSize * 0.35, y + bubbleSize * 0.7);
+            ctx.fill();
+            
+            // Add "AI" text for larger icons
+            if (size >= 48) {
+                ctx.fillStyle = 'white';
+                ctx.font = `bold ${size * 0.15}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.fillText('AI', size / 2, y + bubbleSize * 0.45);
+            }
+            
+            return canvas;
+        }
+        
+        function addIconToPage(canvas, size) {
+            const div = document.createElement('div');
+            div.className = 'icon-preview';
+            
+            const label = document.createElement('div');
+            label.textContent = `${size}x${size}`;
+            
+            const downloadLink = document.createElement('a');
+            downloadLink.href = canvas.toDataURL('image/png');
+            
+            if (size === 180) {
+                downloadLink.download = 'apple-touch-icon.png';
+            } else {
+                downloadLink.download = `icon-${size}x${size}.png`;
+            }
+            
+            downloadLink.textContent = 'Download';
+            
+            div.appendChild(label);
+            div.appendChild(canvas);
+            div.appendChild(document.createElement('br'));
+            div.appendChild(downloadLink);
+            
+            container.appendChild(div);
+        }
+        
+        // Generate all icons
+        sizes.forEach(size => {
+            const canvas = createIcon(size);
+            addIconToPage(canvas, size);
+        });
+        
+        function downloadAll() {
+            const links = document.querySelectorAll('a[download]');
+            links.forEach((link, index) => {
+                setTimeout(() => {
+                    link.click();
+                }, index * 100);
+            });
+        }
+    </script>
+</body>
+</html>

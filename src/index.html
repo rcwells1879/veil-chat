@@ -3,8 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>LLM Chat Interface</title>
+    <title>VeilChat - AI Chat Interface</title>
+    <meta name="description" content="A powerful AI chat interface with voice interaction, image generation, and enhanced reasoning capabilities">
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+    
+    <!-- Icons for different platforms -->
+    <link rel="icon" type="image/png" sizes="16x16" href="icons/icon-16x16.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32x32.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
+    
+    <!-- PWA Theme Colors -->
+    <meta name="theme-color" content="#2d2d2d">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="VeilChat">
+    
     <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/pwa-styles.css">
     <script>
         // Remove or comment out the dynamic viewport height code
         /*
@@ -56,6 +73,7 @@
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     
     <!-- Fixed script references to match actual filenames -->
+    <script src="js/offlineManager.js"></script>
     <script src="js/contextservice.js"></script>
     <script src="js/imageService.js"></script>
     <script src="js/llmService.js"></script>
@@ -63,5 +81,44 @@
     <script src="js/voiceService.js"></script> 
     <script src="js/mcpClient.js"></script>
     <script src="js/main.js"></script>
+    
+    <!-- Service Worker Registration -->
+    <script>
+        // Register service worker for PWA functionality
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/service-worker.js')
+                    .then(registration => {
+                        console.log('Service Worker registered successfully:', registration.scope);
+                        
+                        // Check for updates
+                        registration.addEventListener('updatefound', () => {
+                            console.log('Service Worker update found');
+                        });
+                    })
+                    .catch(error => {
+                        console.log('Service Worker registration failed:', error);
+                    });
+            });
+        }
+        
+        // PWA Install Prompt
+        let deferredPrompt;
+        
+        window.addEventListener('beforeinstallprompt', (e) => {
+            console.log('PWA install prompt triggered');
+            e.preventDefault();
+            deferredPrompt = e;
+            
+            // Show custom install button/UI when appropriate
+            // This will be implemented in the main app logic
+            window.dispatchEvent(new CustomEvent('pwaInstallAvailable', { detail: deferredPrompt }));
+        });
+        
+        window.addEventListener('appinstalled', () => {
+            console.log('PWA was installed');
+            deferredPrompt = null;
+        });
+    </script>
 </body>
 </html>

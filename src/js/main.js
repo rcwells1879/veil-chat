@@ -82,6 +82,72 @@ async function initializeApp() {
     let personaCreated = false;
     let isContinuousConversationActive = false;
 
+    // --- PWA Installation Handling ---
+    let installPromptEvent = null;
+    
+    // Listen for PWA install availability
+    window.addEventListener('pwaInstallAvailable', (e) => {
+        installPromptEvent = e.detail;
+        showInstallButton();
+    });
+    
+    function showInstallButton() {
+        // Only show if not already installed and prompt is available
+        if (!window.matchMedia('(display-mode: standalone)').matches && installPromptEvent) {
+            const installButton = document.createElement('button');
+            installButton.id = 'pwa-install-button';
+            installButton.innerHTML = '📱 Install App';
+            installButton.className = 'install-button';
+            installButton.style.cssText = `
+                position: fixed;
+                top: 10px;
+                right: 10px;
+                background: #4CAF50;
+                color: white;
+                border: none;
+                padding: 8px 12px;
+                border-radius: 6px;
+                font-size: 12px;
+                cursor: pointer;
+                z-index: 1000;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            `;
+            
+            installButton.addEventListener('click', async () => {
+                if (installPromptEvent) {
+                    installPromptEvent.prompt();
+                    const { outcome } = await installPromptEvent.userChoice;
+                    console.log('PWA install outcome:', outcome);
+                    if (outcome === 'accepted') {
+                        installButton.remove();
+                    }
+                    installPromptEvent = null;
+                }
+            });
+            
+            // Only add if not already present
+            if (!document.getElementById('pwa-install-button')) {
+                document.body.appendChild(installButton);
+                
+                // Auto-hide after 10 seconds
+                setTimeout(() => {
+                    if (installButton.parentNode) {
+                        installButton.style.opacity = '0.7';
+                    }
+                }, 10000);
+            }
+        }
+    }
+    
+    // Detect if running as PWA
+    const isPWA = window.matchMedia('(display-mode: standalone)').matches || 
+                  window.navigator.standalone === true;
+    
+    if (isPWA) {
+        console.log('Running as PWA');
+        document.body.classList.add('pwa-mode');
+    }
+
     // --- MCP Client Integration ---
     let mcpClient = null;
     let mcpEnabled = localStorage.getItem('mcpEnabled') === 'true';

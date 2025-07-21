@@ -1,0 +1,171 @@
+/* PWA-specific styles for VeilChat */
+
+/* PWA mode adjustments */
+.pwa-mode {
+    /* Add top padding for devices with notches/status bars */
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Install button styling */
+.install-button {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    transition: all 0.3s ease;
+}
+
+.install-button:hover {
+    background: #45a049 !important;
+    transform: translateY(-1px);
+}
+
+.install-button:active {
+    transform: translateY(0);
+}
+
+/* Offline indicator */
+#offline-indicator {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.7; }
+    100% { opacity: 1; }
+}
+
+/* PWA splash screen styles */
+@media (display-mode: standalone) {
+    body {
+        /* Remove any default margins for better fullscreen experience */
+        margin: 0;
+        padding: 0;
+        
+        /* Ensure full viewport usage */
+        min-height: 100vh;
+        min-height: -webkit-fill-available;
+    }
+    
+    /* Hide elements that don't make sense in PWA mode */
+    .browser-only {
+        display: none !important;
+    }
+    
+    /* Adjust chat container for PWA */
+    .chat-container {
+        min-height: 100vh;
+        min-height: -webkit-fill-available;
+    }
+    
+    /* Better touch targets for PWA */
+    button, .button {
+        min-height: 44px;
+        min-width: 44px;
+    }
+}
+
+/* iOS specific PWA adjustments */
+@supports (-webkit-touch-callout: none) {
+    .pwa-mode .chat-container {
+        /* Account for iOS safe areas */
+        padding-top: max(env(safe-area-inset-top), 20px);
+        padding-bottom: max(env(safe-area-inset-bottom), 20px);
+    }
+    
+    /* Fix iOS viewport height issues in PWA mode */
+    .pwa-mode {
+        height: -webkit-fill-available;
+    }
+}
+
+/* Android specific PWA adjustments */
+@media (display-mode: standalone) and (orientation: portrait) {
+    .chat-window {
+        /* Ensure chat window doesn't get cut off by system UI */
+        max-height: calc(100vh - 140px);
+    }
+}
+
+/* Responsive adjustments for PWA */
+@media screen and (max-width: 768px) {
+    .pwa-mode .chat-container {
+        padding: 10px 5px;
+    }
+    
+    .pwa-mode .input-area {
+        padding: 10px;
+    }
+    
+    /* Make buttons more touch-friendly */
+    .pwa-mode button {
+        padding: 12px 16px;
+        font-size: 16px; /* Prevent zoom on iOS */
+    }
+    
+    .pwa-mode textarea {
+        font-size: 16px; /* Prevent zoom on iOS */
+    }
+}
+
+/* Dark theme adjustments for PWA */
+@media (prefers-color-scheme: dark) {
+    .pwa-mode {
+        background-color: #1a1a1a;
+        color: #ffffff;
+    }
+    
+    .pwa-mode .install-button {
+        background: #2d2d2d !important;
+        color: #ffffff !important;
+        border: 1px solid #444;
+    }
+}
+
+/* Loading state for offline content */
+.offline-loading {
+    position: relative;
+}
+
+.offline-loading::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: repeating-linear-gradient(
+        45deg,
+        transparent,
+        transparent 10px,
+        rgba(255, 107, 107, 0.1) 10px,
+        rgba(255, 107, 107, 0.1) 20px
+    );
+    pointer-events: none;
+}
+
+/* Improved accessibility for PWA */
+@media (prefers-reduced-motion: reduce) {
+    .install-button,
+    #offline-indicator {
+        animation: none !important;
+        transition: none !important;
+    }
+}
+
+/* Focus styles for keyboard navigation */
+.pwa-mode button:focus,
+.pwa-mode input:focus,
+.pwa-mode textarea:focus {
+    outline: 2px solid #4CAF50;
+    outline-offset: 2px;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    .pwa-mode .install-button {
+        border: 2px solid currentColor;
+    }
+    
+    .pwa-mode #offline-indicator {
+        border: 2px solid #ffffff;
+    }
+}
