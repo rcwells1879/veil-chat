@@ -933,6 +933,10 @@ async function initializeApp() {
     function closeSettingsPanel() {
         console.log(`%c[${new Date().toLocaleTimeString()}] CLOSE settings panel triggered.`, 'color: red; font-weight: bold;');
         console.trace("Call stack for closeSettingsPanel:"); // This will show what called the function.
+        
+        // Apply all settings before closing panel to ensure everything is saved
+        saveAllSettings();
+        
         const panel = document.querySelector('#settings-panel-container .settings-panel');
         if (!panel) {
             console.warn('closeSettingsPanel called, but no panel element found.');
@@ -1174,10 +1178,8 @@ async function initializeApp() {
                 setupImageControls();
                 toggleModelIdentifierVisibility();
 
-                // Add event listeners to all settings elements
-                settingsPanelContainer.querySelectorAll('input, select').forEach(el => {
-                    el.addEventListener('change', saveAllSettings);
-                });
+                // Note: Settings are now saved only when panel closes via closeSettingsPanel()
+                // Individual change events removed to prevent redundant service updates
 
                 // Add specific event listeners for voice sliders to update display values
                 const voiceSpeedSlider = settingsPanelContainer.querySelector('#slider-voice-speed');
@@ -1506,10 +1508,7 @@ async function initializeApp() {
         
         // Add event listeners for auto-resize
         userInput.addEventListener('input', (e) => {
-            // Stop TTS when user starts typing
-            if (voiceService && voiceService.stopSpeaking) {
-                voiceService.stopSpeaking();
-            }
+            // Speech is already stopped by focus/touchstart events
             autoResize();
         });
         
@@ -1549,11 +1548,7 @@ async function initializeApp() {
         
         // Handle Enter key behavior
         userInput.addEventListener('keydown', (e) => {
-            // Stop TTS when user starts typing (except for Enter key which submits)
-            if (e.key !== 'Enter' && voiceService && voiceService.stopSpeaking) {
-                voiceService.stopSpeaking();
-            }
-            
+            // Speech is already stopped by focus/touchstart events
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 handleUserInput();
@@ -1659,7 +1654,6 @@ async function initializeApp() {
     addWelcomeMessage();
 
     if (LLMService.hasSavedConversation()) {
-        addMessage('(Previous conversation restored - context preserved)', 'llm');
         console.log('Full conversation history loaded:', llmService.conversationHistory.length, 'messages');
     }
 
