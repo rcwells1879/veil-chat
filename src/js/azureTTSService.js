@@ -10,6 +10,9 @@ if (typeof AzureTTSService === 'undefined') {
             this.voicePitch = 1.0;
             this.currentVoice = 'en-US-JennyNeural';
             
+            // Track active audio elements for stopping
+            this.activeAudioElements = new Set();
+            
             console.log(`AzureTTSService initialized. Region: ${this.region}, Endpoint: ${this.endpoint}`);
         }
 
@@ -176,6 +179,9 @@ if (typeof AzureTTSService === 'undefined') {
                     // Create audio element
                     const audio = new Audio();
                     
+                    // Add to tracking set
+                    this.activeAudioElements.add(audio);
+                    
                     // Create blob and object URL
                     const blob = new Blob([audioBuffer], { type: 'audio/mpeg' });
                     const audioUrl = URL.createObjectURL(blob);
@@ -183,11 +189,13 @@ if (typeof AzureTTSService === 'undefined') {
 
                     // Set up event handlers
                     audio.onended = () => {
+                        this.activeAudioElements.delete(audio); // Remove from tracking
                         URL.revokeObjectURL(audioUrl); // Clean up memory
                         resolve();
                     };
 
                     audio.onerror = (event) => {
+                        this.activeAudioElements.delete(audio); // Remove from tracking
                         URL.revokeObjectURL(audioUrl); // Clean up memory
                         reject(new Error(`Audio playback failed: ${event.message || 'Unknown error'}`));
                     };
@@ -202,6 +210,7 @@ if (typeof AzureTTSService === 'undefined') {
 
                     // Start playback
                     audio.play().catch(error => {
+                        this.activeAudioElements.delete(audio); // Remove from tracking
                         URL.revokeObjectURL(audioUrl);
                         reject(new Error(`Audio play failed: ${error.message}`));
                     });
@@ -214,16 +223,38 @@ if (typeof AzureTTSService === 'undefined') {
 
         // Stop speaking (for compatibility with VoiceService interface)
         stopSpeaking() {
-            // For HTML Audio elements, we'd need to track active audio elements
-            // For now, we'll implement basic stopping
+            console.log("AzureTTSService: stopSpeaking called");
+            
+            // Stop tracked audio elements
+            let stoppedCount = 0;
+            this.activeAudioElements.forEach(audio => {
+                try {
+                    if (!audio.paused) {
+                        console.log("AzureTTSService: Stopping tracked audio element:", audio.src?.substring(0, 100));
+                        audio.pause();
+                        audio.currentTime = 0;
+                        stoppedCount++;
+                    }
+                    // Clean up the element
+                    this.activeAudioElements.delete(audio);
+                } catch (error) {
+                    console.warn("AzureTTSService: Error stopping audio element:", error);
+                    this.activeAudioElements.delete(audio);
+                }
+            });
+            
+            // Also check for any HTML Audio elements in DOM as fallback
             const audioElements = document.querySelectorAll('audio');
             audioElements.forEach(audio => {
                 if (!audio.paused) {
+                    console.log("AzureTTSService: Stopping DOM audio element:", audio.src?.substring(0, 100));
                     audio.pause();
                     audio.currentTime = 0;
+                    stoppedCount++;
                 }
             });
-            console.log("AzureTTSService: Stopped all active audio playback");
+            
+            console.log(`AzureTTSService: Stopped ${stoppedCount} active audio elements`);
         }
 
         // Helper method to convert pitch value to SSML format

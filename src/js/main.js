@@ -144,8 +144,11 @@ async function initializeApp() {
                   window.navigator.standalone === true;
     
     if (isPWA) {
-        console.log('Running as PWA');
+        console.log('Running as PWA - adding pwa-mode class');
         document.body.classList.add('pwa-mode');
+        console.log('Body classes after PWA detection:', document.body.className);
+    } else {
+        console.log('Not running as PWA - regular web app mode');
     }
 
     // --- MCP Client Integration ---
@@ -767,7 +770,48 @@ async function initializeApp() {
             
             if (result.greeting) {
                 console.log('Initial greeting generated and added to conversation history');
-                addMessage(result.greeting, 'llm');
+                
+                // Check if mobile device for autoplay handling
+                const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) || 
+                                 window.innerWidth <= 768;
+                
+                if (isMobile) {
+                    // Mobile: Add greeting without auto-TTS due to autoplay restrictions
+                    console.log('Mobile: Adding greeting without auto-TTS due to autoplay restrictions');
+                    addMessage(result.greeting, 'llm', false); // false = disable TTS
+                    
+                    // Show prompt for user to enable audio
+                    setTimeout(() => {
+                        addMessage('(Tap anywhere to enable voice responses)', 'system', false);
+                    }, 1000);
+                    
+                    // Enable TTS on user interaction
+                    const enableTTSOnTouch = () => {
+                        console.log('Mobile: Enabling TTS after user interaction');
+                        document.removeEventListener('touchstart', enableTTSOnTouch);
+                        document.removeEventListener('click', enableTTSOnTouch);
+                        
+                        // Remove the prompt message
+                        const systemMessages = chatWindow.querySelectorAll('.message');
+                        systemMessages.forEach(msg => {
+                            if (msg.textContent.includes('Tap anywhere to enable')) {
+                                msg.remove();
+                            }
+                        });
+                        
+                        // Re-speak the greeting now that audio is unlocked
+                        if (voiceService && voiceService.isSynthesisSupported()) {
+                            voiceService.speak(result.greeting, SETTINGS.ttsVoice);
+                        }
+                    };
+                    
+                    document.addEventListener('touchstart', enableTTSOnTouch, { once: true });
+                    document.addEventListener('click', enableTTSOnTouch, { once: true });
+                    
+                } else {
+                    // Desktop: Normal TTS behavior
+                    addMessage(result.greeting, 'llm');
+                }
             }
             
         } catch (error) {
@@ -1333,11 +1377,24 @@ async function initializeApp() {
         });
         
         userInput.addEventListener('click', () => {
+            console.log('Click event fired! Input area expanded:', inputArea.classList.contains('expanded'));
+            console.log('Body has pwa-mode class:', document.body.classList.contains('pwa-mode'));
+            
             if (!inputArea.classList.contains('expanded')) {
                 inputArea.classList.add('expanded');
                 userInput.classList.add('expanded');
                 userInput.focus();
-                console.log('Input expanded on click');
+                console.log('Input expanded on click - classes added');
+                console.log('Input area classes:', inputArea.className);
+                console.log('User input classes:', userInput.className);
+                
+                // Force a style recalculation to ensure PWA styles apply
+                setTimeout(() => {
+                    inputArea.style.display = 'flex'; // Trigger reflow
+                    console.log('Forced style recalculation');
+                }, 10);
+            } else {
+                console.log('Input was already expanded');
             }
         });
         
@@ -1455,6 +1512,37 @@ async function initializeApp() {
             }
             autoResize();
         });
+        
+        // Stop TTS on multiple interaction types with debugging  
+        userInput.addEventListener('touchstart', (e) => {
+            console.log('TouchStart: Event fired! voiceService available:', !!window.voiceService);
+            if (window.voiceService && window.voiceService.stopSpeaking) {
+                console.log('TouchStart: Calling stopSpeaking()');
+                window.voiceService.stopSpeaking();
+            } else {
+                console.log('TouchStart: voiceService.stopSpeaking not available');
+            }
+        }, { passive: true });
+        
+        userInput.addEventListener('mousedown', (e) => {
+            console.log('MouseDown: Event fired! voiceService available:', !!window.voiceService);
+            if (window.voiceService && window.voiceService.stopSpeaking) {
+                console.log('MouseDown: Calling stopSpeaking()');
+                window.voiceService.stopSpeaking();
+            } else {
+                console.log('MouseDown: voiceService.stopSpeaking not available');
+            }
+        });
+        
+        userInput.addEventListener('focus', (e) => {
+            console.log('Focus: Event fired! voiceService available:', !!window.voiceService);
+            if (window.voiceService && window.voiceService.stopSpeaking) {
+                console.log('Focus: Calling stopSpeaking()');
+                window.voiceService.stopSpeaking();
+            } else {
+                console.log('Focus: voiceService.stopSpeaking not available');
+            }
+        });
         userInput.addEventListener('paste', () => {
             setTimeout(autoResize, 50);
         });
@@ -1519,7 +1607,46 @@ async function initializeApp() {
                     }
                     
                     if (personaContent.greeting) {
-                        addMessage(personaContent.greeting, 'llm');
+                        // Check if mobile device for autoplay handling
+                        const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) || 
+                                         window.innerWidth <= 768;
+                        
+                        if (isMobile) {
+                            // Mobile: Add greeting without auto-TTS due to autoplay restrictions
+                            console.log('Mobile: Adding restored greeting without auto-TTS due to autoplay restrictions');
+                            addMessage(personaContent.greeting, 'llm', false); // false = disable TTS
+                            
+                            setTimeout(() => {
+                                addMessage('(Tap anywhere to enable voice responses)', 'system', false);
+                            }, 1000);
+                            
+                            // Enable TTS on user interaction
+                            const enableTTSOnTouch = () => {
+                                console.log('Mobile: Enabling TTS after user interaction for restored persona');
+                                document.removeEventListener('touchstart', enableTTSOnTouch);
+                                document.removeEventListener('click', enableTTSOnTouch);
+                                
+                                // Remove the prompt
+                                const systemMessages = chatWindow.querySelectorAll('.message');
+                                systemMessages.forEach(msg => {
+                                    if (msg.textContent.includes('Tap anywhere to enable')) {
+                                        msg.remove();
+                                    }
+                                });
+                                
+                                // Re-speak the greeting
+                                if (voiceService && voiceService.isSynthesisSupported()) {
+                                    voiceService.speak(personaContent.greeting, SETTINGS.ttsVoice);
+                                }
+                            };
+                            
+                            document.addEventListener('touchstart', enableTTSOnTouch, { once: true });
+                            document.addEventListener('click', enableTTSOnTouch, { once: true });
+                            
+                        } else {
+                            // Desktop: Normal TTS behavior
+                            addMessage(personaContent.greeting, 'llm');
+                        }
                     }
                     
                 } catch (error) {

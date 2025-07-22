@@ -138,16 +138,29 @@ if (typeof VoiceService === 'undefined') {
     }
 
     stopSpeaking() {
+        console.log("VoiceService: stopSpeaking called");
+        
         // Stop Azure TTS if active
         if (this.azureTTS) {
+            console.log("VoiceService: Stopping Azure TTS");
             this.azureTTS.stopSpeaking();
         }
         
         // Stop Web Speech API if active
         if (this.isSynthesisSupported() && (this.synthesis.speaking || this.synthesis.pending)) {
-            console.log("VoiceService: Stopping TTS due to user input");
+            console.log("VoiceService: Stopping Web Speech API");
             this.synthesis.cancel();
         }
+        
+        // Additional aggressive stop for PWA - stop all HTML audio elements
+        const audioElements = document.querySelectorAll('audio');
+        audioElements.forEach(audio => {
+            if (!audio.paused) {
+                console.log("VoiceService: Force stopping HTML audio element");
+                audio.pause();
+                audio.currentTime = 0;
+            }
+        });
     }
 
     // Voice settings getters and setters
@@ -529,6 +542,7 @@ if (typeof VoiceService === 'undefined') {
             console.error('VoiceService: TTS Error:', event.error, event);
             reject(event.error); 
         };
+        
         this.synthesis.speak(utterance);
     }
 
