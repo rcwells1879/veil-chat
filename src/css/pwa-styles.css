@@ -213,3 +213,19 @@
         border: 2px solid #ffffff;
     }
 }
+
+/* PWA scrollbar styling - even more minimal */
+.pwa-mode .chat-window::-webkit-scrollbar,
+.pwa-mode .panel-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.pwa-mode .chat-window::-webkit-scrollbar-thumb,
+.pwa-mode .panel-content::-webkit-scrollbar-thumb {
+    background: #333;
+}
+
+.pwa-mode .chat-window::-webkit-scrollbar-thumb:hover,
+.pwa-mode .panel-content::-webkit-scrollbar-thumb:hover {
+    background: #666;
+}
