@@ -1,7 +1,7 @@
 // VeilChat PWA Service Worker
-const CACHE_NAME = 'veilchat-v1';
-const STATIC_CACHE = 'veilchat-static-v1';
-const API_CACHE = 'veilchat-api-v1';
+const CACHE_NAME = 'veilchat-v2';
+const STATIC_CACHE = 'veilchat-static-v2';
+const API_CACHE = 'veilchat-api-v2';
 
 // Static assets to cache immediately
 const STATIC_ASSETS = [
@@ -80,7 +80,31 @@ self.addEventListener('fetch', event => {
     return; // Don't intercept external API calls
   }
   
-  // Handle static assets with cache-first strategy
+  // Handle critical assets (CSS/JS) with stale-while-revalidate strategy
+  if (isCriticalAsset(request)) {
+    event.respondWith(
+      caches.open(STATIC_CACHE).then(cache => {
+        return cache.match(request).then(cachedResponse => {
+          const fetchPromise = fetch(request).then(networkResponse => {
+            // Update cache in background if successful
+            if (networkResponse.status === 200) {
+              cache.put(request, networkResponse.clone());
+            }
+            return networkResponse;
+          }).catch(() => {
+            // If network fails and we have cache, return cached version
+            return cachedResponse;
+          });
+          
+          // Return cached response immediately if available, otherwise wait for network
+          return cachedResponse || fetchPromise;
+        });
+      })
+    );
+    return;
+  }
+  
+  // Handle non-critical static assets (images, fonts) with cache-first strategy
   if (isStaticAsset(request)) {
     event.respondWith(
       caches.match(request)
@@ -155,11 +179,16 @@ self.addEventListener('fetch', event => {
 });
 
 // Helper functions
-function isStaticAsset(request) {
+function isCriticalAsset(request) {
   return request.method === 'GET' && (
     request.url.includes('.css') ||
     request.url.includes('.js') ||
-    request.url.includes('.html') ||
+    request.url.includes('.html')
+  );
+}
+
+function isStaticAsset(request) {
+  return request.method === 'GET' && (
     request.url.includes('.png') ||
     request.url.includes('.jpg') ||
     request.url.includes('.ico') ||
