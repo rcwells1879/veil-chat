@@ -95,10 +95,55 @@
         padding: 10px;
     }
     
-    /* Make buttons more touch-friendly */
-    .pwa-mode button {
+    /* Make buttons more touch-friendly, but preserve input area button behavior */
+    .pwa-mode button:not(.input-area button):not(#attach-button):not(#mic-button):not(#send-button):not(#settings-button) {
         padding: 12px 16px;
         font-size: 16px; /* Prevent zoom on iOS */
+    }
+    
+    /* Ensure input area buttons maintain their original styling for expansion to work */
+    .pwa-mode .input-area button {
+        /* Keep original button dimensions from style.css */
+        height: 44px;
+        width: 44px;
+        padding: 0;
+        font-size: 16px; /* Still prevent zoom on iOS */
+    }
+    
+    /* Fix input expansion for PWA mode - use stronger selectors */
+    .pwa-mode .input-area.expanded #user-input {
+        flex: 1 1 auto !important;
+        width: calc(100% - 60px) !important; /* Account for remaining buttons */
+        max-width: none !important;
+        min-width: 0 !important;
+        background-color: #444 !important; /* Debug color to see if rule applies */
+    }
+    
+    /* Ensure hidden buttons take no space in PWA */
+    .pwa-mode .input-area.expanded #attach-button,
+    .pwa-mode .input-area.expanded #mic-button {
+        opacity: 0 !important;
+        visibility: hidden !important;
+        width: 0 !important;
+        min-width: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+        flex-shrink: 1 !important;
+        transition: all 0.3s ease;
+    }
+    
+    /* Adjust button row spacing in PWA expanded mode */
+    .pwa-mode .input-area.expanded .button-row {
+        margin-left: 3px !important;
+        gap: 2px !important;
+        flex-shrink: 0 !important;
+        transition: all 0.3s ease;
+    }
+    
+    /* Force input area to use all available space in PWA */
+    .pwa-mode .input-area.expanded {
+        gap: 3px !important;
     }
     
     .pwa-mode textarea {
