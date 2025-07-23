@@ -11,6 +11,7 @@ class PuppeteerExtractor extends BaseExtractor {
         this.browser = null;
         this.browserPromise = null;
         this.timeout = 20000; // 20 seconds for complex sites like Bloomberg, CNBC
+        this.inactivityTimer = null; // Track inactivity timer
     }
 
     /**
@@ -95,15 +96,31 @@ class PuppeteerExtractor extends BaseExtractor {
             timeout: 45000 // Increased browser launch timeout
         });
 
-        // Close browser after 5 minutes of inactivity to save resources
-        setTimeout(() => {
-            if (browser && browser.isConnected()) {
-                console.log('🤖 PuppeteerExtractor: Closing browser due to inactivity');
-                browser.close().catch(console.error);
-            }
-        }, 5 * 60 * 1000);
+        // Set up inactivity timer - will be reset on each use
+        this.resetInactivityTimer(browser);
 
         return browser;
+    }
+
+    /**
+     * Reset inactivity timer - following Puppeteer best practices
+     * Timer should reset on each browser use, not run from creation time
+     */
+    resetInactivityTimer(browser) {
+        // Clear existing timer
+        if (this.inactivityTimer) {
+            clearTimeout(this.inactivityTimer);
+        }
+        
+        // Set new timer for 10 minutes of actual inactivity
+        this.inactivityTimer = setTimeout(() => {
+            if (browser && browser.isConnected()) {
+                console.log('🤖 PuppeteerExtractor: Closing browser due to actual inactivity');
+                browser.close().catch(console.error);
+                this.browser = null;
+                this.inactivityTimer = null;
+            }
+        }, 10 * 60 * 1000); // 10 minutes of actual inactivity
     }
 
     /**
@@ -116,6 +133,10 @@ class PuppeteerExtractor extends BaseExtractor {
         
         try {
             const browser = await this.getBrowser();
+            
+            // Reset inactivity timer on each use - following Puppeteer best practices
+            this.resetInactivityTimer(browser);
+            
             page = await browser.newPage();
 
             // Set timeout and configure page
@@ -801,6 +822,12 @@ class PuppeteerExtractor extends BaseExtractor {
      * Close browser instance
      */
     async closeBrowser() {
+        // Clear inactivity timer
+        if (this.inactivityTimer) {
+            clearTimeout(this.inactivityTimer);
+            this.inactivityTimer = null;
+        }
+        
         if (this.browser && this.browser.isConnected()) {
             console.log('🤖 PuppeteerExtractor: Closing browser...');
             await this.browser.close();

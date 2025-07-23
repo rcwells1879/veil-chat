@@ -1404,10 +1404,20 @@ Order by priority (1 = highest). Include all URLs but rank them by expected valu
         
         const extractedContent = {};
         const failedUrls = [];
+        const processedUrls = new Set(); // Track processed URLs to prevent duplicates
         
         // Extract content from URLs in priority order
         for (const urlInfo of prioritizedUrls) {
             const url = urlInfo.url;
+            
+            // Skip if URL already processed
+            if (processedUrls.has(url)) {
+                console.log(`⏭️ Skipping duplicate URL: ${url}`);
+                continue;
+            }
+            
+            // Mark URL as being processed
+            processedUrls.add(url);
             
             try {
                 console.log(`📄 Extracting content from: ${url}`);
@@ -1425,7 +1435,18 @@ Order by priority (1 = highest). Include all URLs but rank them by expected valu
                         relevance_score: urlInfo.relevance_score,
                         reasoning: urlInfo.reasoning
                     };
-                    console.log(`✅ Successfully extracted ${extractionResult.content.length} characters from ${url}`);
+                    
+                    // Calculate actual character count from content structure
+                    let characterCount = 0;
+                    if (Array.isArray(extractionResult.content) && extractionResult.content[0]?.text) {
+                        characterCount = extractionResult.content[0].text.length;
+                    } else if (typeof extractionResult.content === 'string') {
+                        characterCount = extractionResult.content.length;
+                    } else {
+                        characterCount = JSON.stringify(extractionResult.content).length;
+                    }
+                    
+                    console.log(`✅ [EXTRACT-${Date.now()}] Successfully extracted ${characterCount} characters from ${url}`);
                 } else {
                     console.warn(`⚠️ No content extracted from ${url}`);
                     failedUrls.push(url);
@@ -1558,6 +1579,15 @@ Order by priority (1 = highest). Include all URLs but rank them by expected valu
                     contentText = 'No content available';
                 }
                 
+                // Check if content is paywalled before processing
+                if (this.isPaywalledContent(contentText)) {
+                    return `
+Source: ${url}
+Title: ${data.title || 'Untitled'}
+Content: [PAYWALL] This article requires a subscription to read in full. Available preview: ${contentText.substring(0, 300)}${contentText.length > 300 ? '...' : ''}
+`;
+                }
+                
                 // Clean the content to remove website boilerplate and navigation
                 const cleanedContent = this.cleanContentForSynthesis(contentText);
                 
@@ -1585,6 +1615,8 @@ Key guidelines:
 - Provide actionable insights where relevant
 - If there are conflicting viewpoints in the sources, acknowledge them naturally
 - You can mention sources for credibility when appropriate
+- If sources show "[PAYWALL]" content, acknowledge the limitation naturally (e.g., "Some sources require subscriptions") but focus on the available information
+- Don't repeatedly mention paywalls - briefly acknowledge and move on to available content
 
 Focus on being genuinely helpful while maintaining your persona's voice and style. Extract and present the specific information the user is looking for, not meta-information about the websites themselves.`;
         
@@ -1735,35 +1767,165 @@ Goal: "Latest developments in renewable energy" → "latest renewable energy dev
             'youtube.com',
             'maps.google.com',
             'yelp.com',
-            'tripadvisor.com'
+            'tripadvisor.com',
+            // News sites that work better with Puppeteer due to dynamic content/paywalls
+            'wsj.com',           // Wall Street Journal (paywall, dynamic)
+            'bloomberg.com',     // Bloomberg (heavy JavaScript)
+            'cnbc.com',          // CNBC (dynamic market data)
+            'marketwatch.com',   // MarketWatch (dynamic charts)
+            'nytimes.com'        // NY Times (paywall, dynamic content)
+        ];
+        
+        // Static news sites that work well with Cheerio
+        const staticNewsSites = [
+            'foxnews.com',       // Fox News (mostly static HTML)
+            'cnn.com',           // CNN (good static content)
+            'bbc.com',           // BBC (excellent static structure) 
+            'reuters.com',       // Reuters (clean static content)
+            'nbcnews.com',       // NBC News (static articles)
+            'cbsnews.com',       // CBS News (static content)
+            'washingtonpost.com', // Washington Post (some static content)
+            'theguardian.com',   // The Guardian (good static structure)
+            'npr.org',           // NPR (excellent static content)
+            'apnews.com'         // Associated Press (clean static)
         ];
         
         const needsPuppeteer = dynamicSites.some(site => domain.includes(site));
+        const isStaticNewsSite = staticNewsSites.some(site => domain.includes(site));
+        
+        // Log site classification for debugging
+        if (needsPuppeteer) {
+            console.log(`🔍 Site classification: ${domain} → Puppeteer (dynamic)`);
+        } else if (isStaticNewsSite) {
+            console.log(`🔍 Site classification: ${domain} → Cheerio (static news)`);
+        } else {
+            console.log(`🔍 Site classification: ${domain} → Cheerio (default)`);
+        }
         
         try {
+            let extractionResult;
+            
             if (needsPuppeteer) {
                 console.log(`🤖 Using Puppeteer for dynamic site: ${domain}`);
-                return await this.handleExtractWebContent({ url, options });
+                extractionResult = await this.handleExtractWebContent({ url, options });
             } else {
                 console.log(`⚡ Using Cheerio for static site: ${domain}`);
-                // Try Cheerio first for speed
-                return await this.handleExtractForSummary({ url, options });
+                extractionResult = await this.handleExtractForSummary({ url, options });
             }
-        } catch (error) {
-            console.log(`⚠️ Primary extraction failed, trying fallback method for ${url}`);
             
-            // Fallback to the other method
+            // Validate extraction result - only fallback if extraction actually failed
+            if (this.isValidExtractionResult(extractionResult)) {
+                return extractionResult;
+            } else {
+                throw new Error('Extraction returned invalid or insufficient content');
+            }
+            
+        } catch (error) {
+            console.log(`⚠️ Primary extraction failed for ${url}: ${error.message}`);
+            console.log(`🔄 Trying fallback extraction method...`);
+            
+            // Fallback to the other method only on genuine failure
             try {
+                let fallbackResult;
                 if (needsPuppeteer) {
-                    return await this.handleExtractForSummary({ url, options });
+                    console.log(`⚡ Fallback: Using Cheerio for ${domain}`);
+                    fallbackResult = await this.handleExtractForSummary({ url, options });
                 } else {
-                    return await this.handleExtractWebContent({ url, options });
+                    console.log(`🤖 Fallback: Using Puppeteer for ${domain}`);
+                    fallbackResult = await this.handleExtractWebContent({ url, options });
                 }
+                
+                if (this.isValidExtractionResult(fallbackResult)) {
+                    console.log(`✅ Fallback extraction succeeded for ${url}`);
+                    return fallbackResult;
+                } else {
+                    throw new Error('Fallback extraction also returned invalid content');
+                }
+                
             } catch (fallbackError) {
                 console.error(`❌ Both extraction methods failed for ${url}:`, fallbackError.message);
                 throw fallbackError;
             }
         }
+    }
+
+    /**
+     * Check if content indicates a paywall or subscription requirement
+     */
+    isPaywalledContent(content) {
+        if (!content || typeof content !== 'string') {
+            return false;
+        }
+        
+        const lowerContent = content.toLowerCase();
+        const paywallIndicators = [
+            'subscribe to continue',
+            'subscription required',
+            'reached your limit',
+            'free articles remaining',
+            'premium content',
+            'log in to read',
+            'sign up to continue',
+            'become a subscriber',
+            'unlimited access',
+            'digital subscription',
+            'paywall',
+            'subscriber exclusive',
+            'members only',
+            'registration required',
+            'create account to continue',
+            'this article is for subscribers'
+        ];
+        
+        return paywallIndicators.some(indicator => lowerContent.includes(indicator));
+    }
+
+    /**
+     * Validate extraction result to determine if fallback is needed
+     */
+    isValidExtractionResult(result) {
+        if (!result || typeof result !== 'object') {
+            return false;
+        }
+        
+        // Check if result has content
+        let content = '';
+        if (typeof result.content === 'string') {
+            content = result.content;
+        } else if (Array.isArray(result.content) && result.content[0]?.text) {
+            content = result.content[0].text;
+        } else {
+            return false; // No valid content found
+        }
+        
+        const trimmedContent = content.trim();
+        
+        // Check for paywall content first - this is valid content, not a failure
+        if (this.isPaywalledContent(trimmedContent)) {
+            console.log(`🔒 Paywall detected - treating as valid content (no fallback needed)`);
+            return true; // Paywall content is valid, don't trigger fallback
+        }
+        
+        // Content should be substantial (more than just navigation/boilerplate)
+        if (trimmedContent.length < 100) {
+            console.log(`⚠️ Extraction result too short: ${trimmedContent.length} characters`);
+            return false;
+        }
+        
+        // Check if content is mostly navigation/boilerplate - only reject if extremely high percentage
+        const words = trimmedContent.split(/\s+/);
+        const navWords = words.filter(word => 
+            /^(Home|About|Contact|Login|Menu|Browse|Search|News|Sports|Business|World|Markets|Politics|Technology|Health|Sign|Subscribe|Follow|Share|More)$/i.test(word)
+        );
+        
+        // Only reject if more than 70% navigation words (was 30% - too strict)
+        // Most real articles will have some navigation words mixed in with content
+        if (navWords.length / words.length > 0.7) {
+            console.log(`⚠️ Extraction result mostly navigation: ${Math.round(navWords.length / words.length * 100)}% nav words`);
+            return false;
+        }
+        
+        return true;
     }
 
     async run() {
