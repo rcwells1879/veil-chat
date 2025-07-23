@@ -1446,6 +1446,85 @@ Order by priority (1 = highest). Include all URLs but rank them by expected valu
         return extractedContent;
     }
     
+    /**
+     * Clean extracted content by removing website navigation and boilerplate
+     */
+    cleanContentForSynthesis(content) {
+        if (!content || typeof content !== 'string') {
+            return '';
+        }
+        
+        // Remove common website navigation and boilerplate patterns
+        const cleaningPatterns = [
+            // Navigation and site structure
+            /Site\s*Index\s*Browse\s*World\s*Business\s*Markets?/gi,
+            /Browse\s*World\s*Business\s*Markets?\s*Sustainability/gi,
+            /Quick\s*Links\s*Quick\s*Links/gi,
+            /Home\s*Overall\s*Rankings\s*Rankings\s*Index/gi,
+            /News\s*Sections?\s*U\.?S\.?\s*News/gi,
+            
+            // Common footers and headers
+            /About\s+Reuters.*?opens\s+new\s+tab/gi,
+            /Advertise\s+with\s+Us.*?opens\s+new\s+tab/gi,
+            /Careers.*?opens\s+new\s+tab/gi,
+            /Download\s+the\s+App\s+\(iOS\).*?opens\s+new\s+tab/gi,
+            /Download\s+the\s+App\s+\(Android\).*?opens\s+new\s+tab/gi,
+            
+            // Cookie and privacy notices
+            /By\s+continuing,?\s*I\s+agree\s+to\s+the\s+Privacy\s+Policy/gi,
+            /By\s+accepting,?\s*you\s+agree\s+to\s+our\s+updated\s+Terms/gi,
+            
+            // Market tickers and technical data (keep headlines but remove ticker symbols)
+            /\*\d+[\d,]*\.\d+\s*Uptrend\s*[+\-]\d+/gi,
+            /LAST\s*\|\s*\d+:\d+:\d+\s*[AP]M\s*[A-Z]+/gi,
+            
+            // Ad and tracking content
+            /#bfad-slot\s*\{[^}]+\}/gi,
+            /@media[^}]+\{[^}]+\}/gi,
+            
+            // Schema markup and JSON-LD
+            /\[\{"@context".*?\}\]/gi,
+            
+            // Excessive whitespace and line breaks
+            /\s{3,}/g,
+            /\n{3,}/g
+        ];
+        
+        let cleaned = content;
+        
+        // Apply all cleaning patterns
+        cleaningPatterns.forEach(pattern => {
+            cleaned = cleaned.replace(pattern, ' ');
+        });
+        
+        // Additional cleanup for news content
+        // Remove lines that are purely navigation (start with common nav terms)
+        const lines = cleaned.split('\n');
+        const filteredLines = lines.filter(line => {
+            const trimmed = line.trim();
+            if (trimmed.length < 5) return false; // Remove very short lines
+            
+            // Remove pure navigation lines
+            const navPatterns = [
+                /^(Home|About|Contact|Privacy|Terms|Login|Sign\s+[Ii]n|Register|Subscribe|Menu|Browse|Search)$/i,
+                /^(World|Business|Markets|Sports|Technology|Politics|Health)$/i,
+                /^[A-Z\s]{2,20}$/ // All caps short phrases (likely navigation)
+            ];
+            
+            return !navPatterns.some(pattern => pattern.test(trimmed));
+        });
+        
+        cleaned = filteredLines.join('\n');
+        
+        // Final cleanup
+        cleaned = cleaned
+            .replace(/\s+/g, ' ') // Normalize spaces
+            .replace(/\n\s*\n/g, '\n\n') // Normalize line breaks
+            .trim();
+        
+        return cleaned;
+    }
+
     // Phase 4: Synthesize information into final response
     async executeSynthesisPhase(taskId, options = {}) {
         console.log(`🎯 Agent Workflow: Executing synthesis phase for task ${taskId}`);
@@ -1464,7 +1543,7 @@ Order by priority (1 = highest). Include all URLs but rank them by expected valu
             return fallbackSynthesis;
         }
         
-        // Prepare content for synthesis
+        // Prepare content for synthesis - keep source attribution but clean content
         const contentSummary = Object.entries(extractedContent)
             .map(([url, data]) => {
                 // Handle both string and array content formats
@@ -1479,31 +1558,35 @@ Order by priority (1 = highest). Include all URLs but rank them by expected valu
                     contentText = 'No content available';
                 }
                 
+                // Clean the content to remove website boilerplate and navigation
+                const cleanedContent = this.cleanContentForSynthesis(contentText);
+                
                 return `
 Source: ${url}
-Priority: ${data.priority}
-Title: ${data.title || 'No title'}
-Content: ${contentText.substring(0, 1000)}...
+Title: ${data.title || 'Untitled'}
+Content: ${cleanedContent.substring(0, 2000)}${cleanedContent.length > 2000 ? '...' : ''}
 `;
             }).join('\n---\n');
         
         const synthesisPrompt = `You are responding as your current persona in a natural conversation. The user asked about: "${goal}"
 
-I've gathered information from ${Object.keys(extractedContent).length} different sources to help answer their question:
+I've extracted actual content from ${Object.keys(extractedContent).length} sources to help answer their question:
 
 ${contentSummary}
 
 Please provide a natural, conversational response about this information. Stay in character as your persona, be engaging and helpful, and present the information in a way that feels like a natural conversation. 
 
 Key guidelines:
-- Don't start with phrases like "According to my research" or "Based on the information I found"
+- Focus on the ACTUAL CONTENT AND INFORMATION extracted from the sources, not descriptions of what the websites are about
+- Don't start with phrases like "According to my research" or "Based on the information I found"  
 - Present the information as if you naturally know about this topic
-- Synthesize insights from multiple sources into a cohesive narrative
+- Synthesize the most relevant details that directly answer the user's question
 - Be accurate to the source material but conversational in tone
 - Provide actionable insights where relevant
 - If there are conflicting viewpoints in the sources, acknowledge them naturally
+- You can mention sources for credibility when appropriate
 
-Focus on being genuinely helpful while maintaining your persona's voice and style.`;
+Focus on being genuinely helpful while maintaining your persona's voice and style. Extract and present the specific information the user is looking for, not meta-information about the websites themselves.`;
         
         const synthesis = await this.callLLM(synthesisPrompt, 0.7, 2000, options.llmSettings);
         

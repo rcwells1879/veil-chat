@@ -24,7 +24,8 @@
       "WebFetch(domain:pptr.dev)",
       "WebFetch(domain:raw.githubusercontent.com)",
       "WebFetch(domain:docs.anthropic.com)",
-      "WebFetch(domain:web.dev)"
+      "WebFetch(domain:web.dev)",
+      "WebFetch(domain:cheerio.js.org)"
     ],
     "deny": []
   }

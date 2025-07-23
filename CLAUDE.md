@@ -77,3 +77,8 @@ VeilChat is a modern web-based chat interface with AI capabilities, built with v
 ## Deployment Configuration
 
 - CORS settings are handled in my Cloudflare tunnel dashboard 
+
+## Best Practices
+
+### External Tool Usage
+- Always reference online documentation for external tools like Puppeteer or Cheerio before making changes to their services

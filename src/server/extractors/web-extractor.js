@@ -31,20 +31,43 @@ class WebExtractor {
                 }
             }
 
-            // Check URL accessibility first
-            const isAccessible = await this.baseExtractor.checkUrlAccessibility(url);
-            if (!isAccessible) {
-                throw new Error('URL is not accessible');
-            }
+            // Note: Removed strict URL accessibility check as HEAD requests often fail
+            // for sites that block bots, but full requests with proper headers work fine
 
             // Determine extraction method
             const method = this.baseExtractor.determineExtractionMethod(url);
             
             let extractedData;
-            if (method === 'puppeteer') {
-                extractedData = await this.puppeteerExtractor.extractWithPuppeteer(url, options);
-            } else {
-                extractedData = await this.baseExtractor.extractWithCheerio(url, options);
+            let usedFallback = false;
+            
+            try {
+                if (method === 'puppeteer') {
+                    extractedData = await this.puppeteerExtractor.extractWithPuppeteer(url, options);
+                } else {
+                    // Try Cheerio first for performance
+                    extractedData = await this.baseExtractor.extractWithCheerio(url, options);
+                    
+                    // Check if content extraction was poor - fallback to Puppeteer
+                    if (this._shouldFallbackToPuppeteer(extractedData)) {
+                        console.log(`⚡ WebExtractor: Poor Cheerio extraction, falling back to Puppeteer for ${url}`);
+                        extractedData = await this.puppeteerExtractor.extractWithPuppeteer(url, options);
+                        usedFallback = true;
+                    }
+                }
+            } catch (error) {
+                // If Cheerio fails and we haven't tried Puppeteer yet, try it as fallback
+                if (method === 'cheerio' && !usedFallback) {
+                    console.log(`⚡ WebExtractor: Cheerio failed, trying Puppeteer fallback for ${url}: ${error.message}`);
+                    try {
+                        extractedData = await this.puppeteerExtractor.extractWithPuppeteer(url, options);
+                        usedFallback = true;
+                    } catch (puppeteerError) {
+                        // Both methods failed, throw the original error
+                        throw error;
+                    }
+                } else {
+                    throw error;
+                }
             }
 
             // Clean and validate extracted data
@@ -146,6 +169,52 @@ class WebExtractor {
     clearCache() {
         this.cache.clear();
         console.log('🧹 WebExtractor: Cache cleared');
+    }
+
+    /**
+     * Check if we should fallback to Puppeteer based on content quality
+     */
+    _shouldFallbackToPuppeteer(extractedData) {
+        if (!extractedData || !extractedData.content) {
+            return true; // No content at all
+        }
+        
+        const content = extractedData.content.trim();
+        const contentLength = content.length;
+        
+        // Very short content suggests poor extraction
+        if (contentLength < 100) {
+            return true;
+        }
+        
+        // Check for common signs of JavaScript-heavy sites that Cheerio can't handle
+        const jsIndicators = [
+            'Please enable JavaScript',
+            'JavaScript is required',
+            'This site requires JavaScript',
+            'Enable JavaScript to view',
+            'JavaScript must be enabled',
+            'Your browser does not support JavaScript',
+            'Please turn on JavaScript',
+            'JavaScript disabled'
+        ];
+        
+        if (jsIndicators.some(indicator => content.includes(indicator))) {
+            return true;
+        }
+        
+        // Check for mostly navigation/footer content (common with dynamic sites)
+        const navigationWords = ['Home', 'About', 'Contact', 'Privacy', 'Terms', 'Login', 'Sign up', 'Menu'];
+        const words = content.split(/\s+/).filter(w => w.length > 2);
+        const navWordCount = words.filter(word => navigationWords.includes(word)).length;
+        
+        // If more than 30% of content is navigation words, likely poor extraction
+        if (words.length > 0 && (navWordCount / words.length) > 0.3) {
+            return true;
+        }
+        
+        // Content seems reasonable
+        return false;
     }
 
     /**

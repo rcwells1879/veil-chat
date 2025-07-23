@@ -27,7 +27,17 @@ class BaseExtractor {
                 'facebook.com',
                 'twitter.com',
                 'instagram.com',
-                'linkedin.com'
+                'linkedin.com',
+                'cnbc.com',          // CNBC has heavy JavaScript and dynamic loading
+                'usnews.com',        // USNews uses dynamic content loading
+                'wsj.com',           // Wall Street Journal has paywall and dynamic content
+                'bloomberg.com',     // Bloomberg has complex JavaScript interactions
+                'forbes.com',        // Forbes has dynamic ad loading and content
+                'marketwatch.com',   // MarketWatch uses dynamic charts and content
+                'cnet.com',          // CNET has dynamic product listings
+                'techcrunch.com',    // TechCrunch has dynamic article loading
+                'espn.com',          // ESPN has dynamic sports content
+                'yahoo.com'          // Yahoo has complex dynamic layouts
             ];
             
             // Sites that work well with static HTML parsing
@@ -92,81 +102,110 @@ class BaseExtractor {
     async extractWithCheerio(url, options = {}) {
         console.log(`⚡ BaseExtractor: Extracting ${url} with Cheerio...`);
         
-        try {
-            const response = await fetch(url, {
-                timeout: this.timeout,
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                    'Accept-Language': 'en-US,en;q=0.5',
-                    'Accept-Encoding': 'gzip, deflate',
-                    'Connection': 'keep-alive'
-                }
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-
-            const html = await response.text();
-            const $ = cheerio.load(html);
-
-            // Try Mozilla Readability first for articles
-            let readabilityResult = null;
+        const maxRetries = 3;
+        let lastError = null;
+        
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
-                const dom = new JSDOM(html, { url });
-                const reader = new Readability(dom.window.document);
-                readabilityResult = reader.parse();
+                console.log(`⚡ BaseExtractor: Attempt ${attempt}/${maxRetries} for ${url}`);
+                
+                const response = await fetch(url, {
+                    timeout: this.timeout,
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                        'Accept-Language': 'en-US,en;q=0.5',
+                        'Accept-Encoding': 'gzip, deflate',
+                        'Connection': 'keep-alive',
+                        'Cache-Control': 'no-cache',
+                        'Pragma': 'no-cache'
+                    }
+                });
+
+                if (!response.ok) {
+                    // Don't retry for client errors (4xx), only server errors (5xx) and network issues
+                    if (response.status >= 400 && response.status < 500) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    throw new Error(`HTTP ${response.status}: ${response.statusText} (will retry)`);
+                }
+
+                const html = await response.text();
+                const $ = cheerio.load(html);
+
+                // Try Mozilla Readability first for articles
+                let readabilityResult = null;
+                try {
+                    const dom = new JSDOM(html, { url });
+                    const reader = new Readability(dom.window.document);
+                    readabilityResult = reader.parse();
+                } catch (error) {
+                    console.warn('BaseExtractor: Readability parsing failed:', error.message);
+                }
+
+                // Extract basic information
+                const extractedData = {
+                    url: url,
+                    title: readabilityResult?.title || 
+                           $('h1').first().text().trim() || 
+                           $('title').text().trim() ||
+                           'Untitled',
+                    
+                    content: readabilityResult?.textContent || 
+                            this.extractMainContent($) ||
+                            '',
+                    
+                    author: readabilityResult?.byline ||
+                           $('[rel="author"]').text().trim() ||
+                           $('.author').text().trim() ||
+                           $('meta[name="author"]').attr('content') ||
+                           '',
+                    
+                    publishDate: $('time').attr('datetime') ||
+                               $('meta[property="article:published_time"]').attr('content') ||
+                               $('meta[name="date"]').attr('content') ||
+                               '',
+                    
+                    description: $('meta[name="description"]').attr('content') ||
+                               $('meta[property="og:description"]').attr('content') ||
+                               '',
+                    
+                    images: options.includeImages ? this.extractImages($) : [],
+                    
+                    extractionMethod: 'cheerio',
+                    extractedAt: new Date().toISOString()
+                };
+
+                // Truncate content if needed
+                if (options.maxLength && extractedData.content.length > options.maxLength) {
+                    extractedData.content = this.truncateIntelligently(extractedData.content, options.maxLength);
+                    extractedData.truncated = true;
+                }
+
+                console.log(`✅ BaseExtractor: Successfully extracted ${extractedData.content.length} characters from ${url}`);
+                return extractedData;
+
             } catch (error) {
-                console.warn('BaseExtractor: Readability parsing failed:', error.message);
+                lastError = error;
+                console.error(`❌ BaseExtractor: Attempt ${attempt} failed for ${url}:`, error.message);
+                
+                // Don't retry for client errors (4xx)
+                if (error.message.includes('HTTP 4')) {
+                    break;
+                }
+                
+                // Wait before retrying (exponential backoff)
+                if (attempt < maxRetries) {
+                    const delay = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s
+                    console.log(`⚡ BaseExtractor: Waiting ${delay}ms before retry...`);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                }
             }
-
-            // Extract basic information
-            const extractedData = {
-                url: url,
-                title: readabilityResult?.title || 
-                       $('h1').first().text().trim() || 
-                       $('title').text().trim() ||
-                       'Untitled',
-                
-                content: readabilityResult?.textContent || 
-                        this.extractMainContent($) ||
-                        '',
-                
-                author: readabilityResult?.byline ||
-                       $('[rel="author"]').text().trim() ||
-                       $('.author').text().trim() ||
-                       $('meta[name="author"]').attr('content') ||
-                       '',
-                
-                publishDate: $('time').attr('datetime') ||
-                           $('meta[property="article:published_time"]').attr('content') ||
-                           $('meta[name="date"]').attr('content') ||
-                           '',
-                
-                description: $('meta[name="description"]').attr('content') ||
-                           $('meta[property="og:description"]').attr('content') ||
-                           '',
-                
-                images: options.includeImages ? this.extractImages($) : [],
-                
-                extractionMethod: 'cheerio',
-                extractedAt: new Date().toISOString()
-            };
-
-            // Truncate content if needed
-            if (options.maxLength && extractedData.content.length > options.maxLength) {
-                extractedData.content = this.truncateIntelligently(extractedData.content, options.maxLength);
-                extractedData.truncated = true;
-            }
-
-            console.log(`✅ BaseExtractor: Successfully extracted ${extractedData.content.length} characters from ${url}`);
-            return extractedData;
-
-        } catch (error) {
-            console.error(`❌ BaseExtractor: Cheerio extraction failed for ${url}:`, error.message);
-            throw error;
         }
+        
+        // All attempts failed
+        console.error(`❌ BaseExtractor: All ${maxRetries} attempts failed for ${url}`);
+        throw lastError;
     }
 
     /**

@@ -364,9 +364,9 @@ if (typeof MCPClient === 'undefined') {
                 apiKey: localStorage.getItem('searchApiKey') || '',
                 limit: parseInt(localStorage.getItem('searchLimit')) || 10,
                 timeFilter: localStorage.getItem('searchTimeFilter') || 'any',
-                autoSummarize: localStorage.getItem('searchAutoSummarize') !== 'false'
+                autoSummarize: localStorage.getItem('searchAutoSummarize') !== 'false' // Used for basic search, overridden for research
             };
-            console.log('🔍 MCPClient: Agent workflow search settings:', settings);
+            console.log('🔍 MCPClient: Search settings:', settings);
             return settings;
         }
 
@@ -633,8 +633,14 @@ if (typeof MCPClient === 'undefined') {
                 console.log('🤖 Detected agent workflow request');
                 
                 try {
-                    // Execute the research workflow
-                    const result = await this.executeResearchWorkflow(message);
+                    // Execute the research workflow - override autoSummarize to false for research
+                    // Research should always extract full content, not just summarize search results
+                    const result = await this.executeResearchWorkflow(message, { 
+                        searchSettings: {
+                            ...this.getSearchSettings(),
+                            autoSummarize: false // Always extract full content for research
+                        }
+                    });
                     
                     if (result.success) {
                         console.log('✅ Agent workflow completed successfully');

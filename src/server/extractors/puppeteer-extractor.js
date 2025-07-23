@@ -10,7 +10,7 @@ class PuppeteerExtractor extends BaseExtractor {
         super();
         this.browser = null;
         this.browserPromise = null;
-        this.timeout = 10000; // Optimized timeout for better performance
+        this.timeout = 20000; // 20 seconds for complex sites like Bloomberg, CNBC
     }
 
     /**
@@ -45,13 +45,6 @@ class PuppeteerExtractor extends BaseExtractor {
             console.log('🤖 Environment CHROME_PATH not set, setting to default:', process.env.CHROME_PATH);
         }
         
-        console.log('🤖 Chrome path candidates:', {
-            env: process.env.CHROME_PATH,
-            envDefined: !!process.env.CHROME_PATH,
-            platform: process.platform,
-            currentWorkingDir: process.cwd()
-        });
-        
         // Prioritize environment variable approach (matches user's working test)
         const possibleChromePaths = [
             process.env.CHROME_PATH,
@@ -59,18 +52,8 @@ class PuppeteerExtractor extends BaseExtractor {
             'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe'
         ].filter(Boolean);
         
-        console.log('🤖 Raw paths before filter:', [
-            process.env.CHROME_PATH,
-            'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-            'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe'
-        ]);
-        console.log('🤖 Filtered Chrome paths:', possibleChromePaths);
-        console.log('🤖 Environment CHROME_PATH value:', process.env.CHROME_PATH);
-        
         let chromePath = possibleChromePaths[0]; // Use environment variable first
-        console.log('🤖 Final Chrome path selected:', chromePath);
-        
-        console.log('🤖 Attempting to launch browser with executablePath:', chromePath);
+        console.log('🤖 PuppeteerExtractor: Using Chrome path:', chromePath);
         
         const browser = await puppeteer.launch({
             headless: 'new',
@@ -109,7 +92,7 @@ class PuppeteerExtractor extends BaseExtractor {
                 isLandscape: true,
                 isMobile: false
             },
-            timeout: 30000
+            timeout: 45000 // Increased browser launch timeout
         });
 
         // Close browser after 5 minutes of inactivity to save resources
@@ -178,37 +161,59 @@ class PuppeteerExtractor extends BaseExtractor {
                 });
             }
 
-            // Navigate to page with retry logic
+            // Navigate to page with enhanced retry logic
             console.log(`🤖 PuppeteerExtractor: Navigating to ${url}...`);
             let navigationAttempts = 0;
             const maxAttempts = 3;
             
             while (navigationAttempts < maxAttempts) {
                 try {
+                    // Try different wait strategies based on attempt - optimized for heavy JS sites
+                    const waitStrategies = [
+                        ['domcontentloaded'], // Start with fastest strategy for heavy sites
+                        ['domcontentloaded', 'networkidle2'],
+                        ['load'] // Most permissive fallback
+                    ];
+                    
+                    const waitUntil = waitStrategies[navigationAttempts] || ['domcontentloaded'];
+                    
                     await page.goto(url, { 
-                        waitUntil: ['domcontentloaded', 'networkidle2'],
+                        waitUntil: waitUntil,
                         timeout: this.timeout 
                     });
+                    console.log(`🤖 PuppeteerExtractor: Successfully navigated to ${url} on attempt ${navigationAttempts + 1}`);
                     break;
                 } catch (navError) {
                     navigationAttempts++;
                     console.log(`🤖 Navigation attempt ${navigationAttempts} failed:`, navError.message);
+                    
+                    // Check if it's a specific error we can handle
+                    if (navError.message.includes('ERR_NAME_NOT_RESOLVED') || 
+                        navError.message.includes('ERR_INTERNET_DISCONNECTED')) {
+                        // Network connectivity issue - don't retry
+                        throw navError;
+                    }
+                    
                     if (navigationAttempts >= maxAttempts) throw navError;
-                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    
+                    // Progressive delay: 2s, 4s, 6s
+                    const delay = navigationAttempts * 2000;
+                    console.log(`🤖 PuppeteerExtractor: Waiting ${delay}ms before retry...`);
+                    await new Promise(resolve => setTimeout(resolve, delay));
                 }
             }
 
             // Advanced content loading strategy
             console.log(`🤖 PuppeteerExtractor: Waiting for dynamic content...`);
             
-            // Wait for initial content
-            await new Promise(resolve => setTimeout(resolve, 3000));
+            // Reduced wait times for faster extraction
+            await new Promise(resolve => setTimeout(resolve, 2000));
             
-            // Handle lazy loading by scrolling
+            // Handle lazy loading by scrolling (reduced iterations)
             await this.handleLazyLoading(page);
             
-            // Wait for any final dynamic content
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            // Wait for any final dynamic content (reduced)
+            await new Promise(resolve => setTimeout(resolve, 1000));
 
             // Platform-specific extraction logic
             const domain = new URL(url).hostname.toLowerCase();
@@ -604,13 +609,13 @@ class PuppeteerExtractor extends BaseExtractor {
             // Get initial page height
             let previousHeight = await page.evaluate('document.body.scrollHeight');
             
-            // Scroll down gradually to trigger lazy loading
-            for (let i = 0; i < 5; i++) {
+            // Optimized scrolling for faster content loading
+            for (let i = 0; i < 3; i++) {
                 // Scroll to bottom
                 await page.evaluate('window.scrollTo(0, document.body.scrollHeight)');
                 
-                // Wait for new content to load
-                await new Promise(resolve => setTimeout(resolve, 1000));
+                // Reduced wait time for new content
+                await new Promise(resolve => setTimeout(resolve, 500));
                 
                 // Check if page height changed (new content loaded)
                 const newHeight = await page.evaluate('document.body.scrollHeight');
@@ -660,14 +665,37 @@ class PuppeteerExtractor extends BaseExtractor {
                              document.querySelector('[data-testid*="description"]');
                 if (descEl) result.description = descEl.getAttribute('content') || descEl.textContent?.trim();
 
-                // Enhanced content extraction with modern selectors
+                // Enhanced content extraction with priority-based selectors
+                // Following Puppeteer best practices for page evaluation
                 const contentSelectors = [
-                    // Modern webapp selectors
+                    // Semantic HTML5 elements (highest priority)
+                    'article',
+                    'main',
+                    '[role="main"]',
+                    
+                    // Modern webapp selectors with data attributes
                     '[data-testid*="post-content"]',
                     '[data-testid*="content"]',
-                    '[role="main"]',
-                    'main',
-                    'article',
+                    '[data-testid*="article"]',
+                    
+                    // News site specific selectors (based on common patterns)
+                    '.story-body',                    // BBC, CNN
+                    '.articleBody',                   // CNBC
+                    '.story-content',                 // USNews  
+                    '.InlineStory-container',         // CNBC inline stories
+                    '.ArticleBody-articleBody',       // WSJ
+                    '.story-text',                    // Various news sites
+                    '.post-content-body',            // Forbes
+                    '.entry-content',                // WordPress sites
+                    '.article-content',              // Generic news
+                    '.article-body',                 // Alternative article body
+                    
+                    // Content-specific selectors that avoid navigation
+                    '.content:not(.nav):not(.menu):not(.header):not(.footer)',
+                    '.main-content:not(.sidebar)',
+                    '#content:not(#nav):not(#menu)',
+                    '.post-content:not(.meta)',
+                    '.text-content',
                     
                     // Reddit-specific
                     '[data-adclicklocation="media"]',
@@ -675,28 +703,52 @@ class PuppeteerExtractor extends BaseExtractor {
                     '.Post',
                     '[data-testid="post-content"] .md',
                     
-                    // Generic fallbacks
+                    // Generic fallbacks (lowest priority)
                     '.content',
-                    '.main-content',
-                    '#content',
-                    '.post-content',
-                    '.entry-content',
-                    '.text-content'
+                    '.main-content', 
+                    '#content'
                 ];
 
                 let content = '';
                 let bestContent = '';
                 let maxLength = 0;
 
-                // Try each selector and keep the longest meaningful content
+                // Try each selector in priority order and take first good match
+                // Following Puppeteer/Cheerio best practices for content selection
                 for (const selector of contentSelectors) {
                     const elements = document.querySelectorAll(selector);
                     for (const el of elements) {
                         const text = el.textContent?.trim() || '';
-                        if (text.length > maxLength && text.length > 50) {
-                            maxLength = text.length;
-                            bestContent = text;
+                        
+                        // Filter out navigation-heavy content
+                        if (text.length > 100) {
+                            // Check if content is mostly navigation by counting nav-like words
+                            const words = text.split(/\s+/);
+                            const navWords = words.filter(word => 
+                                /^(Home|About|Contact|Login|Menu|Browse|Search|News|Sports|Business|World|Markets|Politics|Technology|Health|Sign|Subscribe|Follow|Share|More)$/i.test(word)
+                            );
+                            
+                            // Skip if more than 20% navigation words
+                            if (navWords.length / words.length > 0.2) {
+                                continue;
+                            }
+                            
+                            // Prefer longer, more substantial content
+                            if (text.length > maxLength) {
+                                maxLength = text.length;
+                                bestContent = text;
+                                
+                                // If we found substantial content (>500 chars) from a high-priority selector, use it
+                                if (text.length > 500 && contentSelectors.indexOf(selector) < 10) {
+                                    break;
+                                }
+                            }
                         }
+                    }
+                    
+                    // Break if we found good content from high-priority selector
+                    if (bestContent.length > 500 && contentSelectors.indexOf(selector) < 5) {
+                        break;
                     }
                 }
 
