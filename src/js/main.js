@@ -348,6 +348,55 @@ async function initializeApp() {
         }
     }
 
+    // --- Keywords List Function ---
+    function generateKeywordsList() {
+        return `# VeilChat Available Keywords
+
+## 🖼️ Image Generation
+- **"show me [description]"** - Generate images based on your description
+  - Example: "show me a sunset over mountains"
+  - Example: "show me what you look like" (generates persona image)
+
+## 🔬 Agent Research Workflow
+*Comprehensive research with web search and content extraction*
+- **"research [topic]"** - Full research workflow
+- **"investigate [topic]"** - Same as research
+- **"find out about [topic]"** - Same as research  
+- **"look into [topic]"** - Same as research
+- **"gather information about [topic]"** - Same as research
+- **"what can you tell me about [topic]"** - Same as research
+- **"learn about [topic]"** - Same as research
+- **"find information about [topic]"** - Same as research
+- **"search for information about [topic]"** - Same as research
+
+*Research trigger words (can be combined with any topic):*
+- **"latest [topic]"** - Research recent information
+- **"current [topic]"** - Research current state
+- **"recent [topic]"** - Research recent developments
+- **"comprehensive [topic]"** - Research in-depth
+- **"detailed [topic]"** - Research thoroughly
+
+## 🧠 Sequential Thinking Tools
+- **"break down [problem]"** - Analyze complex problems step-by-step
+- **"analyze step by step [topic]"** - Same as break down
+  - Example: "break down the problem of climate change"
+
+## 🔍 Basic Web Search
+*Quick search without comprehensive research*
+- **"search [query]"** - Basic web search
+- **"look up [query]"** - Basic web search  
+- **"find [query]"** - Basic web search
+  - Example: "search for Python tutorials"
+
+## 💡 Usage Tips
+- You can combine keywords with any topic
+- Research workflows provide more comprehensive results than basic search
+- Image generation works with detailed descriptions
+- All features work with voice input when microphone is enabled
+
+Type **"/list"** anytime to see this help again.`;
+    }
+
     // --- Search Functions ---
     function detectSearchKeywords(message) {
         const lowerMessage = message.toLowerCase();
@@ -440,6 +489,29 @@ async function initializeApp() {
     async function handleUserInput() {
         const message = userInput.value.trim();
         if (!message) return;
+
+        // Check for /list command first
+        if (message.toLowerCase().startsWith('/list')) {
+            userInput.value = '';
+            
+            // Reset textarea height after clearing content
+            const minHeight = 44;
+            userInput.style.height = minHeight + 'px';
+            
+            // Contract the input expansion after sending
+            const inputArea = document.querySelector('.input-area');
+            if (inputArea) {
+                inputArea.classList.remove('expanded');
+                userInput.classList.remove('expanded');
+            }
+            
+            // Add user message to show they asked for the list
+            addMessage('/list', 'user');
+            
+            // Display the keywords list
+            addMessage(generateKeywordsList(), 'llm');
+            return;
+        }
 
         userInput.value = '';
         
