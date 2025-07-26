@@ -25,7 +25,9 @@
       "WebFetch(domain:raw.githubusercontent.com)",
       "WebFetch(domain:docs.anthropic.com)",
       "WebFetch(domain:web.dev)",
-      "WebFetch(domain:cheerio.js.org)"
+      "WebFetch(domain:cheerio.js.org)",
+      "WebFetch(domain:docs.litellm.ai)",
+      "WebFetch(domain:www.yelp.com)"
     ],
     "deny": []
   }

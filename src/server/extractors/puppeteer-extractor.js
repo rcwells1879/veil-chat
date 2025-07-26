@@ -10,7 +10,7 @@ class PuppeteerExtractor extends BaseExtractor {
         super();
         this.browser = null;
         this.browserPromise = null;
-        this.timeout = 20000; // 20 seconds for complex sites like Bloomberg, CNBC
+        this.timeout = 12000; // Reduced from 20s to 12s for faster failure detection
         this.inactivityTimer = null; // Track inactivity timer
     }
 
@@ -75,14 +75,23 @@ class PuppeteerExtractor extends BaseExtractor {
                 '--disable-backgrounding-occluded-windows',
                 '--disable-renderer-backgrounding',
                 '--disable-blink-features=AutomationControlled',
-                '--disable-extensions',
-                '--disable-plugins',
-                '--disable-images', // Speed up by not loading images
-                '--disable-javascript-harmony-shipping',
+                '--exclude-switches=enable-automation',
+                '--disable-extensions-except=', // Allow some extensions for realism
+                '--disable-plugins-discovery',
+                '--disable-default-apps',
+                '--disable-sync',
+                '--disable-translate',
+                '--hide-scrollbars',
+                '--mute-audio',
+                '--no-first-run',
+                '--no-default-browser-check',
+                '--disable-component-update',
+                '--disable-background-networking',
+                '--disable-domain-reliability',
                 '--disable-ipc-flooding-protection',
-                '--enable-automation',
                 '--password-store=basic',
                 '--use-mock-keychain',
+                '--disable-javascript-harmony-shipping',
                 '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
             ],
             defaultViewport: {
@@ -143,23 +152,80 @@ class PuppeteerExtractor extends BaseExtractor {
             await page.setDefaultNavigationTimeout(this.timeout);
             await page.setDefaultTimeout(this.timeout);
 
-            // Enhanced stealth configuration
+            // Enhanced stealth configuration with more realistic headers
             await page.setExtraHTTPHeaders({
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
                 'Accept-Language': 'en-US,en;q=0.9',
                 'Accept-Encoding': 'gzip, deflate, br',
+                'Cache-Control': 'max-age=0',
                 'DNT': '1',
                 'Connection': 'keep-alive',
                 'Upgrade-Insecure-Requests': '1',
+                'sec-ch-ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+                'sec-ch-ua-mobile': '?0',
+                'sec-ch-ua-platform': '"Windows"',
+                'Sec-Fetch-Dest': 'document',
+                'Sec-Fetch-Mode': 'navigate',
+                'Sec-Fetch-Site': 'none',
+                'Sec-Fetch-User': '?1'
             });
 
-            // Remove webdriver traces
+            // Enhanced webdriver trace removal and fingerprint spoofing
             await page.evaluateOnNewDocument(() => {
+                // Remove webdriver property
                 Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-                Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
+                
+                // Add realistic navigator properties
+                Object.defineProperty(navigator, 'plugins', { 
+                    get: () => ({
+                        length: 5,
+                        0: { name: 'Chrome PDF Plugin', filename: 'internal-pdf-viewer' },
+                        1: { name: 'Chrome PDF Viewer', filename: 'mhjfbmdgcfjbbpaeojofohoefgiehjai' },
+                        2: { name: 'Native Client', filename: 'internal-nacl-plugin' }
+                    })
+                });
+                
                 Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
-                window.chrome = { runtime: {} };
-                Object.defineProperty(navigator, 'permissions', { get: () => ({ query: () => ({ state: 'granted' }) }) });
+                Object.defineProperty(navigator, 'platform', { get: () => 'Win32' });
+                Object.defineProperty(navigator, 'hardwareConcurrency', { get: () => 8 });
+                Object.defineProperty(navigator, 'deviceMemory', { get: () => 8 });
+                
+                // Add Chrome runtime
+                window.chrome = { 
+                    runtime: {
+                        onConnect: null,
+                        onMessage: null
+                    },
+                    app: {
+                        isInstalled: false
+                    }
+                };
+                
+                // Override permissions API
+                Object.defineProperty(navigator, 'permissions', { 
+                    get: () => ({ 
+                        query: () => Promise.resolve({ state: 'granted' })
+                    })
+                });
+                
+                // Spoof canvas fingerprinting
+                const originalToDataURL = HTMLCanvasElement.prototype.toDataURL;
+                HTMLCanvasElement.prototype.toDataURL = function(...args) {
+                    const context = this.getContext('2d');
+                    if (context) {
+                        context.fillStyle = 'rgba(0, 0, 0, 0.1)';
+                        context.fillRect(0, 0, 1, 1);
+                    }
+                    return originalToDataURL.apply(this, args);
+                };
+                
+                // Spoof WebGL fingerprinting
+                const originalGetParameter = WebGLRenderingContext.prototype.getParameter;
+                WebGLRenderingContext.prototype.getParameter = function(parameter) {
+                    if (parameter === 37445) return 'Intel Inc.';
+                    if (parameter === 37446) return 'Intel(R) HD Graphics 620';
+                    return originalGetParameter.apply(this, arguments);
+                };
             });
 
             // Smart resource blocking
@@ -210,15 +276,18 @@ class PuppeteerExtractor extends BaseExtractor {
                     
                     // Check if it's a specific error we can handle
                     if (navError.message.includes('ERR_NAME_NOT_RESOLVED') || 
-                        navError.message.includes('ERR_INTERNET_DISCONNECTED')) {
-                        // Network connectivity issue - don't retry
+                        navError.message.includes('ERR_INTERNET_DISCONNECTED') ||
+                        navError.message.includes('Navigation timeout') ||
+                        navError.message.includes('timeout')) {
+                        // Network connectivity issue or timeout - don't retry
+                        console.log(`⚠️ PuppeteerExtractor: Unrecoverable navigation error detected, stopping retries`);
                         throw navError;
                     }
                     
                     if (navigationAttempts >= maxAttempts) throw navError;
                     
-                    // Progressive delay: 2s, 4s, 6s
-                    const delay = navigationAttempts * 2000;
+                    // Reduced delay: 1s, 2s instead of 2s, 4s, 6s for faster processing
+                    const delay = navigationAttempts * 1000;
                     console.log(`🤖 PuppeteerExtractor: Waiting ${delay}ms before retry...`);
                     await new Promise(resolve => setTimeout(resolve, delay));
                 }
@@ -227,8 +296,29 @@ class PuppeteerExtractor extends BaseExtractor {
             // Advanced content loading strategy
             console.log(`🤖 PuppeteerExtractor: Waiting for dynamic content...`);
             
-            // Reduced wait times for faster extraction
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            // Give more time for heavily dynamic sites like Yelp/TripAdvisor with random delays
+            const siteDomain = new URL(url).hostname.toLowerCase();
+            const isProblematicSite = siteDomain.includes('yelp.com') || siteDomain.includes('tripadvisor.com');
+            const baseWaitTime = isProblematicSite ? 7000 : 3000;
+            const randomDelay = Math.random() * 2000; // Add 0-2 seconds random delay
+            const waitTime = baseWaitTime + randomDelay;
+            
+            console.log(`🤖 PuppeteerExtractor: Waiting ${Math.round(waitTime)}ms for content to load...`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+            
+            // Add human-like mouse movement
+            if (isProblematicSite) {
+                try {
+                    await page.mouse.move(100 + Math.random() * 200, 100 + Math.random() * 200);
+                    await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 1000));
+                    await page.mouse.move(300 + Math.random() * 200, 200 + Math.random() * 200);
+                } catch (error) {
+                    // Ignore mouse movement errors
+                }
+            }
+            
+            // Handle popups and overlays before content extraction
+            await this.handlePopupsAndOverlays(page, url);
             
             // Handle lazy loading by scrolling (reduced iterations)
             await this.handleLazyLoading(page);
@@ -375,8 +465,42 @@ class PuppeteerExtractor extends BaseExtractor {
         console.log('⭐ PuppeteerExtractor: Extracting Yelp data...');
         
         try {
-            // Wait for business info
-            await page.waitForSelector('h1', { timeout: 10000 });
+            // Try multiple strategies to wait for Yelp content - focus on search results
+            const yelpSelectors = [
+                '[data-testid="serp-ia-card"]', // Search result cards
+                '[class*="businessName"]',
+                '[class*="search-result"]',
+                '[data-testid*="business"]',
+                'h3 a[href*="/biz/"]', // Business links
+                '.regular-search-result',
+                '[class*="searchResult"]',
+                'h1',
+                'main',
+                'article'
+            ];
+            
+            let contentFound = false;
+            let workingSelector = null;
+            
+            for (const selector of yelpSelectors) {
+                try {
+                    await page.waitForSelector(selector, { timeout: 3000 });
+                    console.log(`⭐ Found Yelp content with selector: ${selector}`);
+                    contentFound = true;
+                    workingSelector = selector;
+                    break;
+                } catch (e) {
+                    console.log(`⭐ Selector ${selector} not found, trying next...`);
+                }
+            }
+            
+            if (!contentFound) {
+                console.log('⭐ No specific Yelp selectors found, using generic extraction...');
+                return await this._extractGeneric(page, url);
+            }
+            
+            // Additional wait for dynamic content to load
+            await new Promise(resolve => setTimeout(resolve, 2000));
             
             const data = await page.evaluate(() => {
                 const result = {
@@ -389,33 +513,113 @@ class PuppeteerExtractor extends BaseExtractor {
                     website: ''
                 };
 
-                // Business name
-                const nameEl = document.querySelector('h1');
-                if (nameEl) result.title = nameEl.textContent.trim();
+                // Enhanced business name extraction with multiple fallbacks
+                const nameSelectors = [
+                    'h1',
+                    '[data-testid*="business-name"]',
+                    '[class*="businessName"]',
+                    '[class*="name"]:not([class*="user"]):not([class*="review"])',
+                    'h2',
+                    'h3'
+                ];
+                
+                for (const selector of nameSelectors) {
+                    const nameEl = document.querySelector(selector);
+                    if (nameEl && nameEl.textContent.trim().length > 2) {
+                        result.title = nameEl.textContent.trim();
+                        break;
+                    }
+                }
 
-                // Rating
-                const ratingEl = document.querySelector('[data-testid="review-star-rating"]') ||
-                               document.querySelector('.i-stars');
-                if (ratingEl) result.rating = ratingEl.getAttribute('aria-label') || ratingEl.textContent.trim();
+                // Enhanced rating extraction
+                const ratingSelectors = [
+                    '[data-testid="review-star-rating"]',
+                    '[aria-label*="star"]',
+                    '[class*="rating"]',
+                    '[class*="star"]',
+                    '.i-stars'
+                ];
+                
+                for (const selector of ratingSelectors) {
+                    const ratingEl = document.querySelector(selector);
+                    if (ratingEl) {
+                        result.rating = ratingEl.getAttribute('aria-label') || 
+                                       ratingEl.getAttribute('title') ||
+                                       ratingEl.textContent.trim();
+                        if (result.rating) break;
+                    }
+                }
 
-                // Address
-                const addressEl = document.querySelector('[data-testid="business-address"]') ||
-                                document.querySelector('address');
-                if (addressEl) result.address = addressEl.textContent.trim();
+                // Enhanced address extraction
+                const addressSelectors = [
+                    '[data-testid="business-address"]',
+                    'address',
+                    '[class*="address"]',
+                    '[data-testid*="address"]'
+                ];
+                
+                for (const selector of addressSelectors) {
+                    const addressEl = document.querySelector(selector);
+                    if (addressEl && addressEl.textContent.trim()) {
+                        result.address = addressEl.textContent.trim();
+                        break;
+                    }
+                }
 
-                // Phone
+                // Phone extraction
                 const phoneEl = document.querySelector('[href*="tel:"]');
                 if (phoneEl) result.phone = phoneEl.textContent.trim();
 
-                // Reviews
-                const reviewElements = document.querySelectorAll('[data-testid*="review"]') ||
-                                     document.querySelectorAll('.review');
+                // Enhanced review extraction with multiple strategies
+                const reviewSelectors = [
+                    '[data-testid*="review"]',
+                    '[class*="review"]',
+                    'li[class*="review"]',
+                    'div[class*="review"]'
+                ];
+                
+                let reviewElements = [];
+                for (const selector of reviewSelectors) {
+                    reviewElements = document.querySelectorAll(selector);
+                    if (reviewElements.length > 0) break;
+                }
                 
                 Array.from(reviewElements).slice(0, 5).forEach(review => {
-                    const reviewText = review.querySelector('.raw__09f24__T4Ezm')?.textContent?.trim() ||
-                                     review.querySelector('.comment')?.textContent?.trim();
-                    const reviewer = review.querySelector('[data-testid="user-name"]')?.textContent?.trim() ||
-                                   review.querySelector('.user-name')?.textContent?.trim();
+                    // Try multiple review text selectors
+                    const reviewTextSelectors = [
+                        '.raw__09f24__T4Ezm',
+                        '[class*="comment"]',
+                        '[class*="review-text"]',
+                        '[class*="text"]',
+                        'p',
+                        'span'
+                    ];
+                    
+                    let reviewText = '';
+                    for (const textSelector of reviewTextSelectors) {
+                        const textEl = review.querySelector(textSelector);
+                        if (textEl && textEl.textContent.trim().length > 20) {
+                            reviewText = textEl.textContent.trim();
+                            break;
+                        }
+                    }
+                    
+                    // Try multiple reviewer name selectors
+                    const reviewerSelectors = [
+                        '[data-testid="user-name"]',
+                        '[class*="user-name"]',
+                        '[class*="author"]',
+                        'a[href*="/user"]'
+                    ];
+                    
+                    let reviewer = '';
+                    for (const nameSelector of reviewerSelectors) {
+                        const nameEl = review.querySelector(nameSelector);
+                        if (nameEl && nameEl.textContent.trim()) {
+                            reviewer = nameEl.textContent.trim();
+                            break;
+                        }
+                    }
                     
                     if (reviewText) {
                         result.reviews.push({
@@ -424,6 +628,16 @@ class PuppeteerExtractor extends BaseExtractor {
                         });
                     }
                 });
+
+                // Fallback: get all text content if specific extraction fails
+                if (!result.title && !result.content && reviewElements.length === 0) {
+                    const mainContent = document.querySelector('main') || document.querySelector('body');
+                    const allText = mainContent ? mainContent.textContent.trim() : '';
+                    if (allText) {
+                        result.title = 'Yelp Search Results';
+                        result.content = allText.slice(0, 2000); // Limit content
+                    }
+                }
 
                 // Create content summary
                 let content = `${result.title}\n\n`;
@@ -436,6 +650,9 @@ class PuppeteerExtractor extends BaseExtractor {
                     result.reviews.forEach((review, i) => {
                         content += `${i + 1}. ${review.author}: ${review.text}\n`;
                     });
+                } else if (!result.title && !result.rating && !result.address) {
+                    // If no structured data found, include general page content
+                    content = result.content || 'Unable to extract specific business information';
                 }
 
                 result.content = content;
@@ -445,7 +662,12 @@ class PuppeteerExtractor extends BaseExtractor {
             return data;
         } catch (error) {
             console.error('Error extracting Yelp data:', error);
-            return { title: 'Yelp Business', content: 'Unable to extract detailed information' };
+            // Fallback to generic extraction
+            try {
+                return await this._extractGeneric(page, url);
+            } catch (fallbackError) {
+                return { title: 'Yelp Business', content: 'Unable to extract detailed information' };
+            }
         }
     }
 
@@ -456,34 +678,137 @@ class PuppeteerExtractor extends BaseExtractor {
         console.log('✈️ PuppeteerExtractor: Extracting TripAdvisor data...');
         
         try {
-            await page.waitForSelector('h1', { timeout: 10000 });
+            // Try multiple strategies to wait for TripAdvisor content
+            const tripAdvisorSelectors = [
+                'h1',
+                '[data-test-target="POI_NAME"]',
+                '[data-testid*="restaurant"]',
+                '[class*="restaurant"]',
+                '[class*="business"]',
+                'main',
+                'article',
+                '.listContainer', // TripAdvisor list container
+                '.restaurants-list' // Restaurant listings
+            ];
+            
+            let contentFound = false;
+            let workingSelector = null;
+            
+            for (const selector of tripAdvisorSelectors) {
+                try {
+                    await page.waitForSelector(selector, { timeout: 3000 });
+                    console.log(`✈️ Found TripAdvisor content with selector: ${selector}`);
+                    contentFound = true;
+                    workingSelector = selector;
+                    break;
+                } catch (e) {
+                    console.log(`✈️ Selector ${selector} not found, trying next...`);
+                }
+            }
+            
+            if (!contentFound) {
+                console.log('✈️ No specific TripAdvisor selectors found, using generic extraction...');
+                return await this._extractGeneric(page, url);
+            }
+            
+            // Additional wait for dynamic content to load
+            await new Promise(resolve => setTimeout(resolve, 2000));
             
             const data = await page.evaluate(() => {
                 const result = {
                     title: '',
                     content: '',
                     rating: '',
-                    reviews: []
+                    reviews: [],
+                    restaurants: [] // For restaurant listings
                 };
 
-                // Title
-                const titleEl = document.querySelector('h1') ||
-                              document.querySelector('[data-test-target="POI_NAME"]');
-                if (titleEl) result.title = titleEl.textContent.trim();
+                // Enhanced title extraction
+                const titleSelectors = [
+                    'h1',
+                    '[data-test-target="POI_NAME"]',
+                    '[class*="title"]',
+                    'h2',
+                    'h3'
+                ];
+                
+                for (const selector of titleSelectors) {
+                    const titleEl = document.querySelector(selector);
+                    if (titleEl && titleEl.textContent.trim().length > 2) {
+                        result.title = titleEl.textContent.trim();
+                        break;
+                    }
+                }
 
-                // Rating
-                const ratingEl = document.querySelector('[data-test-target="review-rating"]') ||
-                               document.querySelector('.ui_bubble_rating');
-                if (ratingEl) result.rating = ratingEl.getAttribute('alt') || ratingEl.textContent.trim();
+                // Enhanced rating extraction
+                const ratingSelectors = [
+                    '[data-test-target="review-rating"]',
+                    '.ui_bubble_rating',
+                    '[class*="rating"]',
+                    '[class*="star"]',
+                    '[aria-label*="star"]'
+                ];
+                
+                for (const selector of ratingSelectors) {
+                    const ratingEl = document.querySelector(selector);
+                    if (ratingEl) {
+                        result.rating = ratingEl.getAttribute('alt') || 
+                                       ratingEl.getAttribute('aria-label') ||
+                                       ratingEl.textContent.trim();
+                        if (result.rating) break;
+                    }
+                }
 
-                // Reviews
-                const reviewElements = document.querySelectorAll('[data-test-target="HR_CC_CARD"]') ||
-                                     document.querySelectorAll('.review-container');
+                // Enhanced review extraction
+                const reviewSelectors = [
+                    '[data-test-target="HR_CC_CARD"]',
+                    '.review-container',
+                    '[class*="review"]',
+                    'div[data-test*="review"]'
+                ];
+                
+                let reviewElements = [];
+                for (const selector of reviewSelectors) {
+                    reviewElements = document.querySelectorAll(selector);
+                    if (reviewElements.length > 0) break;
+                }
                 
                 Array.from(reviewElements).slice(0, 5).forEach(review => {
-                    const reviewText = review.querySelector('.partial_entry')?.textContent?.trim() ||
-                                     review.querySelector('.reviewText')?.textContent?.trim();
-                    const reviewer = review.querySelector('.username')?.textContent?.trim();
+                    // Try multiple review text selectors
+                    const reviewTextSelectors = [
+                        '.partial_entry',
+                        '.reviewText',
+                        '[class*="review-text"]',
+                        '[class*="text"]',
+                        'p',
+                        'span'
+                    ];
+                    
+                    let reviewText = '';
+                    for (const textSelector of reviewTextSelectors) {
+                        const textEl = review.querySelector(textSelector);
+                        if (textEl && textEl.textContent.trim().length > 20) {
+                            reviewText = textEl.textContent.trim();
+                            break;
+                        }
+                    }
+                    
+                    // Try multiple reviewer name selectors
+                    const reviewerSelectors = [
+                        '.username',
+                        '[class*="username"]',
+                        '[class*="author"]',
+                        'a[href*="/Profile"]'
+                    ];
+                    
+                    let reviewer = '';
+                    for (const nameSelector of reviewerSelectors) {
+                        const nameEl = review.querySelector(nameSelector);
+                        if (nameEl && nameEl.textContent.trim()) {
+                            reviewer = nameEl.textContent.trim();
+                            break;
+                        }
+                    }
                     
                     if (reviewText) {
                         result.reviews.push({
@@ -493,15 +818,71 @@ class PuppeteerExtractor extends BaseExtractor {
                     }
                 });
 
-                // Create content
+                // Extract restaurant listings if this is a search/list page
+                const restaurantListSelectors = [
+                    '[data-test*="restaurant"]',
+                    '.restaurant',
+                    '.listItem',
+                    '[class*="restaurant"]'
+                ];
+                
+                let restaurantElements = [];
+                for (const selector of restaurantListSelectors) {
+                    restaurantElements = document.querySelectorAll(selector);
+                    if (restaurantElements.length > 0) break;
+                }
+                
+                Array.from(restaurantElements).slice(0, 10).forEach(restaurant => {
+                    const nameEl = restaurant.querySelector('h3, h2, [class*="name"], a[href*="/Restaurant_Review"]');
+                    const ratingEl = restaurant.querySelector('[class*="rating"], [class*="star"]');
+                    const priceEl = restaurant.querySelector('[class*="price"], [class*="cost"]');
+                    const cuisineEl = restaurant.querySelector('[class*="cuisine"], [class*="category"]');
+                    
+                    if (nameEl && nameEl.textContent.trim()) {
+                        const restaurantData = {
+                            name: nameEl.textContent.trim(),
+                            rating: ratingEl ? ratingEl.textContent.trim() : '',
+                            price: priceEl ? priceEl.textContent.trim() : '',
+                            cuisine: cuisineEl ? cuisineEl.textContent.trim() : ''
+                        };
+                        result.restaurants.push(restaurantData);
+                    }
+                });
+
+                // Fallback: get all text content if specific extraction fails
+                if (!result.title && result.reviews.length === 0 && result.restaurants.length === 0) {
+                    const mainContent = document.querySelector('main') || document.querySelector('body');
+                    const allText = mainContent ? mainContent.textContent.trim() : '';
+                    if (allText) {
+                        result.title = 'TripAdvisor Results';
+                        result.content = allText.slice(0, 2000); // Limit content
+                    }
+                }
+
+                // Create content summary
                 let content = `${result.title}\n\n`;
                 if (result.rating) content += `Rating: ${result.rating}\n\n`;
+                
+                if (result.restaurants.length > 0) {
+                    content += 'Restaurants:\n';
+                    result.restaurants.forEach((restaurant, i) => {
+                        content += `${i + 1}. ${restaurant.name}`;
+                        if (restaurant.cuisine) content += ` (${restaurant.cuisine})`;
+                        if (restaurant.rating) content += ` - Rating: ${restaurant.rating}`;
+                        if (restaurant.price) content += ` - Price: ${restaurant.price}`;
+                        content += '\n';
+                    });
+                    content += '\n';
+                }
                 
                 if (result.reviews.length > 0) {
                     content += 'Recent Reviews:\n';
                     result.reviews.forEach((review, i) => {
                         content += `${i + 1}. ${review.author}: ${review.text}\n`;
                     });
+                } else if (!result.title && !result.rating && result.restaurants.length === 0) {
+                    // If no structured data found, include general page content
+                    content = result.content || 'Unable to extract specific information';
                 }
 
                 result.content = content;
@@ -511,7 +892,12 @@ class PuppeteerExtractor extends BaseExtractor {
             return data;
         } catch (error) {
             console.error('Error extracting TripAdvisor data:', error);
-            return { title: 'TripAdvisor Location', content: 'Unable to extract detailed information' };
+            // Fallback to generic extraction
+            try {
+                return await this._extractGeneric(page, url);
+            } catch (fallbackError) {
+                return { title: 'TripAdvisor Location', content: 'Unable to extract detailed information' };
+            }
         }
     }
 
@@ -621,6 +1007,186 @@ class PuppeteerExtractor extends BaseExtractor {
     }
 
     /**
+     * Handle modals, overlays, and in-page popups that block content
+     */
+    async handlePopupsAndOverlays(page, url) {
+        console.log('🤖 PuppeteerExtractor: Checking for modals and overlays...');
+        
+        try {
+            const domain = new URL(url).hostname.toLowerCase();
+            
+            // Common overlay/modal close button selectors
+            const closeButtonSelectors = [
+                '[aria-label*="close"]',
+                '[aria-label*="Close"]',
+                '[data-testid*="close"]',
+                '[class*="close"]',
+                '[class*="Close"]',
+                '.modal-close',
+                '.overlay-close',
+                'button[aria-label="Close"]',
+                'button[title="Close"]',
+                '[role="button"][aria-label*="close"]',
+                '.close-button',
+                '.dismiss-button',
+                '[data-dismiss]'
+            ];
+            
+            // Site-specific selectors
+            if (domain.includes('yelp.com')) {
+                // Yelp-specific modal/overlay selectors
+                const yelpOverlaySelectors = [
+                    '[data-testid*="login"]',
+                    '[data-testid*="signup"]',
+                    '[class*="login"]',
+                    '[class*="signup"]',
+                    '[class*="modal"]',
+                    '[class*="overlay"]',
+                    '[class*="dialog"]',
+                    '.react-modal-overlay',
+                    '[role="dialog"]',
+                    '[aria-modal="true"]',
+                    // Google sign-in specific
+                    '[data-testid*="google"]',
+                    '[class*="google"]',
+                    'iframe[src*="google"]',
+                    // Generic dismiss buttons (using XPath-like text matching via evaluate)
+                    'button',
+                    'a[role="button"]',
+                    '[type="button"]'
+                ];
+                
+                closeButtonSelectors.push(...yelpOverlaySelectors);
+                console.log('⭐ Checking for Yelp login/signup modals...');
+            }
+            
+            if (domain.includes('tripadvisor.com')) {
+                // TripAdvisor-specific selectors
+                const tripAdvisorOverlaySelectors = [
+                    '[class*="modal"]',
+                    '[class*="overlay"]',
+                    '[class*="popup"]',
+                    '[role="dialog"]',
+                    '[aria-modal="true"]',
+                    // Bot detection/CAPTCHA
+                    '[class*="captcha"]',
+                    '[class*="bot"]',
+                    '[class*="challenge"]',
+                    // Cookie/privacy notices
+                    '[class*="cookie"]',
+                    '[class*="privacy"]',
+                    '[class*="consent"]'
+                ];
+                
+                closeButtonSelectors.push(...tripAdvisorOverlaySelectors);
+                console.log('✈️ Checking for TripAdvisor modals and bot detection...');
+            }
+            
+            // Try to find and close any overlays/modals
+            for (const selector of closeButtonSelectors) {
+                try {
+                    // Check if element exists without waiting too long
+                    const element = await page.$(selector);
+                    if (element) {
+                        // Check if element is visible and clickable
+                        const isVisible = await page.evaluate((el) => {
+                            const rect = el.getBoundingClientRect();
+                            const style = window.getComputedStyle(el);
+                            return rect.width > 0 && rect.height > 0 && 
+                                   style.display !== 'none' && 
+                                   style.visibility !== 'hidden' &&
+                                   style.opacity !== '0';
+                        }, element);
+                        
+                        if (isVisible) {
+                            console.log(`🤖 Found overlay element with selector: ${selector}, attempting to close...`);
+                            await element.click();
+                            await new Promise(resolve => setTimeout(resolve, 1000)); // Wait for overlay to close
+                            console.log(`✅ Successfully closed overlay with selector: ${selector}`);
+                            
+                            // Try pressing Escape key as backup
+                            await page.keyboard.press('Escape');
+                            await new Promise(resolve => setTimeout(resolve, 500));
+                            
+                            break; // Exit after successfully closing one overlay
+                        }
+                    }
+                } catch (error) {
+                    // Continue to next selector if this one fails
+                    console.log(`🤖 Selector ${selector} failed: ${error.message}`);
+                    continue;
+                }
+            }
+            
+            // Additional strategy: find buttons with dismissive text content
+            try {
+                const dismissiveButtons = await page.evaluate(() => {
+                    const dismissTexts = ['no thanks', 'skip', 'maybe later', 'close', 'dismiss', 'cancel', 'not now'];
+                    const buttons = Array.from(document.querySelectorAll('button, a[role="button"], [type="button"]'));
+                    
+                    return buttons.filter(button => {
+                        const text = button.textContent.toLowerCase().trim();
+                        const ariaLabel = (button.getAttribute('aria-label') || '').toLowerCase();
+                        return dismissTexts.some(dismissText => 
+                            text.includes(dismissText) || ariaLabel.includes(dismissText)
+                        );
+                    });
+                });
+                
+                for (const button of dismissiveButtons) {
+                    try {
+                        console.log('🤖 Found dismissive button, attempting to click...');
+                        await button.click();
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                        console.log('✅ Successfully clicked dismissive button');
+                        break;
+                    } catch (error) {
+                        continue;
+                    }
+                }
+            } catch (error) {
+                // Ignore errors finding dismissive buttons
+            }
+            
+            // Additional strategy: try pressing Escape key multiple times
+            try {
+                await page.keyboard.press('Escape');
+                await new Promise(resolve => setTimeout(resolve, 500));
+                await page.keyboard.press('Escape');
+                await new Promise(resolve => setTimeout(resolve, 500));
+            } catch (error) {
+                // Ignore keyboard errors
+            }
+            
+            // Look for any remaining visible overlays and try to click outside them
+            try {
+                const hasVisibleOverlay = await page.evaluate(() => {
+                    const overlays = document.querySelectorAll('[class*="modal"], [class*="overlay"], [role="dialog"], [aria-modal="true"]');
+                    return Array.from(overlays).some(overlay => {
+                        const rect = overlay.getBoundingClientRect();
+                        const style = window.getComputedStyle(overlay);
+                        return rect.width > 0 && rect.height > 0 && 
+                               style.display !== 'none' && 
+                               style.visibility !== 'hidden';
+                    });
+                });
+                
+                if (hasVisibleOverlay) {
+                    console.log('🤖 Found persistent overlay, trying to click outside it...');
+                    // Click in top-left corner to dismiss overlay
+                    await page.click('body', { offset: { x: 10, y: 10 } });
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+            } catch (error) {
+                // Ignore click errors
+            }
+            
+        } catch (error) {
+            console.log('🤖 PuppeteerExtractor: Overlay handling failed:', error.message);
+        }
+    }
+
+    /**
      * Handle lazy loading by scrolling and waiting for content
      */
     async handleLazyLoading(page) {
@@ -687,9 +1253,25 @@ class PuppeteerExtractor extends BaseExtractor {
                 if (descEl) result.description = descEl.getAttribute('content') || descEl.textContent?.trim();
 
                 // Enhanced content extraction with priority-based selectors
-                // Following Puppeteer best practices for page evaluation
+                // Restaurant/business listing specific selectors (highest priority)
                 const contentSelectors = [
-                    // Semantic HTML5 elements (highest priority)
+                    // Restaurant-specific content areas
+                    '[class*="menu"]',
+                    '[class*="hours"]', 
+                    '[class*="contact"]',
+                    '[class*="about"]',
+                    '[class*="location"]',
+                    '[class*="address"]',
+                    
+                    // Yelp/restaurant specific selectors
+                    '[data-testid="serp-ia-card"]',
+                    '[class*="search-result"]',
+                    '[class*="business"]',
+                    '[class*="restaurant"]',
+                    'h3 a[href*="/biz/"]',
+                    '.regular-search-result',
+                    
+                    // Semantic HTML5 elements
                     'article',
                     'main',
                     '[role="main"]',
@@ -777,17 +1359,39 @@ class PuppeteerExtractor extends BaseExtractor {
 
                 // Fallback: collect all paragraphs and meaningful text
                 if (!content || content.length < 100) {
-                    const textElements = document.querySelectorAll('p, h2, h3, h4, .comment, [data-testid*="comment"]');
+                    const textElements = document.querySelectorAll('p, h2, h3, h4, h1, .comment, [data-testid*="comment"], div, span, a');
                     const texts = Array.from(textElements)
                         .map(el => el.textContent?.trim())
-                        .filter(text => text && text.length > 30 && !text.match(/^(Advertisement|Cookie|Privacy)/i))
-                        .slice(0, 20); // Limit to prevent too much content
+                        .filter(text => text && text.length > 10 && !text.match(/^(Advertisement|Cookie|Privacy|Skip|Sign|Log)/i))
+                        .slice(0, 50); // Get more content for debugging
                     
                     content = texts.join('\n\n');
                 }
+                
+                // Last resort: get ALL text content if still nothing
+                if (!content || content.length < 50) {
+                    const bodyText = document.body ? document.body.textContent.trim() : '';
+                    if (bodyText && bodyText.length > 50) {
+                        content = bodyText.slice(0, 2000); // Limit but capture something
+                    }
+                }
 
-                // Extract metadata
+                // Extract metadata with restaurant-specific fields
                 result.metadata = {
+                    // Restaurant-specific metadata
+                    phone: document.querySelector('a[href*="tel:"]')?.textContent?.trim() ||
+                           document.querySelector('[class*="phone"]')?.textContent?.trim(),
+                    
+                    address: document.querySelector('[class*="address"]')?.textContent?.trim() ||
+                            document.querySelector('address')?.textContent?.trim(),
+                    
+                    hours: document.querySelector('[class*="hours"]')?.textContent?.trim() ||
+                           document.querySelector('[class*="open"]')?.textContent?.trim(),
+                    
+                    cuisine: document.querySelector('[class*="cuisine"]')?.textContent?.trim() ||
+                            document.querySelector('[class*="category"]')?.textContent?.trim(),
+                    
+                    // General metadata
                     author: document.querySelector('[data-testid*="author"]')?.textContent?.trim() ||
                            document.querySelector('.author')?.textContent?.trim() ||
                            document.querySelector('[rel="author"]')?.textContent?.trim(),
@@ -798,6 +1402,28 @@ class PuppeteerExtractor extends BaseExtractor {
                     score: document.querySelector('[data-testid*="score"]')?.textContent?.trim() ||
                           document.querySelector('.score')?.textContent?.trim()
                 };
+
+                // Append restaurant metadata to content if available
+                if (result.metadata) {
+                    const restaurantInfo = [];
+                    
+                    if (result.metadata.phone) {
+                        restaurantInfo.push(`Phone: ${result.metadata.phone}`);
+                    }
+                    if (result.metadata.address) {
+                        restaurantInfo.push(`Address: ${result.metadata.address}`);
+                    }
+                    if (result.metadata.hours) {
+                        restaurantInfo.push(`Hours: ${result.metadata.hours}`);
+                    }
+                    if (result.metadata.cuisine) {
+                        restaurantInfo.push(`Cuisine: ${result.metadata.cuisine}`);
+                    }
+                    
+                    if (restaurantInfo.length > 0) {
+                        content += '\n\n' + restaurantInfo.join('\n');
+                    }
+                }
 
                 result.content = content;
                 return result;

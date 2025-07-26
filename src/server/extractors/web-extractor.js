@@ -55,6 +55,18 @@ class WebExtractor {
                     }
                 }
             } catch (error) {
+                // Don't fallback to Puppeteer for true connection timeouts - but do fallback for request timeouts
+                if (error.message.includes('ETIMEDOUT') || error.message.includes('ECONNREFUSED')) {
+                    console.log(`⚠️ WebExtractor: Connection timeout detected, skipping Puppeteer fallback for ${url}`);
+                    throw error;
+                }
+                
+                // For request timeouts (AbortError), still try Puppeteer as the site might need JS
+                if (error.message.includes('Request timeout') || error.name === 'AbortError') {
+                    console.log(`🔄 WebExtractor: Request timeout detected, trying Puppeteer fallback for ${url}`);
+                    // Don't throw here, let it fall through to Puppeteer fallback
+                }
+                
                 // If Cheerio fails and we haven't tried Puppeteer yet, try it as fallback
                 if (method === 'cheerio' && !usedFallback) {
                     console.log(`⚡ WebExtractor: Cheerio failed, trying Puppeteer fallback for ${url}: ${error.message}`);

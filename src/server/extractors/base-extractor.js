@@ -109,8 +109,12 @@ class BaseExtractor {
             try {
                 console.log(`⚡ BaseExtractor: Attempt ${attempt}/${maxRetries} for ${url}`);
                 
+                // Create AbortController for proper timeout handling
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+                
                 const response = await fetch(url, {
-                    timeout: this.timeout,
+                    signal: controller.signal,
                     headers: {
                         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
@@ -121,6 +125,8 @@ class BaseExtractor {
                         'Pragma': 'no-cache'
                     }
                 });
+                
+                clearTimeout(timeoutId); // Clear timeout if request completes
 
                 if (!response.ok) {
                     // Don't retry for client errors (4xx), only server errors (5xx) and network issues
@@ -136,7 +142,18 @@ class BaseExtractor {
                 // Try Mozilla Readability first for articles
                 let readabilityResult = null;
                 try {
-                    const dom = new JSDOM(html, { url });
+                    const dom = new JSDOM(html, { 
+                        url,
+                        resources: "usable",
+                        runScripts: "outside-only",
+                        pretendToBeVisual: false,
+                        // Disable CSS parsing to avoid CSS errors
+                        features: {
+                            FetchExternalResources: false,
+                            ProcessExternalResources: false,
+                            SkipExternalResources: true
+                        }
+                    });
                     const reader = new Readability(dom.window.document);
                     readabilityResult = reader.parse();
                 } catch (error) {
@@ -189,14 +206,26 @@ class BaseExtractor {
                 lastError = error;
                 console.error(`❌ BaseExtractor: Attempt ${attempt} failed for ${url}:`, error.message);
                 
-                // Don't retry for client errors (4xx)
+                // Handle AbortError from timeout
+                if (error.name === 'AbortError') {
+                    console.log(`⚠️ BaseExtractor: Request timeout for ${url}`);
+                    error.message = 'Request timeout (8 seconds)';
+                }
+                
+                // Don't retry for client errors (4xx) or connection timeouts
                 if (error.message.includes('HTTP 4')) {
                     break;
                 }
                 
-                // Wait before retrying (exponential backoff)
+                // Don't retry connection timeouts - site is likely unresponsive
+                if (error.message.includes('ETIMEDOUT') || error.message.includes('ECONNREFUSED') || error.message.includes('timeout')) {
+                    console.log(`⚠️ BaseExtractor: Connection timeout detected, skipping retries for ${url}`);
+                    break;
+                }
+                
+                // Wait before retrying (exponential backoff) - reduced delays for faster processing
                 if (attempt < maxRetries) {
-                    const delay = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s
+                    const delay = Math.pow(2, attempt) * 500; // 1s, 2s instead of 2s, 4s, 8s
                     console.log(`⚡ BaseExtractor: Waiting ${delay}ms before retry...`);
                     await new Promise(resolve => setTimeout(resolve, delay));
                 }

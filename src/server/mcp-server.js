@@ -7,6 +7,31 @@ import { CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 // Web extraction functionality
 import WebExtractor from './extractors/web-extractor.js';
 
+// Shared blocklist of sites with aggressive bot detection that should be skipped entirely
+const BLOCKED_SITES = [
+    'yelp.com',
+    'tripadvisor.com',
+    'facebook.com',
+    'twitter.com',
+    'x.com',
+    'linkedin.com',
+    'instagram.com',
+    'tiktok.com',
+    'pinterest.com',
+    'beeradvocate.com',
+    'ubereats.com'
+];
+
+// Helper function to check if a URL is from a blocked site
+function isBlockedSite(url) {
+    try {
+        const domain = new URL(url).hostname.toLowerCase();
+        return BLOCKED_SITES.some(blockedSite => domain.includes(blockedSite));
+    } catch (error) {
+        return false; // Invalid URL, don't block
+    }
+}
+
 // Search Provider Classes
 class BraveSearchProvider {
     constructor(apiKey, options = {}) {
@@ -19,7 +44,7 @@ class BraveSearchProvider {
     async search(query, options = {}) {
         const params = new URLSearchParams({
             q: query,
-            count: options.limit || 10,
+            count: options.limit || 20,
             freshness: options.timeFilter || 'any',
             country: 'US',
             lang: 'en'
@@ -165,7 +190,7 @@ class DuckDuckGoSearchProvider {
         }
 
         const data = await response.json();
-        return this.formatResults(data, options.limit || 10);
+        return this.formatResults(data, options.limit || 20);
     }
 
     formatResults(data, limit) {
@@ -264,7 +289,7 @@ class BingSearchProvider {
     async search(query, options = {}) {
         const params = new URLSearchParams({
             q: query,
-            count: options.limit || 10,
+            count: options.limit || 20,
             freshness: this.getFreshness(options.timeFilter),
             mkt: 'en-US'
         });
@@ -860,7 +885,7 @@ Be logical, clear, and focused. Keep your response concise (2-3 sentences).`;
             // Get search provider and settings
             const provider = searchSettings.provider || 'brave';
             const apiKey = searchSettings.apiKey;
-            const limit = parseInt(searchSettings.limit) || 10;
+            const limit = parseInt(searchSettings.limit) || 20;
             const timeFilter = searchSettings.timeFilter || 'any';
             const autoSummarize = searchSettings.autoSummarize !== false;
 
@@ -1144,15 +1169,28 @@ Please provide a natural, conversational response about this information. Stay i
                 ]
             };
         } catch (error) {
-            console.error(`❌ MCP Server: Web extraction failed for ${url}:`, error.message);
-            return {
-                content: [
-                    {
-                        type: 'text',
-                        text: `⚠️ Failed to extract content from ${url}: ${error.message}`
-                    }
-                ]
-            };
+            // Handle blocked sites differently from extraction failures
+            if (error.message.includes('is blocked due to aggressive bot detection')) {
+                console.log(`🚫 Skipped blocked site: ${url}`);
+                return {
+                    content: [
+                        {
+                            type: 'text',
+                            text: `🚫 Skipped ${url}: Site blocked due to aggressive bot detection`
+                        }
+                    ]
+                };
+            } else {
+                console.error(`❌ MCP Server: Web extraction failed for ${url}:`, error.message);
+                return {
+                    content: [
+                        {
+                            type: 'text',
+                            text: `⚠️ Failed to extract content from ${url}: ${error.message}`
+                        }
+                    ]
+                };
+            }
         }
     }
 
@@ -1453,8 +1491,14 @@ Order by priority (1 = highest). Include all URLs but rank them by expected valu
                 }
                 
             } catch (error) {
-                console.error(`❌ Extraction failed for ${url}:`, error.message);
-                failedUrls.push(url);
+                // Handle blocked sites differently from extraction failures  
+                if (error.message.includes('is blocked due to aggressive bot detection')) {
+                    console.log(`🚫 Skipped blocked site: ${url}`);
+                    failedUrls.push(`${url} (blocked)`);
+                } else {
+                    console.error(`❌ Extraction failed for ${url}:`, error.message);
+                    failedUrls.push(url);
+                }
             }
         }
         
@@ -1659,7 +1703,7 @@ Goal: "Latest developments in renewable energy" → "latest renewable energy dev
     async executeRawWebSearch(query, searchSettings = {}) {
         const provider = searchSettings.provider || 'brave';
         const apiKey = searchSettings.apiKey;
-        const limit = parseInt(searchSettings.limit) || 10;
+        const limit = parseInt(searchSettings.limit) || 20;
         const timeFilter = searchSettings.timeFilter || 'any';
 
         console.log('🔍 Raw web search:', { query, provider, limit, timeFilter });
@@ -1717,10 +1761,17 @@ Goal: "Latest developments in renewable energy" → "latest renewable energy dev
             console.log('🔍 URL Extraction - rawSearchResults is not an array or is empty');
         }
         
-        // Remove duplicates and limit to top 5 URLs
+        // Remove duplicates, filter out blocked sites, then limit to top 5 URLs
         const uniqueUrls = [...new Set(urls)]
             .filter(url => url && url.startsWith('http'))
-            .slice(0, 5); // Limit to top 5 URLs
+            .filter(url => {
+                if (isBlockedSite(url)) {
+                    console.log(`🚫 Filtered out blocked site: ${url}`);
+                    return false;
+                }
+                return true;
+            })
+            .slice(0, 5); // Limit to top 5 URLs after filtering
         
         console.log('🔍 URL Extraction - Final URLs extracted:', uniqueUrls);
         return uniqueUrls;
@@ -1745,10 +1796,17 @@ Goal: "Latest developments in renewable energy" → "latest renewable energy dev
             }
         }
         
-        // Remove duplicates and clean URLs
+        // Remove duplicates, filter out blocked sites, then limit to top 5 URLs
         const uniqueUrls = [...new Set(urls)]
             .filter(url => url && url.startsWith('http'))
-            .slice(0, 5); // Limit to top 5 URLs
+            .filter(url => {
+                if (isBlockedSite(url)) {
+                    console.log(`🚫 Filtered out blocked site: ${url}`);
+                    return false;
+                }
+                return true;
+            })
+            .slice(0, 5); // Limit to top 5 URLs after filtering
         
         return uniqueUrls;
     }
@@ -1756,6 +1814,12 @@ Goal: "Latest developments in renewable energy" → "latest renewable energy dev
     // Helper method for intelligent extraction method selection
     async extractWithIntelligentMethod(url, options = {}) {
         const domain = new URL(url).hostname.toLowerCase();
+        
+        // Check if site is blocked using shared blocklist
+        if (isBlockedSite(url)) {
+            console.log(`🚫 Skipping blocked site: ${domain}`);
+            throw new Error(`Site ${domain} is blocked due to aggressive bot detection`);
+        }
         
         // Dynamic sites that typically need Puppeteer
         const dynamicSites = [
@@ -1765,7 +1829,11 @@ Goal: "Latest developments in renewable energy" → "latest renewable energy dev
             'linkedin.com',
             'instagram.com',
             'youtube.com',
+            'opentable.com',
             'maps.google.com',
+            'squarespace.com',    // Squarespace sites with heavy JS
+            'squareup.com',       // Square restaurant sites
+            'wixsite.com',        // Wix sites
             'yelp.com',
             'tripadvisor.com',
             // News sites that work better with Puppeteer due to dynamic content/paywalls
@@ -1790,8 +1858,23 @@ Goal: "Latest developments in renewable energy" → "latest renewable energy dev
             'apnews.com'         // Associated Press (clean static)
         ];
         
-        const needsPuppeteer = dynamicSites.some(site => domain.includes(site));
+        let needsPuppeteer = dynamicSites.some(site => domain.includes(site));
         const isStaticNewsSite = staticNewsSites.some(site => domain.includes(site));
+        
+        // Check for common restaurant website builders that need Puppeteer
+        if (!needsPuppeteer) {
+            const restaurantBuilderPatterns = [
+                'poquitosbothell.com',     // Known Squarespace restaurant sites
+                'vivajaliscoinbothell.com', // Another Squarespace pattern
+                '.square.site',            // Square sites
+                '.wixsite.com'             // Wix sites
+            ];
+            
+            if (restaurantBuilderPatterns.some(pattern => domain.includes(pattern) || url.includes(pattern))) {
+                console.log(`🍽️ Restaurant website builder detected: ${domain}`);
+                needsPuppeteer = true;
+            }
+        }
         
         // Log site classification for debugging
         if (needsPuppeteer) {
