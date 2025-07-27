@@ -29,7 +29,8 @@
       "WebFetch(domain:docs.litellm.ai)",
       "WebFetch(domain:www.yelp.com)",
       "WebFetch(domain:platform.openai.com)",
-      "WebFetch(domain:ai.google.dev)"
+      "WebFetch(domain:ai.google.dev)",
+      "WebFetch(domain:simonwillison.net)"
     ],
     "deny": []
   }

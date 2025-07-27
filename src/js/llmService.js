@@ -166,6 +166,7 @@ if (typeof LLMService === 'undefined') {
         // Add additional headers for Anthropic
         if (this.providerType === 'anthropic-direct') {
             headers['anthropic-version'] = '2023-06-01';
+            headers['anthropic-dangerous-direct-browser-access'] = 'true';
         }
 
         console.log(`Sending direct ${this.providerType} request:`, JSON.stringify(payload, null, 2));
