@@ -484,6 +484,11 @@ Make sure the character you create embodies and follows the persona instructions
         if (lowerCaseMessage.includes("show me")) {
             console.log(`"Show me" detected. Provider: ${this.providerType}. Processing image prompt for: ${message}`);
             
+            // Get last 5 messages from conversation history (excluding system/internal messages)
+            const recentMessages = this.conversationHistory
+                .filter(msg => msg.role !== 'system' && !msg.content.includes('[INTERNAL'))
+                .slice(-5);
+
             // For image generation, create a completely separate context that forces the LLM to generate keywords
             const imageGenMessagesForApiCall = [
                 {
@@ -493,6 +498,7 @@ Make sure the character you create embodies and follows the persona instructions
                     "gender ('man' or 'woman'), hair color and style, eye color, skin tone, height, build, clothing style, age, and whatever else is relevant to the current conversation. " +
                     "Do not include the character's name or more than one adjective per trait."
                 },
+                ...recentMessages, // Include last 5 conversation messages for context
                 {
                     role: "user", 
                     content: "Convert this request into ONLY a comma-separated list of image generation keywords: \"" + message + "\". If your persona is in the image, " +

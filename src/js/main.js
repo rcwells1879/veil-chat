@@ -187,17 +187,6 @@ async function initializeApp() {
     }
 
     // Disable the viewport resize listeners that cause the gap issue
-    // Comment out or remove these lines:
-    /*
-    window.addEventListener('resize', setChatContainerHeight);
-    window.addEventListener('orientationchange', () => {
-        setTimeout(setChatContainerHeight, 100);
-    });
-
-    if (window.visualViewport) {
-        window.visualViewport.addEventListener('resize', setChatContainerHeight);
-    }
-    */
 
     // Set initial height once
     setChatContainerHeight();
@@ -548,9 +537,8 @@ Type **"/list"** anytime to see this help again.`;
         
         // Check if this is a "show me" image request - if so, don't add to conversation history
         const isImageRequest = message.toLowerCase().includes("show me");
-        if (!isImageRequest) {
-            addMessage(message, 'user');
-        } else {
+        addMessage(message, 'user'); // Always show user message in chat
+        if (isImageRequest) {
             console.log('📸 Image request detected - excluding from conversation history:', message);
         }
 
@@ -644,7 +632,7 @@ Type **"/list"** anytime to see this help again.`;
                     } else if (mcpResult.needsLLMProcessing) {
                         // Web extraction result - needs LLM processing
                         console.log('🔄 MCP result needs LLM processing');
-                        documentContext = mcpResult.content[0].text;
+                        let documentContext = mcpResult.content[0].text;
                         console.log('📄 Document context length:', documentContext.length);
                         // Continue to LLM processing below
                     } else if (mcpResult.fallback) {
@@ -707,81 +695,7 @@ Type **"/list"** anytime to see this help again.`;
         }
     }
 
-    // Save conversation to file
-    function saveConversationToFile() {
-        const conversationState = {
-            version: "1.0",
-            savedAt: new Date().toISOString(),
-            personaPrompt: currentPersonaPrompt,
-            llmServiceState: {
-                conversationHistory: llmService.conversationHistory,
-                characterInitialized: llmService.characterInitialized
-            },
-            documentContext: contextService.exportContext()
-        };
 
-        const jsonString = JSON.stringify(conversationState, null, 2);
-        const blob = new Blob([jsonString], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `conversation_${new Date().toISOString().split('T')[0]}.json`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        console.log("Conversation saved to file.");
-    }
-
-    function loadConversationFromFile(event) {
-        const file = event.target.files[0];
-        if (!file) return;
-
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            try {
-                const conversationData = JSON.parse(e.target.result);
-                
-                if (!conversationData.version || !conversationData.llmServiceState) {
-                    throw new Error('Invalid conversation file format');
-                }
-                
-                // Clear current conversation
-                clearConversation();
-                
-                // Restore persona if it exists  
-                if (conversationData.personaPrompt) {
-                    currentPersonaPrompt = conversationData.personaPrompt;
-                    setPersonaInput(currentPersonaPrompt);
-                    llmService.setCustomPersona(currentPersonaPrompt, true);
-                }
-                
-                // Restore conversation history
-                if (conversationData.llmServiceState.conversationHistory) {
-                    llmService.conversationHistory = conversationData.llmServiceState.conversationHistory;
-                    llmService.characterInitialized = conversationData.llmServiceState.characterInitialized || false;
-                    llmService.saveConversationHistory();
-                }
-                
-                // Restore document context
-                if (conversationData.documentContext) {
-                    contextService.importContext(conversationData.documentContext);
-                }
-                
-                // Render the conversation
-                renderConversation(llmService.conversationHistory);
-                
-                addMessage('📁 Conversation loaded successfully!', 'system', false);
-                
-            } catch (error) {
-                console.error("Failed to load or parse conversation file:", error);
-                addMessage(`(Error: Could not load file. ${error.message})`, 'llm');
-            }
-        };
-        reader.readAsText(file);
-        event.target.value = null;
-    }
 
     function clearConversation() {
         chatWindow.innerHTML = '';
@@ -977,11 +891,9 @@ Type **"/list"** anytime to see this help again.`;
 
                 const createButton = personaPanelContainer.querySelector('#create-persona-button');
                 const randomButton = personaPanelContainer.querySelector('#use-random-persona-button');
-                // const cancelButton = personaPanelContainer.querySelector('#cancel-persona-button'); // Button removed from HTML
 
                 if (createButton) addMobileCompatibleEvent(createButton, 'click', () => createPersona(textarea.value));
                 if (randomButton) addMobileCompatibleEvent(randomButton, 'click', () => createPersona(null));
-                // if (cancelButton) addMobileCompatibleEvent(cancelButton, 'click', closePersonaPanel); // Logic for removed button
 
             } else {
                 throw new Error('.persona-panel element not found in persona.html');
@@ -1073,14 +985,6 @@ Type **"/list"** anytime to see this help again.`;
         removeOverlay();
     }
 
-    // The following 'if' block is redundant and is the cause of the flickering.
-    // It is being replaced by a more robust event listener later in the file.
-    /*
-    // --- Attach open/close logic to settings and persona buttons ---
-    if (settingsButton) {
-        settingsButton.onclick = showSettingsPanel;
-    }
-    */
 
     // Persona panel open logic should be attached to wherever you open persona (e.g., a button or menu)
     // Example: document.getElementById('open-persona-btn').onclick = showPersonaPanel;
