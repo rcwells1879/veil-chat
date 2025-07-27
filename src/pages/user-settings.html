@@ -32,6 +32,9 @@
                     <option value="litellm">LiteLLM (OpenAI Compatible)</option>
                     <option value="lmstudio">LMStudio (OpenAI Compatible)</option>
                     <option value="ollama">Ollama (Direct - OpenAI Compatible)</option>
+                    <option value="openai-direct">OpenAI (Direct API)</option>
+                    <option value="anthropic-direct">Anthropic (Direct API)</option>
+                    <option value="google-direct">Google AI Studio (Direct API)</option>
                 </select>
             </div>
 
@@ -58,6 +61,60 @@
             <div class="setting-item" id="api-key-item">
                 <label for="llm-api-key">LLM API Key </label>
                 <input type="password" id="llm-api-key" placeholder="Enter API Key if required">
+            </div>
+
+            <!-- OpenAI Direct API Settings -->
+            <div class="openai-direct-settings" style="display: none;">
+                <div class="setting-item">
+                    <label for="openai-model-identifier">OpenAI Model</label>
+                    <select id="openai-model-identifier">
+                        <option value="gpt-4.1">GPT-4.1</option>
+                        <option value="gpt-4.1-mini">GPT-4.1 Mini</option>
+                        <option value="gpt-4.1-nano">GPT-4.1 Nano</option>
+                        <option value="gpt-4.5">GPT-4.5</option>
+                        <option value="o3-mini">o3-mini</option>
+                    </select>
+                </div>
+                <div class="setting-item">
+                    <label for="openai-api-key">OpenAI API Key</label>
+                    <input type="password" id="openai-api-key" placeholder="Enter OpenAI API Key">
+                </div>
+            </div>
+
+            <!-- Anthropic Direct API Settings -->
+            <div class="anthropic-direct-settings" style="display: none;">
+                <div class="setting-item">
+                    <label for="anthropic-model-identifier">Anthropic Model</label>
+                    <select id="anthropic-model-identifier">
+                        <option value="claude-opus-4">Claude Opus 4</option>
+                        <option value="claude-sonnet-4">Claude Sonnet 4</option>
+                        <option value="claude-sonnet-3.7">Claude Sonnet 3.7</option>
+                        <option value="claude-sonnet-3.5">Claude Sonnet 3.5</option>
+                        <option value="claude-haiku-3.5">Claude Haiku 3.5</option>
+                    </select>
+                </div>
+                <div class="setting-item">
+                    <label for="anthropic-api-key">Anthropic API Key</label>
+                    <input type="password" id="anthropic-api-key" placeholder="Enter Anthropic API Key">
+                </div>
+            </div>
+
+            <!-- Google AI Studio Direct API Settings -->
+            <div class="google-direct-settings" style="display: none;">
+                <div class="setting-item">
+                    <label for="google-model-identifier">Google AI Model</label>
+                    <select id="google-model-identifier">
+                        <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+                        <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                        <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash Lite</option>
+                        <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                        <option value="gemini-2.0-flash-lite">Gemini 2.0 Flash Lite</option>
+                    </select>
+                </div>
+                <div class="setting-item">
+                    <label for="google-api-key">Google AI API Key</label>
+                    <input type="password" id="google-api-key" placeholder="Enter Google AI Studio API Key">
+                </div>
             </div>
 
             <!-- MCP Settings -->

@@ -1,10 +1,16 @@
 if (typeof LLMService === 'undefined') {
     window.LLMService = class LLMService {
-        constructor(apiBaseUrl, providerType = 'lmstudio', modelIdentifier = null, apiKey = null) {
+        constructor(apiBaseUrl, providerType = 'lmstudio', modelIdentifier = null, apiKey = null, directProviders = {}) {
             this.apiBaseUrl = apiBaseUrl;
             this.providerType = providerType;
             this.modelIdentifier = modelIdentifier;
-        this.apiKey = apiKey;
+            this.apiKey = apiKey;
+            
+            // Store direct provider configurations
+            this.directProviders = directProviders || {};
+            
+            // Set up direct API endpoints and settings
+            this.setupDirectProviderConfig();
 
         // --- Easily Modifiable LLM Parameters ---
         // For Normal Chat
@@ -42,6 +48,166 @@ if (typeof LLMService === 'undefined') {
         this.loadConversationHistory();
         
         console.log(`LLMService initialized. Provider: ${this.providerType}, Base URL: ${this.apiBaseUrl}, Model ID: ${this.modelIdentifier}`);
+    }
+
+    setupDirectProviderConfig() {
+        // Configure direct API endpoints and models based on provider type
+        if (this.providerType === 'openai-direct') {
+            this.directApiEndpoint = 'https://api.openai.com/v1/chat/completions';
+            this.directModel = this.directProviders.openaiModel || 'gpt-4.1-mini';
+            this.directApiKey = this.directProviders.openaiApiKey;
+            this.authHeader = 'Authorization';
+            this.authValue = `Bearer ${this.directApiKey}`;
+            console.log(`Configured OpenAI Direct API: ${this.directModel}, API Key: ${this.directApiKey ? 'PRESENT' : 'MISSING'}`);
+        } else if (this.providerType === 'anthropic-direct') {
+            this.directApiEndpoint = 'https://api.anthropic.com/v1/messages';
+            this.directModel = this.directProviders.anthropicModel || 'claude-sonnet-4';
+            this.directApiKey = this.directProviders.anthropicApiKey;
+            this.authHeader = 'x-api-key';
+            this.authValue = this.directApiKey;
+            console.log(`Configured Anthropic Direct API: ${this.directModel}`);
+        } else if (this.providerType === 'google-direct') {
+            this.directApiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${this.directProviders.googleModel || 'gemini-2.5-flash'}:generateContent`;
+            this.directModel = this.directProviders.googleModel || 'gemini-2.5-flash';
+            this.directApiKey = this.directProviders.googleApiKey;
+            this.authHeader = 'x-goog-api-key';
+            this.authValue = this.directApiKey;
+            console.log(`Configured Google Direct API: ${this.directModel}`);
+        }
+    }
+
+    createDirectProviderPayload(messages, temperature, maxTokens) {
+        if (this.providerType === 'openai-direct') {
+            return {
+                model: this.directModel,
+                messages: messages,
+                temperature: temperature,
+                max_tokens: maxTokens,
+                stream: false
+            };
+        } else if (this.providerType === 'anthropic-direct') {
+            // Anthropic API format
+            const anthropicMessages = messages.filter(msg => msg.role !== 'system');
+            const systemPrompts = messages.filter(msg => msg.role === 'system').map(msg => msg.content).join('\n');
+            
+            return {
+                model: this.directModel,
+                max_tokens: maxTokens,
+                temperature: temperature,
+                system: systemPrompts || undefined,
+                messages: anthropicMessages
+            };
+        } else if (this.providerType === 'google-direct') {
+            // Google AI Studio API format
+            // Combine consecutive user messages to avoid API errors
+            const processedMessages = [];
+            let currentUserContent = [];
+            
+            for (const msg of messages.filter(msg => msg.role !== 'system')) {
+                if (msg.role === 'user') {
+                    currentUserContent.push(msg.content);
+                } else {
+                    // If we have accumulated user content, add it first
+                    if (currentUserContent.length > 0) {
+                        processedMessages.push({
+                            role: 'user',
+                            parts: [{ text: currentUserContent.join('\n\n') }]
+                        });
+                        currentUserContent = [];
+                    }
+                    // Add the assistant message
+                    processedMessages.push({
+                        role: 'model',
+                        parts: [{ text: msg.content }]
+                    });
+                }
+            }
+            
+            // Add any remaining user content
+            if (currentUserContent.length > 0) {
+                processedMessages.push({
+                    role: 'user',
+                    parts: [{ text: currentUserContent.join('\n\n') }]
+                });
+            }
+            
+            // Combine all system messages for Google API
+            const systemMessages = messages.filter(msg => msg.role === 'system');
+            
+            const payload = {
+                contents: processedMessages,
+                generationConfig: {
+                    temperature: temperature,
+                    maxOutputTokens: maxTokens,
+                    // Set thinking budget to 0 for Gemini 2.5 models
+                    thinkingConfig: {
+                        thinkingBudget: 0
+                    }
+                }
+            };
+            
+            if (systemMessages.length > 0) {
+                const combinedSystemContent = systemMessages.map(msg => msg.content).join('\n\n');
+                payload.systemInstruction = {
+                    parts: [{ text: combinedSystemContent }]
+                };
+            }
+            
+            return payload;
+        }
+    }
+
+    async sendDirectProviderRequest(payload) {
+        const headers = {
+            'Content-Type': 'application/json',
+            [this.authHeader]: this.authValue
+        };
+
+        // Add additional headers for Anthropic
+        if (this.providerType === 'anthropic-direct') {
+            headers['anthropic-version'] = '2023-06-01';
+        }
+
+        console.log(`Sending direct ${this.providerType} request:`, JSON.stringify(payload, null, 2));
+        console.log(`Headers being sent:`, JSON.stringify(headers, null, 2));
+
+        const response = await fetch(this.directApiEndpoint, {
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => response.text());
+            console.error(`${this.providerType} API Error:`, errorData);
+            throw new Error(`${this.providerType} API request failed with status ${response.status}: ${JSON.stringify(errorData)}`);
+        }
+
+        return await response.json();
+    }
+
+    extractDirectProviderResponse(data) {
+        if (this.providerType === 'openai-direct') {
+            return data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content
+                ? data.choices[0].message.content.trim()
+                : '';
+        } else if (this.providerType === 'anthropic-direct') {
+            return data.content && data.content[0] && data.content[0].text
+                ? data.content[0].text.trim()
+                : '';
+        } else if (this.providerType === 'google-direct') {
+            return data.candidates && data.candidates[0] && data.candidates[0].content && 
+                   data.candidates[0].content.parts && data.candidates[0].content.parts[0] && 
+                   data.candidates[0].content.parts[0].text
+                ? data.candidates[0].content.parts[0].text.trim()
+                : '';
+        }
+        return '';
+    }
+
+    updateDirectProviders(directProviders) {
+        this.directProviders = directProviders || {};
+        this.setupDirectProviderConfig();
     }
 
     static hasSavedConversation() {
@@ -148,7 +314,8 @@ if (typeof LLMService === 'undefined') {
             return;
         }
         
-        const endpoint = `${this.apiBaseUrl}/v1/chat/completions`;
+        const isDirectProvider = ['openai-direct', 'anthropic-direct', 'google-direct'].includes(this.providerType);
+        const endpoint = isDirectProvider ? this.directApiEndpoint : `${this.apiBaseUrl}/v1/chat/completions`;
         
         // Create a separate message array for character generation
         let characterGenMessages;
@@ -199,39 +366,47 @@ Make sure the character you create embodies and follows the persona instructions
         console.log("Generating character profile...");
 
         try {
-            const payload = this.createCompatiblePayload(characterGenMessages, this.characterGenTemperature, this.characterGenMaxTokens, false);
-
-            const headers = {
-                'Content-Type': 'application/json',
-            };
-
-            if (this.apiKey) {
-                headers['Authorization'] = `Bearer ${this.apiKey}`;
-            }
-
-            console.log('Sending character generation request:', JSON.stringify(payload, null, 2));
-
-            const response = await fetch(endpoint, {
-                method: 'POST',
-                headers: headers,
-                body: JSON.stringify(payload)
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => response.text());
-                console.error('Character Generation API Error:', errorData);
-                console.error('Request payload that failed:', JSON.stringify(payload, null, 2));
-                console.error('Request headers:', headers);
-                throw new Error("Character generation failed with status " + response.status + ": " + JSON.stringify(errorData));
-            }
-
-            const data = await response.json();
-            console.log('Raw API response data:', data);
+            let payload, data, characterProfile;
             
-            // Since reasoning is disabled, content should be in the standard location
-            const characterProfile = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content
-                ? data.choices[0].message.content.trim()
-                : "";
+            if (isDirectProvider) {
+                payload = this.createDirectProviderPayload(characterGenMessages, this.characterGenTemperature, this.characterGenMaxTokens);
+                console.log('Sending direct provider character generation request:', JSON.stringify(payload, null, 2));
+                data = await this.sendDirectProviderRequest(payload);
+                characterProfile = this.extractDirectProviderResponse(data);
+            } else {
+                payload = this.createCompatiblePayload(characterGenMessages, this.characterGenTemperature, this.characterGenMaxTokens, false);
+
+                const headers = {
+                    'Content-Type': 'application/json',
+                };
+
+                if (this.apiKey) {
+                    headers['Authorization'] = `Bearer ${this.apiKey}`;
+                }
+
+                console.log('Sending traditional character generation request:', JSON.stringify(payload, null, 2));
+
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: headers,
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => response.text());
+                    console.error('Character Generation API Error:', errorData);
+                    console.error('Request payload that failed:', JSON.stringify(payload, null, 2));
+                    throw new Error("Character generation failed with status " + response.status + ": " + JSON.stringify(errorData));
+                }
+
+                data = await response.json();
+                console.log('Raw API response data:', data);
+                
+                // Since reasoning is disabled, content should be in the standard location
+                characterProfile = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content
+                    ? data.choices[0].message.content.trim()
+                    : "";
+            }
 
             console.log('Extracted character profile:', characterProfile); // Add this debug line
 
@@ -290,7 +465,12 @@ Make sure the character you create embodies and follows the persona instructions
         }
 
         const lowerCaseMessage = message.toLowerCase();
-        const endpoint = `${this.apiBaseUrl}/v1/chat/completions`;        // Prepare the full message with document context if provided
+        
+        // Determine if we're using a direct provider
+        const isDirectProvider = ['openai-direct', 'anthropic-direct', 'google-direct'].includes(this.providerType);
+        const endpoint = isDirectProvider ? this.directApiEndpoint : `${this.apiBaseUrl}/v1/chat/completions`;
+        
+        // Prepare the full message with document context if provided
         let fullMessage = message;
         if (documentContext) {
             fullMessage = `${documentContext}\n\nUser message: ${message}`;
@@ -324,36 +504,45 @@ Make sure the character you create embodies and follows the persona instructions
 
             console.log("Sending request for dedicated image prompt:", JSON.stringify(imageGenMessagesForApiCall, null, 2));
             
-            const payload = this.createCompatiblePayload(imageGenMessagesForApiCall, this.imagePromptTemperature, this.imagePromptMaxTokens, false);
-
-            const headers = {
-                'Content-Type': 'application/json',
-            };
-
-            if (this.apiKey) {
-                headers['Authorization'] = `Bearer ${this.apiKey}`;
-            }
-
-            console.log('Sending image prompt request:', JSON.stringify(payload, null, 2));
-
-            const response = await fetch(endpoint, {
-                method: 'POST',
-                headers: headers,
-                body: JSON.stringify(payload)
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => response.text());
-                console.error('LLM API Error (Image Prompt Request):', errorData);
-                console.error('Request payload that failed:', JSON.stringify(payload, null, 2));
-                throw new Error("LLM API request for image prompt failed with status " + response.status + ": " + JSON.stringify(errorData));
-            }
-
-            const data = await response.json();
+            let payload, data, rawReply;
             
-            const rawReply = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content
-                ? data.choices[0].message.content.trim()
-                : "";
+            if (isDirectProvider) {
+                payload = this.createDirectProviderPayload(imageGenMessagesForApiCall, this.imagePromptTemperature, this.imagePromptMaxTokens);
+                console.log('Sending direct provider image prompt request:', JSON.stringify(payload, null, 2));
+                data = await this.sendDirectProviderRequest(payload);
+                rawReply = this.extractDirectProviderResponse(data);
+            } else {
+                payload = this.createCompatiblePayload(imageGenMessagesForApiCall, this.imagePromptTemperature, this.imagePromptMaxTokens, false);
+
+                const headers = {
+                    'Content-Type': 'application/json',
+                };
+
+                if (this.apiKey) {
+                    headers['Authorization'] = `Bearer ${this.apiKey}`;
+                }
+
+                console.log('Sending traditional image prompt request:', JSON.stringify(payload, null, 2));
+
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: headers,
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => response.text());
+                    console.error('LLM API Error (Image Prompt Request):', errorData);
+                    console.error('Request payload that failed:', JSON.stringify(payload, null, 2));
+                    throw new Error("LLM API request for image prompt failed with status " + response.status + ": " + JSON.stringify(errorData));
+                }
+
+                data = await response.json();
+                
+                rawReply = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content
+                    ? data.choices[0].message.content.trim()
+                    : "";
+            }
 
                             console.log("Received from LLM (Image Prompt Request - raw): " + rawReply);
 
@@ -390,37 +579,49 @@ Make sure the character you create embodies and follows the persona instructions
             console.log("Current conversation history being sent to LLM:", JSON.stringify(messagesForAPI, null, 2));
 
             try {
-                const payload = this.createCompatiblePayload(messagesForAPI, this.chatTemperature, this.chatMaxTokens, true);
-
-                const headers = {
-                    'Content-Type': 'application/json',
-                };
-
-                if (this.apiKey) {
-                    headers['Authorization'] = `Bearer ${this.apiKey}`;
-                }
-
-                console.log('Sending normal chat request:', JSON.stringify(payload, null, 2));
-
-                const response = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: headers,
-                    body: JSON.stringify(payload),
-                    });
-
-                if (!response.ok) {
-                    const errorData = await response.json().catch(() => response.text());
-                    console.error('LLM API Error (Normal Chat):', errorData);
-                    console.error('Request payload that failed:', JSON.stringify(payload, null, 2));
-                    this.conversationHistory.pop(); 
-                    throw new Error("LLM API request failed with status " + response.status + ": " + JSON.stringify(errorData));
-                }
-
-                const data = await response.json();
+                let payload, data, rawReply;
                 
-                const rawReply = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content
-                    ? data.choices[0].message.content.trim()
-                    : "Sorry, I couldn't understand that.";
+                if (isDirectProvider) {
+                    payload = this.createDirectProviderPayload(messagesForAPI, this.chatTemperature, this.chatMaxTokens);
+                    console.log('Sending direct provider normal chat request:', JSON.stringify(payload, null, 2));
+                    data = await this.sendDirectProviderRequest(payload);
+                    rawReply = this.extractDirectProviderResponse(data);
+                    if (!rawReply) {
+                        rawReply = "Sorry, I couldn't understand that.";
+                    }
+                } else {
+                    payload = this.createCompatiblePayload(messagesForAPI, this.chatTemperature, this.chatMaxTokens, true);
+
+                    const headers = {
+                        'Content-Type': 'application/json',
+                    };
+
+                    if (this.apiKey) {
+                        headers['Authorization'] = `Bearer ${this.apiKey}`;
+                    }
+
+                    console.log('Sending traditional normal chat request:', JSON.stringify(payload, null, 2));
+
+                    const response = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: headers,
+                        body: JSON.stringify(payload),
+                        });
+
+                    if (!response.ok) {
+                        const errorData = await response.json().catch(() => response.text());
+                        console.error('LLM API Error (Normal Chat):', errorData);
+                        console.error('Request payload that failed:', JSON.stringify(payload, null, 2));
+                        this.conversationHistory.pop(); 
+                        throw new Error("LLM API request failed with status " + response.status + ": " + JSON.stringify(errorData));
+                    }
+
+                    data = await response.json();
+                    
+                    rawReply = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content
+                        ? data.choices[0].message.content.trim()
+                        : "Sorry, I couldn't understand that.";
+                }
 
                 this.conversationHistory.push({ role: "assistant", content: rawReply });
                 console.log("Received from LLM (Normal Chat - raw): " + rawReply);
@@ -539,45 +740,69 @@ Make sure the character you create embodies and follows the persona instructions
                 }
             ];
             
-            const imagePayload = this.createCompatiblePayload(imageGenMessages, this.imagePromptTemperature, this.imagePromptMaxTokens, false);
-
-            const imageHeaders = {
-                'Content-Type': 'application/json',
-            };
-
-            if (this.apiKey) {
-                imageHeaders['Authorization'] = `Bearer ${this.apiKey}`;
-            }
-
-            console.log('Sending initial image generation request:', JSON.stringify(imagePayload, null, 2));
-
-            const response = await fetch(`${this.apiBaseUrl}/v1/chat/completions`, {
-                method: 'POST',
-                headers: imageHeaders,
-                body: JSON.stringify(imagePayload),
-            });
-
+            const isDirectProvider = ['openai-direct', 'anthropic-direct', 'google-direct'].includes(this.providerType);
             let imagePrompt = null;
-            if (response.ok) {
-                const imageData = await response.json();
-                console.log('Raw image generation response:', imageData);
+            
+            if (isDirectProvider) {
+                const imagePayload = this.createDirectProviderPayload(imageGenMessages, this.imagePromptTemperature, this.imagePromptMaxTokens);
+                console.log('Sending direct provider initial image generation request:', JSON.stringify(imagePayload, null, 2));
                 
-                const rawImageReply = imageData.choices && imageData.choices[0] && imageData.choices[0].message && imageData.choices[0].message.content
-                    ? imageData.choices[0].message.content.trim()
-                    : null;
-                
-                console.log('Extracted image reply:', rawImageReply);
-                
-                if (rawImageReply) {
-                    imagePrompt = rawImageReply;
-                    console.log("Generated image prompt:", imagePrompt);
-                } else {
-                    console.log('No image prompt generated - full response:', JSON.stringify(imageData, null, 2));
+                try {
+                    const imageData = await this.sendDirectProviderRequest(imagePayload);
+                    console.log('Raw image generation response:', imageData);
+                    
+                    const rawImageReply = this.extractDirectProviderResponse(imageData);
+                    console.log('Extracted image reply:', rawImageReply);
+                    
+                    if (rawImageReply) {
+                        imagePrompt = rawImageReply;
+                        console.log("Generated image prompt:", imagePrompt);
+                    } else {
+                        console.log('No image prompt generated - full response:', JSON.stringify(imageData, null, 2));
+                    }
+                } catch (error) {
+                    console.error('Direct provider image generation request failed:', error);
                 }
             } else {
-                console.error('Image generation request failed:', response.status, response.statusText);
-                const errorText = await response.text();
-                console.error('Error response:', errorText);
+                const imagePayload = this.createCompatiblePayload(imageGenMessages, this.imagePromptTemperature, this.imagePromptMaxTokens, false);
+
+                const imageHeaders = {
+                    'Content-Type': 'application/json',
+                };
+
+                if (this.apiKey) {
+                    imageHeaders['Authorization'] = `Bearer ${this.apiKey}`;
+                }
+
+                console.log('Sending traditional initial image generation request:', JSON.stringify(imagePayload, null, 2));
+
+                const response = await fetch(`${this.apiBaseUrl}/v1/chat/completions`, {
+                    method: 'POST',
+                    headers: imageHeaders,
+                    body: JSON.stringify(imagePayload),
+                });
+
+                if (response.ok) {
+                    const imageData = await response.json();
+                    console.log('Raw image generation response:', imageData);
+                    
+                    const rawImageReply = imageData.choices && imageData.choices[0] && imageData.choices[0].message && imageData.choices[0].message.content
+                        ? imageData.choices[0].message.content.trim()
+                        : null;
+                    
+                    console.log('Extracted image reply:', rawImageReply);
+                    
+                    if (rawImageReply) {
+                        imagePrompt = rawImageReply;
+                        console.log("Generated image prompt:", imagePrompt);
+                    } else {
+                        console.log('No image prompt generated - full response:', JSON.stringify(imageData, null, 2));
+                    }
+                } else {
+                    console.error('Image generation request failed:', response.status, response.statusText);
+                    const errorText = await response.text();
+                    console.error('Error response:', errorText);
+                }
             }
             
             // Then, get a greeting using temporary messages
@@ -589,35 +814,54 @@ Make sure the character you create embodies and follows the persona instructions
                 }
             ];
             
-            const greetingPayload = this.createCompatiblePayload(greetingMessages, this.chatTemperature, this.chatMaxTokens, true);
-
-            const greetingHeaders = {
-                'Content-Type': 'application/json',
-            };
-
-            if (this.apiKey) {
-                greetingHeaders['Authorization'] = `Bearer ${this.apiKey}`;
-            }
-
-            console.log('Sending initial greeting request:', JSON.stringify(greetingPayload, null, 2));
-
-            const greetingResponse = await fetch(`${this.apiBaseUrl}/v1/chat/completions`, {
-                method: 'POST',
-                headers: greetingHeaders,
-                body: JSON.stringify(greetingPayload),
-            });
-
             let greeting = "Hello there! What's your name?";
-            if (greetingResponse.ok) {
-                const greetingData = await greetingResponse.json();
-                const rawGreetingReply = greetingData.choices && greetingData.choices[0] && greetingData.choices[0].message && greetingData.choices[0].message.content
-                    ? greetingData.choices[0].message.content.trim()
-                    : null;
+            
+            if (isDirectProvider) {
+                const greetingPayload = this.createDirectProviderPayload(greetingMessages, this.chatTemperature, this.chatMaxTokens);
+                console.log('Sending direct provider initial greeting request:', JSON.stringify(greetingPayload, null, 2));
                 
-                if (rawGreetingReply) {
-                    greeting = rawGreetingReply;
-                } else {
-                    console.log('No greeting generated - full response:', JSON.stringify(greetingData, null, 2));
+                try {
+                    const greetingData = await this.sendDirectProviderRequest(greetingPayload);
+                    const rawGreetingReply = this.extractDirectProviderResponse(greetingData);
+                    
+                    if (rawGreetingReply) {
+                        greeting = rawGreetingReply;
+                    } else {
+                        console.log('No greeting generated - full response:', JSON.stringify(greetingData, null, 2));
+                    }
+                } catch (error) {
+                    console.error('Direct provider greeting generation failed:', error);
+                }
+            } else {
+                const greetingPayload = this.createCompatiblePayload(greetingMessages, this.chatTemperature, this.chatMaxTokens, true);
+
+                const greetingHeaders = {
+                    'Content-Type': 'application/json',
+                };
+
+                if (this.apiKey) {
+                    greetingHeaders['Authorization'] = `Bearer ${this.apiKey}`;
+                }
+
+                console.log('Sending traditional initial greeting request:', JSON.stringify(greetingPayload, null, 2));
+
+                const greetingResponse = await fetch(`${this.apiBaseUrl}/v1/chat/completions`, {
+                    method: 'POST',
+                    headers: greetingHeaders,
+                    body: JSON.stringify(greetingPayload),
+                });
+
+                if (greetingResponse.ok) {
+                    const greetingData = await greetingResponse.json();
+                    const rawGreetingReply = greetingData.choices && greetingData.choices[0] && greetingData.choices[0].message && greetingData.choices[0].message.content
+                        ? greetingData.choices[0].message.content.trim()
+                        : null;
+                    
+                    if (rawGreetingReply) {
+                        greeting = rawGreetingReply;
+                    } else {
+                        console.log('No greeting generated - full response:', JSON.stringify(greetingData, null, 2));
+                    }
                 }
             }
             

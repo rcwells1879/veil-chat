@@ -499,14 +499,22 @@ class SequentialThinkingMCPServer {
             });
 
             // Use provided settings or defaults
+            const provider = llmSettings?.provider || 'litellm';
             const apiBaseUrl = llmSettings?.apiBaseUrl || 'https://litellm-veil.veilstudio.io';
             const apiKey = llmSettings?.apiKey || 'sk-DSHSfgTh65Fvd';
             const model = llmSettings?.model || 'gemini2.5-flash';
             
-            const endpoint = `${apiBaseUrl}/v1/chat/completions`;
+            // Set endpoint based on provider type
+            let endpoint;
+            if (provider === 'openai-direct' || provider === 'anthropic-direct' || provider === 'google-direct') {
+                endpoint = apiBaseUrl; // Direct providers already have full endpoint URL
+            } else {
+                // Traditional providers (litellm, lmstudio, ollama) use /v1/chat/completions
+                endpoint = `${apiBaseUrl}/v1/chat/completions`;
+            }
             
             // Log the endpoint, model, and key (mask the key for safety)
-            console.log('🌐 MCP Server calling LLM:', endpoint, 'Model:', model, 'Key:', apiKey ? apiKey.slice(0, 6) + '...' : '(none)');
+            console.log('🌐 MCP Server calling LLM:', { provider, endpoint, model, hasApiKey: !!apiKey });
 
             // Enhanced system message for agent tasks
             const systemMessage = {
@@ -522,30 +530,130 @@ class SequentialThinkingMCPServer {
                 }
             ];
 
-            const payload = {
-                model: model,
-                messages: messages,
-                temperature: temperature,
-                max_tokens: maxTokens,
-                stream: false
-            };
+            let payload, headers;
 
-            // Handle Gemini-specific parameters to disable reasoning
-            if (model && model.toLowerCase().includes('gemini')) {
-                console.log('🤖 Applying Gemini-specific settings to disable reasoning...');
-                payload.thinkingBudget = 0;
-                payload.thinkingConfig = {
-                    thinkingBudget: 0
+            // Create provider-specific payload and headers
+            if (provider === 'openai-direct') {
+                payload = {
+                    model: model,
+                    messages: messages,
+                    temperature: temperature,
+                    max_tokens: maxTokens,
+                    stream: false
                 };
-                payload.reasoning_effort = "low";
-            }
+                
+                headers = {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`
+                };
+                
+            } else if (provider === 'anthropic-direct') {
+                // Anthropic API format
+                const anthropicMessages = messages.filter(msg => msg.role !== 'system');
+                const systemPrompts = messages.filter(msg => msg.role === 'system').map(msg => msg.content).join('\n');
+                
+                payload = {
+                    model: model,
+                    max_tokens: maxTokens,
+                    temperature: temperature,
+                    system: systemPrompts || undefined,
+                    messages: anthropicMessages
+                };
+                
+                headers = {
+                    'Content-Type': 'application/json',
+                    'x-api-key': apiKey,
+                    'anthropic-version': '2023-06-01'
+                };
+                
+            } else if (provider === 'google-direct') {
+                // Google AI Studio API format
+                // Combine consecutive user messages to avoid API errors
+                const processedMessages = [];
+                let currentUserContent = [];
+                
+                for (const msg of messages.filter(msg => msg.role !== 'system')) {
+                    if (msg.role === 'user') {
+                        currentUserContent.push(msg.content);
+                    } else {
+                        // If we have accumulated user content, add it first
+                        if (currentUserContent.length > 0) {
+                            processedMessages.push({
+                                role: 'user',
+                                parts: [{ text: currentUserContent.join('\n\n') }]
+                            });
+                            currentUserContent = [];
+                        }
+                        // Add the assistant message
+                        processedMessages.push({
+                            role: 'model',
+                            parts: [{ text: msg.content }]
+                        });
+                    }
+                }
+                
+                // Add any remaining user content
+                if (currentUserContent.length > 0) {
+                    processedMessages.push({
+                        role: 'user',
+                        parts: [{ text: currentUserContent.join('\n\n') }]
+                    });
+                }
+                
+                // Combine all system messages for Google API
+                const systemMessages = messages.filter(msg => msg.role === 'system');
+                
+                payload = {
+                    contents: processedMessages,
+                    generationConfig: {
+                        temperature: temperature,
+                        maxOutputTokens: maxTokens,
+                        // Set thinking budget to 0 for Gemini 2.5 models
+                        thinkingConfig: {
+                            thinkingBudget: 0
+                        }
+                    }
+                };
+                
+                if (systemMessages.length > 0) {
+                    const combinedSystemContent = systemMessages.map(msg => msg.content).join('\n\n');
+                    payload.systemInstruction = {
+                        parts: [{ text: combinedSystemContent }]
+                    };
+                }
+                
+                headers = {
+                    'Content-Type': 'application/json',
+                    'x-goog-api-key': apiKey
+                };
+                
+            } else {
+                // Traditional providers (litellm, lmstudio, ollama)
+                payload = {
+                    model: model,
+                    messages: messages,
+                    temperature: temperature,
+                    max_tokens: maxTokens,
+                    stream: false
+                };
 
-            const headers = {
-                'Content-Type': 'application/json',
-            };
+                // Handle Gemini-specific parameters to disable reasoning for LiteLLM
+                if (model && model.toLowerCase().includes('gemini')) {
+                    console.log('🤖 Applying Gemini-specific settings to disable reasoning...');
+                    payload.thinkingBudget = 0;
+                    payload.thinkingConfig = {
+                        thinkingBudget: 0
+                    };
+                    payload.reasoning_effort = "low";
+                }
 
-            if (apiKey) {
-                headers['Authorization'] = `Bearer ${apiKey}`;
+                headers = {
+                    'Content-Type': 'application/json',
+                };
+
+                if (apiKey) {
+                    headers['Authorization'] = `Bearer ${apiKey}`;
+                }
             }
 
             console.log('🌐 MCP Server payload:', JSON.stringify(payload, null, 2));
@@ -565,16 +673,34 @@ class SequentialThinkingMCPServer {
             const data = await response.json();
             console.log('🌐 MCP Server LLM response:', JSON.stringify(data, null, 2));
             
-            // Handle different response structures
+            // Handle different response structures based on provider
             let content = null;
-            if (data.choices && data.choices[0] && data.choices[0].message) {
-                content = data.choices[0].message.content;
-            } else if (data.choices && data.choices[0] && data.choices[0].text) {
-                content = data.choices[0].text;
-            } else if (data.content) {
-                content = data.content;
-            } else if (data.response) {
-                content = data.response;
+            
+            if (provider === 'openai-direct') {
+                content = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content
+                    ? data.choices[0].message.content.trim()
+                    : null;
+            } else if (provider === 'anthropic-direct') {
+                content = data.content && data.content[0] && data.content[0].text
+                    ? data.content[0].text.trim()
+                    : null;
+            } else if (provider === 'google-direct') {
+                content = data.candidates && data.candidates[0] && data.candidates[0].content && 
+                         data.candidates[0].content.parts && data.candidates[0].content.parts[0] && 
+                         data.candidates[0].content.parts[0].text
+                    ? data.candidates[0].content.parts[0].text.trim()
+                    : null;
+            } else {
+                // Traditional providers (litellm, lmstudio, ollama)
+                if (data.choices && data.choices[0] && data.choices[0].message) {
+                    content = data.choices[0].message.content;
+                } else if (data.choices && data.choices[0] && data.choices[0].text) {
+                    content = data.choices[0].text;
+                } else if (data.content) {
+                    content = data.content;
+                } else if (data.response) {
+                    content = data.response;
+                }
             }
             
             // Check if content is null or empty

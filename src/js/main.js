@@ -209,6 +209,13 @@ async function initializeApp() {
         customLlmApiUrl: (localStorage.getItem('customLlmApiUrl') || 'https://litellm-veil.veilstudio.io').replace(/\/$/, ""),
         customLlmModelIdentifier: localStorage.getItem('customLlmModelIdentifier') || 'gemini2.5-flash',
         customLlmApiKey: localStorage.getItem('customLlmApiKey') || 'sk-DSHSfgTh65Fvd',
+        // Direct API Providers
+        openaiModelIdentifier: localStorage.getItem('openaiModelIdentifier') || 'gpt-4.1-mini',
+        openaiApiKey: localStorage.getItem('openaiApiKey') || '',
+        anthropicModelIdentifier: localStorage.getItem('anthropicModelIdentifier') || 'claude-sonnet-4',
+        anthropicApiKey: localStorage.getItem('anthropicApiKey') || '',
+        googleModelIdentifier: localStorage.getItem('googleModelIdentifier') || 'gemini-2.5-flash',
+        googleApiKey: localStorage.getItem('googleApiKey') || '',
         // Image
         customImageProvider: localStorage.getItem('customImageProvider') || 'openai',
         customImageApiUrl: (localStorage.getItem('customImageApiUrl') || 'https://a1111-veil.veilstudio.io').replace(/\/$/, ""),
@@ -242,7 +249,20 @@ async function initializeApp() {
     };
 
     // --- Service Initialization ---
-    let llmService = new LLMService(SETTINGS.customLlmApiUrl, SETTINGS.customLlmProvider, SETTINGS.customLlmModelIdentifier, SETTINGS.customLlmApiKey);
+    let llmService = new LLMService(
+        SETTINGS.customLlmApiUrl, 
+        SETTINGS.customLlmProvider, 
+        SETTINGS.customLlmModelIdentifier, 
+        SETTINGS.customLlmApiKey,
+        {
+            openaiModel: SETTINGS.openaiModelIdentifier,
+            openaiApiKey: SETTINGS.openaiApiKey,
+            anthropicModel: SETTINGS.anthropicModelIdentifier,
+            anthropicApiKey: SETTINGS.anthropicApiKey,
+            googleModel: SETTINGS.googleModelIdentifier,
+            googleApiKey: SETTINGS.googleApiKey
+        }
+    );
     let imageService = new ImageService(SETTINGS.customImageApiUrl, SETTINGS.customImageProvider, SETTINGS.customOpenAIImageApiKey);
     let voiceService;
     try {
@@ -806,7 +826,20 @@ Type **"/list"** anytime to see this help again.`;
             localStorage.removeItem('currentPersonaPrompt');
         }
 
-        llmService = new LLMService(SETTINGS.customLlmApiUrl, SETTINGS.customLlmProvider, SETTINGS.customLlmModelIdentifier, SETTINGS.customLlmApiKey);
+        llmService = new LLMService(
+            SETTINGS.customLlmApiUrl, 
+            SETTINGS.customLlmProvider, 
+            SETTINGS.customLlmModelIdentifier, 
+            SETTINGS.customLlmApiKey,
+            {
+                openaiModel: SETTINGS.openaiModelIdentifier,
+                openaiApiKey: SETTINGS.openaiApiKey,
+                anthropicModel: SETTINGS.anthropicModelIdentifier,
+                anthropicApiKey: SETTINGS.anthropicApiKey,
+                googleModel: SETTINGS.googleModelIdentifier,
+                googleApiKey: SETTINGS.googleApiKey
+            }
+        );
         llmService.clearConversationHistory();
         
         contextService.clearAllDocuments();
@@ -1065,6 +1098,12 @@ Type **"/list"** anytime to see this help again.`;
         customLlmApiUrl: 'llm-api-url',
         customLlmModelIdentifier: 'llm-model-identifier',
         customLlmApiKey: 'llm-api-key',
+        openaiModelIdentifier: 'openai-model-identifier',
+        openaiApiKey: 'openai-api-key',
+        anthropicModelIdentifier: 'anthropic-model-identifier',
+        anthropicApiKey: 'anthropic-api-key',
+        googleModelIdentifier: 'google-model-identifier',
+        googleApiKey: 'google-api-key',
         customImageProvider: 'image-provider',
         customImageApiUrl: 'image-api-url',
         customOpenAIImageApiKey: 'openai-image-api-key',
@@ -1093,6 +1132,7 @@ Type **"/list"** anytime to see this help again.`;
     };
 
     function saveAllSettings() {
+        console.log('🔧 saveAllSettings: Starting to save settings...');
         Object.keys(SETTINGS).forEach(key => {
             const elementId = settingsIdMap[key];
             if (!elementId) return;
@@ -1102,23 +1142,70 @@ Type **"/list"** anytime to see this help again.`;
                 const value = element.type === 'checkbox' ? element.checked : element.value;
                 localStorage.setItem(key, value);
                 SETTINGS[key] = value;
+                // Log direct provider settings specifically
+                if (key.includes('openai') || key.includes('anthropic') || key.includes('google')) {
+                    console.log(`🔧 saveAllSettings: ${key} = ${value ? (key.includes('ApiKey') ? 'PRESENT' : value) : 'EMPTY'}`);
+                }
             }
         });
         
-        const llmSettingsChanged = SETTINGS.customLlmApiUrl !== llmService.apiBaseUrl || SETTINGS.customLlmModelIdentifier !== llmService.modelIdentifier || SETTINGS.customLlmApiKey !== llmService.apiKey || SETTINGS.customLlmProvider !== llmService.providerType;
+        const llmSettingsChanged = SETTINGS.customLlmApiUrl !== llmService.apiBaseUrl || 
+                                   SETTINGS.customLlmModelIdentifier !== llmService.modelIdentifier || 
+                                   SETTINGS.customLlmApiKey !== llmService.apiKey || 
+                                   SETTINGS.customLlmProvider !== llmService.providerType ||
+                                   SETTINGS.openaiModelIdentifier !== (llmService.directProviders && llmService.directProviders.openaiModel) ||
+                                   SETTINGS.openaiApiKey !== (llmService.directProviders && llmService.directProviders.openaiApiKey) ||
+                                   SETTINGS.anthropicModelIdentifier !== (llmService.directProviders && llmService.directProviders.anthropicModel) ||
+                                   SETTINGS.anthropicApiKey !== (llmService.directProviders && llmService.directProviders.anthropicApiKey) ||
+                                   SETTINGS.googleModelIdentifier !== (llmService.directProviders && llmService.directProviders.googleModel) ||
+                                   SETTINGS.googleApiKey !== (llmService.directProviders && llmService.directProviders.googleApiKey);
         const imageSettingsChanged = SETTINGS.customImageApiUrl !== imageService.apiBaseUrl || SETTINGS.customImageProvider !== imageService.provider || SETTINGS.customOpenAIImageApiKey !== imageService.openaiApiKey;
         const mcpSettingsChanged = SETTINGS.mcpEnabled !== mcpEnabled;
 
         if (llmSettingsChanged) {
+            console.log('🔧 saveAllSettings: LLM settings changed, recreating LLMService...');
+            console.log('🔧 Provider:', SETTINGS.customLlmProvider);
+            console.log('🔧 Direct providers config:', {
+                openaiModel: SETTINGS.openaiModelIdentifier,
+                openaiApiKey: SETTINGS.openaiApiKey ? 'PRESENT' : 'MISSING',
+                anthropicModel: SETTINGS.anthropicModelIdentifier,
+                anthropicApiKey: SETTINGS.anthropicApiKey ? 'PRESENT' : 'MISSING',
+                googleModel: SETTINGS.googleModelIdentifier,
+                googleApiKey: SETTINGS.googleApiKey ? 'PRESENT' : 'MISSING'
+            });
+            
             const oldHistory = llmService.conversationHistory;
             const oldInitialized = llmService.characterInitialized;
-            llmService = new LLMService(SETTINGS.customLlmApiUrl, SETTINGS.customLlmProvider, SETTINGS.customLlmModelIdentifier, SETTINGS.customLlmApiKey);
+            llmService = new LLMService(
+                SETTINGS.customLlmApiUrl, 
+                SETTINGS.customLlmProvider, 
+                SETTINGS.customLlmModelIdentifier, 
+                SETTINGS.customLlmApiKey,
+                {
+                    openaiModel: SETTINGS.openaiModelIdentifier,
+                    openaiApiKey: SETTINGS.openaiApiKey,
+                    anthropicModel: SETTINGS.anthropicModelIdentifier,
+                    anthropicApiKey: SETTINGS.anthropicApiKey,
+                    googleModel: SETTINGS.googleModelIdentifier,
+                    googleApiKey: SETTINGS.googleApiKey
+                }
+            );
             llmService.conversationHistory = oldHistory;
             llmService.characterInitialized = oldInitialized;
             llmService.saveConversationHistory();
             if (currentPersonaPrompt) {
                 llmService.setCustomPersona(currentPersonaPrompt, true);
             }
+        } else {
+            // Even if LLMService doesn't need to be recreated, update direct provider configs
+            llmService.updateDirectProviders({
+                openaiModel: SETTINGS.openaiModelIdentifier,
+                openaiApiKey: SETTINGS.openaiApiKey,
+                anthropicModel: SETTINGS.anthropicModelIdentifier,
+                anthropicApiKey: SETTINGS.anthropicApiKey,
+                googleModel: SETTINGS.googleModelIdentifier,
+                googleApiKey: SETTINGS.googleApiKey
+            });
         }
         if (imageSettingsChanged) {
             imageService = new ImageService(SETTINGS.customImageApiUrl, SETTINGS.customImageProvider, SETTINGS.customOpenAIImageApiKey);
@@ -1196,15 +1283,53 @@ Type **"/list"** anytime to see this help again.`;
 
         const llmProviderSelect = container.querySelector('#llm-provider');
         const modelIdentifierItem = container.querySelector('#model-identifier-item');
+        const apiKeyItem = container.querySelector('#api-key-item');
+        const llmApiUrlItem = container.querySelector('#llm-api-url').parentElement;
+        
+        // Direct provider settings
+        const openaiDirectSettings = container.querySelector('.openai-direct-settings');
+        const anthropicDirectSettings = container.querySelector('.anthropic-direct-settings');
+        const googleDirectSettings = container.querySelector('.google-direct-settings');
 
         function toggleVisibility() {
-            if (!llmProviderSelect || !modelIdentifierItem) return;
+            if (!llmProviderSelect) return;
             const provider = llmProviderSelect.value;
-            // LMStudio uses a path, not a model identifier from a list
-            if (provider === 'lmstudio') {
-                modelIdentifierItem.style.display = 'none';
+            
+            // Hide all direct provider settings first
+            if (openaiDirectSettings) openaiDirectSettings.style.display = 'none';
+            if (anthropicDirectSettings) anthropicDirectSettings.style.display = 'none';
+            if (googleDirectSettings) googleDirectSettings.style.display = 'none';
+            
+            // Handle traditional provider settings visibility
+            if (provider === 'openai-direct') {
+                // Hide traditional settings, show OpenAI direct settings
+                if (modelIdentifierItem) modelIdentifierItem.style.display = 'none';
+                if (apiKeyItem) apiKeyItem.style.display = 'none';
+                if (llmApiUrlItem) llmApiUrlItem.style.display = 'none';
+                if (openaiDirectSettings) openaiDirectSettings.style.display = 'block';
+            } else if (provider === 'anthropic-direct') {
+                // Hide traditional settings, show Anthropic direct settings
+                if (modelIdentifierItem) modelIdentifierItem.style.display = 'none';
+                if (apiKeyItem) apiKeyItem.style.display = 'none';
+                if (llmApiUrlItem) llmApiUrlItem.style.display = 'none';
+                if (anthropicDirectSettings) anthropicDirectSettings.style.display = 'block';
+            } else if (provider === 'google-direct') {
+                // Hide traditional settings, show Google direct settings
+                if (modelIdentifierItem) modelIdentifierItem.style.display = 'none';
+                if (apiKeyItem) apiKeyItem.style.display = 'none';
+                if (llmApiUrlItem) llmApiUrlItem.style.display = 'none';
+                if (googleDirectSettings) googleDirectSettings.style.display = 'block';
             } else {
-                modelIdentifierItem.style.display = 'flex';
+                // Traditional providers - show traditional settings
+                if (llmApiUrlItem) llmApiUrlItem.style.display = 'flex';
+                if (apiKeyItem) apiKeyItem.style.display = 'flex';
+                
+                // LMStudio uses a path, not a model identifier from a list
+                if (provider === 'lmstudio') {
+                    if (modelIdentifierItem) modelIdentifierItem.style.display = 'none';
+                } else {
+                    if (modelIdentifierItem) modelIdentifierItem.style.display = 'flex';
+                }
             }
         }
 
