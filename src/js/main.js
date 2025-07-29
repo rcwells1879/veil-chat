@@ -504,6 +504,11 @@ Type **"/list"** anytime to see this help again.`;
             console.log('STT stopped by send button, final transcript:', transcript);
         }
         
+        // Clear voice service accumulated transcript when sending
+        if (voiceService) {
+            voiceService.accumulatedTranscript = "";
+        }
+        
         const message = userInput.value.trim();
         if (!message) return;
 
@@ -1390,7 +1395,12 @@ Type **"/list"** anytime to see this help again.`;
     }
 
     // --- Voice Service Handlers ---
-    function handleSttResult(text) { userInput.value = text; }
+    function handleSttResult(text) { 
+        userInput.value = text; 
+        // Trigger auto-resize manually since direct value assignment doesn't fire 'input' event
+        const autoResizeEvent = new Event('input');
+        userInput.dispatchEvent(autoResizeEvent);
+    }
     function handleSttError(error) { console.error("STT Error:", error); isContinuousConversationActive = false; }
     function handleSttListeningState(isListening) {
         if (micButton) {

@@ -44,7 +44,7 @@ if (typeof VoiceService === 'undefined') {
         
         // Simplified STT state
         this.isRecognitionActive = false;
-        this.currentTranscript = "";
+        this.accumulatedTranscript = ""; // Single transcript that accumulates across sessions
         
         this._setupSpeechSynthesis();
         if (this.isRecognitionSupported()) {
@@ -585,7 +585,6 @@ if (typeof VoiceService === 'undefined') {
         console.log("VoiceService: Web Speech API setup completed");
 
         this.recognition.onstart = () => {
-            console.log("VoiceService: Web Speech recognition started");
             this.isRecognitionActive = true;
             this.sttListeningStateCallback(true);
         };
@@ -603,17 +602,27 @@ if (typeof VoiceService === 'undefined') {
                 }
             }
 
-            // Update with interim or final results
-            const currentText = finalTranscript || interimTranscript;
-            if (currentText.trim()) {
-                this.currentTranscript = currentText;
-                this.sttResultCallback(currentText);
-                console.log('VoiceService: Web Speech result:', finalTranscript ? 'FINAL' : 'INTERIM', currentText.substring(0, 50));
+            const sessionText = finalTranscript || interimTranscript;
+            
+            if (sessionText.trim()) {
+                // For final results, append to accumulated transcript
+                if (finalTranscript) {
+                    const cleanFinal = finalTranscript.trim();
+                    if (!this.accumulatedTranscript.endsWith(cleanFinal)) {
+                        this.accumulatedTranscript = this.accumulatedTranscript ? 
+                            this.accumulatedTranscript + " " + cleanFinal : cleanFinal;
+                    }
+                    this.sttResultCallback(this.accumulatedTranscript);
+                } else {
+                    // For interim results, show accumulated + current session
+                    const displayText = this.accumulatedTranscript ? 
+                        this.accumulatedTranscript + " " + sessionText : sessionText;
+                    this.sttResultCallback(displayText);
+                }
             }
         };
 
         this.recognition.onend = () => {
-            console.log("VoiceService: Web Speech recognition ended");
             this.isRecognitionActive = false;
             this.sttListeningStateCallback(false);
         };
@@ -640,12 +649,23 @@ if (typeof VoiceService === 'undefined') {
     // Start STT (Azure primary, Web Speech fallback)
     startSTT() {
         if (this.isRecognitionActive) {
-            console.warn("VoiceService: STT already active");
+            console.warn("VoiceService: STT already active - skipping start");
             return false;
         }
 
-        console.log("VoiceService: Starting STT...");
-        this.currentTranscript = "";
+        if (this.isRecognitionActive) {
+            console.warn("VoiceService: STT already active - skipping start");
+            return false;
+        }
+        
+        // Get current user input for sync
+        const userInput = document.getElementById('user-input');
+        const currentInputValue = userInput ? userInput.value : "";
+        
+        // Initialize accumulated transcript if empty, otherwise preserve it
+        if (!this.accumulatedTranscript) {
+            this.accumulatedTranscript = currentInputValue;
+        }
 
         // Try Azure STT first
         if (this.isAzureSTTEnabled()) {
@@ -660,11 +680,13 @@ if (typeof VoiceService === 'undefined') {
     // Stop STT (no auto-send)
     stopSTT() {
         if (!this.isRecognitionActive) {
-            console.log("VoiceService: No active STT to stop");
-            return this.currentTranscript;
+            console.log("VoiceService: No active STT to stop - already inactive");
+            return this.accumulatedTranscript;
         }
 
-        console.log("VoiceService: Stopping STT...");
+        if (!this.isRecognitionActive) {
+            return this.accumulatedTranscript;
+        }
         
         if (this.isAzureSTTEnabled() && this.azureSTT.getIsRecognizing()) {
             this.azureSTT.stopRecognition();
@@ -676,12 +698,10 @@ if (typeof VoiceService === 'undefined') {
             }
         }
 
-        const finalTranscript = this.currentTranscript.trim();
-        this.currentTranscript = "";
+        const finalTranscript = this.accumulatedTranscript.trim();
         this.isRecognitionActive = false;
         this.sttListeningStateCallback(false);
         
-        console.log("VoiceService: STT stopped, final transcript:", finalTranscript);
         return finalTranscript;
     }
 
@@ -690,14 +710,21 @@ if (typeof VoiceService === 'undefined') {
         try {
             const success = this.azureSTT.startContinuousRecognition(
                 (interimText) => {
-                    // Update input box with interim results
-                    this.currentTranscript = interimText;
-                    this.sttResultCallback(interimText);
+                    if (interimText.trim()) {
+                        const displayText = this.accumulatedTranscript ? 
+                            this.accumulatedTranscript + " " + interimText : interimText;
+                        this.sttResultCallback(displayText);
+                    }
                 },
                 (finalText) => {
-                    // Update input box with final results
-                    this.currentTranscript = finalText;
-                    this.sttResultCallback(finalText);
+                    if (finalText.trim()) {
+                        const cleanFinal = finalText.trim();
+                        if (!this.accumulatedTranscript.endsWith(cleanFinal)) {
+                            this.accumulatedTranscript = this.accumulatedTranscript ? 
+                                this.accumulatedTranscript + " " + cleanFinal : cleanFinal;
+                        }
+                        this.sttResultCallback(this.accumulatedTranscript);
+                    }
                 },
                 (error) => {
                     console.error("VoiceService: Azure STT error:", error);
@@ -706,7 +733,6 @@ if (typeof VoiceService === 'undefined') {
                     this.sttListeningStateCallback(false);
                 },
                 () => {
-                    // Recognition ended
                     this.isRecognitionActive = false;
                     this.sttListeningStateCallback(false);
                 }
