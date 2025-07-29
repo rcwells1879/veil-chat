@@ -208,7 +208,6 @@ async function initializeApp() {
         // Image
         customImageProvider: localStorage.getItem('customImageProvider') || 'openai',
         customImageApiUrl: (localStorage.getItem('customImageApiUrl') || '').replace(/\/$/, ""),
-        customOpenAIImageApiKey: localStorage.getItem('customOpenAIImageApiKey') || '',
         imageSize: localStorage.getItem('imageSize') || 'auto',
         imageWidth: localStorage.getItem('imageWidth') || '1024',
         imageHeight: localStorage.getItem('imageHeight') || '1536',
@@ -252,7 +251,7 @@ async function initializeApp() {
             googleApiKey: SETTINGS.googleApiKey
         }
     );
-    let imageService = new ImageService(SETTINGS.customImageApiUrl, SETTINGS.customImageProvider, SETTINGS.customOpenAIImageApiKey);
+    let imageService = new ImageService(SETTINGS.customImageApiUrl, SETTINGS.customImageProvider, SETTINGS.openaiApiKey);
     let voiceService;
     try {
         voiceService = new VoiceService(handleSttResult, handleSttError, handleSttListeningState);
@@ -1086,7 +1085,6 @@ Type **"/list"** anytime to see this help again.`;
         googleApiKey: 'google-api-key',
         customImageProvider: 'image-provider',
         customImageApiUrl: 'image-api-url',
-        customOpenAIImageApiKey: 'openai-image-api-key',
         imageSize: 'image-size',
         imageWidth: 'image-width',
         imageHeight: 'image-height',
@@ -1129,6 +1127,7 @@ Type **"/list"** anytime to see this help again.`;
             }
         });
         
+        
         const llmSettingsChanged = SETTINGS.customLlmApiUrl !== llmService.apiBaseUrl || 
                                    SETTINGS.customLlmModelIdentifier !== llmService.modelIdentifier || 
                                    SETTINGS.customLlmApiKey !== llmService.apiKey || 
@@ -1139,7 +1138,7 @@ Type **"/list"** anytime to see this help again.`;
                                    SETTINGS.anthropicApiKey !== (llmService.directProviders && llmService.directProviders.anthropicApiKey) ||
                                    SETTINGS.googleModelIdentifier !== (llmService.directProviders && llmService.directProviders.googleModel) ||
                                    SETTINGS.googleApiKey !== (llmService.directProviders && llmService.directProviders.googleApiKey);
-        const imageSettingsChanged = SETTINGS.customImageApiUrl !== imageService.apiBaseUrl || SETTINGS.customImageProvider !== imageService.provider || SETTINGS.customOpenAIImageApiKey !== imageService.openaiApiKey;
+        const imageSettingsChanged = SETTINGS.customImageApiUrl !== imageService.apiBaseUrl || SETTINGS.customImageProvider !== imageService.provider || SETTINGS.openaiApiKey !== imageService.openaiApiKey;
         const mcpSettingsChanged = SETTINGS.mcpEnabled !== mcpEnabled;
 
         if (llmSettingsChanged) {
@@ -1188,7 +1187,7 @@ Type **"/list"** anytime to see this help again.`;
             });
         }
         if (imageSettingsChanged) {
-            imageService = new ImageService(SETTINGS.customImageApiUrl, SETTINGS.customImageProvider, SETTINGS.customOpenAIImageApiKey);
+            imageService = new ImageService(SETTINGS.customImageApiUrl, SETTINGS.customImageProvider, SETTINGS.openaiApiKey);
         }
         
         // Handle MCP settings changes
@@ -1216,6 +1215,7 @@ Type **"/list"** anytime to see this help again.`;
             quality: SETTINGS.openaiQuality,
             output_format: SETTINGS.openaiOutputFormat,
             background: SETTINGS.openaiBackground,
+            openaiApiKey: SETTINGS.openaiApiKey
         });
         if (voiceService) {
             voiceService.setVoiceRate(SETTINGS.voiceSpeed);
@@ -1350,6 +1350,7 @@ Type **"/list"** anytime to see this help again.`;
                     }
                 });
 
+
                 // Re-run setup for the newly added elements
                 setupImageControls();
                 toggleModelIdentifierVisibility();
@@ -1374,6 +1375,7 @@ Type **"/list"** anytime to see this help again.`;
                         voicePitchValue.textContent = voicePitchSlider.value;
                     });
                 }
+
 
                 // Add event listeners for save/load conversation buttons
                 const saveButton = settingsPanelContainer.querySelector('#save-conversation-button');

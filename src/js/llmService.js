@@ -516,9 +516,18 @@ Make sure the character you create embodies and follows the persona instructions
             if (isDirectProvider) {
                 payload = this.createDirectProviderPayload(imageGenMessagesForApiCall, this.imagePromptTemperature, this.imagePromptMaxTokens);
                 console.log('Sending direct provider image prompt request:', JSON.stringify(payload, null, 2));
-                data = await this.sendDirectProviderRequest(payload);
-                rawReply = this.extractDirectProviderResponse(data);
-            } else {
+                try {
+                    data = await this.sendDirectProviderRequest(payload);
+                    rawReply = this.extractDirectProviderResponse(data);
+                } catch (error) {
+                    console.error('Direct provider image prompt generation failed:', error);
+                    console.log('Falling back to traditional LLM approach for image prompt generation...');
+                    rawReply = null; // Set to null to trigger fallback
+                }
+            }
+            
+            // If direct provider failed or we're not using a direct provider, try traditional approach
+            if (!rawReply) {
                 payload = this.createCompatiblePayload(imageGenMessagesForApiCall, this.imagePromptTemperature, this.imagePromptMaxTokens, false);
 
                 const headers = {
@@ -752,14 +761,14 @@ Make sure the character you create embodies and follows the persona instructions
             
             if (isDirectProvider) {
                 const imagePayload = this.createDirectProviderPayload(imageGenMessages, this.imagePromptTemperature, this.imagePromptMaxTokens);
-                console.log('Sending direct provider initial image generation request:', JSON.stringify(imagePayload, null, 2));
+                console.log('Sending direct provider initial image prompt generation request:', JSON.stringify(imagePayload, null, 2));
                 
                 try {
                     const imageData = await this.sendDirectProviderRequest(imagePayload);
-                    console.log('Raw image generation response:', imageData);
+                    console.log('Raw image prompt generation response:', imageData);
                     
                     const rawImageReply = this.extractDirectProviderResponse(imageData);
-                    console.log('Extracted image reply:', rawImageReply);
+                    console.log('Extracted image prompt:', rawImageReply);
                     
                     if (rawImageReply) {
                         imagePrompt = rawImageReply;
@@ -768,9 +777,13 @@ Make sure the character you create embodies and follows the persona instructions
                         console.log('No image prompt generated - full response:', JSON.stringify(imageData, null, 2));
                     }
                 } catch (error) {
-                    console.error('Direct provider image generation request failed:', error);
+                    console.error('Direct provider image prompt generation failed:', error);
+                    // Continue to try traditional LLM approach as fallback
                 }
-            } else {
+            }
+            
+            // If direct provider failed or we're not using a direct provider, try traditional approach
+            if (!imagePrompt) {
                 const imagePayload = this.createCompatiblePayload(imageGenMessages, this.imagePromptTemperature, this.imagePromptMaxTokens, false);
 
                 const imageHeaders = {
