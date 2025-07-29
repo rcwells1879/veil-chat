@@ -200,11 +200,13 @@ function isStaticAsset(request) {
 
 function isExternalAPI(request) {
   return (
-    request.url.includes('veilstudio.io') ||
     request.url.includes('openai.com') ||
+    request.url.includes('anthropic.com') ||
+    request.url.includes('googleapis.com') ||
+    request.url.includes('speech.microsoft.com') ||
     request.url.includes('litellm') ||
-    request.url.includes('a1111-veil') ||
-    request.url.includes('mcp-veil')
+    request.url.includes('localhost:3001') ||
+    request.url.includes('localhost:7860')
   );
 }
 

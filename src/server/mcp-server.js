@@ -500,8 +500,8 @@ class SequentialThinkingMCPServer {
 
             // Use provided settings or defaults
             const provider = llmSettings?.provider || 'litellm';
-            const apiBaseUrl = llmSettings?.apiBaseUrl || 'https://litellm-veil.veilstudio.io';
-            const apiKey = llmSettings?.apiKey || 'sk-DSHSfgTh65Fvd';
+            const apiBaseUrl = llmSettings?.apiBaseUrl || '';
+            const apiKey = llmSettings?.apiKey || '';
             const model = llmSettings?.model || 'gemini2.5-flash';
             
             // Set endpoint based on provider type

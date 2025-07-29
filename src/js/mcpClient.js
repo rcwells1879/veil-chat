@@ -8,27 +8,9 @@ if (typeof MCPClient === 'undefined') {
         }
 
         getDefaultServerUrl() {
-            // Auto-detect the correct MCP server URL based on current domain
-            const currentHost = window.location.hostname;
-            const currentProtocol = window.location.protocol;
-            
-            console.log('MCP Client: Auto-detecting server URL for host:', currentHost);
-            
-            // If running on localhost, use local MCP server
-            if (currentHost === 'localhost' || currentHost === '127.0.0.1') {
-                console.log('MCP Client: Using localhost server');
-                return 'http://localhost:3001';
-            }
-            
-            // If running on hosted domain, use Cloudflare tunnel URL
-            if (currentHost.includes('veilstudio.io')) {
-                console.log('MCP Client: Using veilstudio.io server');
-                return 'https://mcp-veil.veilstudio.io';
-            }
-            
-            // Default fallback
-            console.log('MCP Client: Using default localhost server');
-            return 'http://localhost:3001';
+            // Default to empty string - users must configure their own MCP server
+            console.log('MCP Client: No default server configured');
+            return '';
         }
 
         async connect() {
@@ -156,8 +138,8 @@ if (typeof MCPClient === 'undefined') {
                 // Traditional providers (litellm, lmstudio, ollama)
                 llmSettings = {
                     provider: provider,
-                    apiBaseUrl: localStorage.getItem('customLlmApiUrl') || 'https://litellm-veil.veilstudio.io',
-                    apiKey: localStorage.getItem('customLlmApiKey') || 'sk-DSHSfgTh65Fvd',
+                    apiBaseUrl: localStorage.getItem('customLlmApiUrl') || '',
+                    apiKey: localStorage.getItem('customLlmApiKey') || '',
                     model: localStorage.getItem('customLlmModelIdentifier') || 'gemini2.5-flash'
                 };
             }
@@ -403,8 +385,8 @@ if (typeof MCPClient === 'undefined') {
 
         getLLMSettings() {
             return {
-                apiBaseUrl: localStorage.getItem('customLlmApiUrl') || 'https://litellm-veil.veilstudio.io',
-                apiKey: localStorage.getItem('customLlmApiKey') || 'sk-DSHSfgTh65Fvd',
+                apiBaseUrl: localStorage.getItem('customLlmApiUrl') || '',
+                apiKey: localStorage.getItem('customLlmApiKey') || '',
                 model: localStorage.getItem('customLlmModelIdentifier') || 'gemini2.5-flash'
             };
         }

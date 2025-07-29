@@ -195,9 +195,9 @@ async function initializeApp() {
     const SETTINGS = {
         // LLM
         customLlmProvider: localStorage.getItem('customLlmProvider') || 'litellm',
-        customLlmApiUrl: (localStorage.getItem('customLlmApiUrl') || 'https://litellm-veil.veilstudio.io').replace(/\/$/, ""),
+        customLlmApiUrl: (localStorage.getItem('customLlmApiUrl') || '').replace(/\/$/, ""),
         customLlmModelIdentifier: localStorage.getItem('customLlmModelIdentifier') || 'gemini2.5-flash',
-        customLlmApiKey: localStorage.getItem('customLlmApiKey') || 'sk-DSHSfgTh65Fvd',
+        customLlmApiKey: localStorage.getItem('customLlmApiKey') || '',
         // Direct API Providers
         openaiModelIdentifier: localStorage.getItem('openaiModelIdentifier') || 'gpt-4.1-mini',
         openaiApiKey: localStorage.getItem('openaiApiKey') || '',
@@ -207,7 +207,7 @@ async function initializeApp() {
         googleApiKey: localStorage.getItem('googleApiKey') || '',
         // Image
         customImageProvider: localStorage.getItem('customImageProvider') || 'openai',
-        customImageApiUrl: (localStorage.getItem('customImageApiUrl') || 'https://a1111-veil.veilstudio.io').replace(/\/$/, ""),
+        customImageApiUrl: (localStorage.getItem('customImageApiUrl') || '').replace(/\/$/, ""),
         customOpenAIImageApiKey: localStorage.getItem('customOpenAIImageApiKey') || '',
         imageSize: localStorage.getItem('imageSize') || 'auto',
         imageWidth: localStorage.getItem('imageWidth') || '1024',
@@ -227,7 +227,7 @@ async function initializeApp() {
         azureRegion: localStorage.getItem('azureRegion') || 'eastus',
         // MCP
         mcpEnabled: mcpEnabled,
-        mcpServerUrl: localStorage.getItem('mcpServerUrl') || 'http://localhost:3001',
+        mcpServerUrl: localStorage.getItem('mcpServerUrl') || '',
         // Search
         searchEnabled: localStorage.getItem('searchEnabled') === 'true',
         searchProvider: localStorage.getItem('searchProvider') || 'brave',
