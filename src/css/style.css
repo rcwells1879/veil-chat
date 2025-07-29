@@ -202,6 +202,8 @@ body {
     box-sizing: border-box;
     font-family: inherit;
     line-height: 1;
+    outline: none; /* Remove focus outline */
+    -webkit-tap-highlight-color: transparent; /* Remove mobile tap highlight */
 }
 
 #send-button {
@@ -211,6 +213,24 @@ body {
 
 #send-button:hover {
     background-color: #0056b3;
+}
+
+#mic-button.recording {
+    background-color: #28a745;
+    box-shadow: 0 0 10px rgba(40, 167, 69, 0.5);
+    animation: pulse-green 1.5s infinite;
+}
+
+@keyframes pulse-green {
+    0% {
+        box-shadow: 0 0 10px rgba(40, 167, 69, 0.5);
+    }
+    50% {
+        box-shadow: 0 0 20px rgba(40, 167, 69, 0.8);
+    }
+    100% {
+        box-shadow: 0 0 10px rgba(40, 167, 69, 0.5);
+    }
 }
 
 .input-area.expanded #attach-button,

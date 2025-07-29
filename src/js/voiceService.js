@@ -1,6 +1,6 @@
 if (typeof VoiceService === 'undefined') {
     window.VoiceService = class VoiceService {
-        constructor(sttResultCallback, sttErrorCallback, sttListeningStateCallback, sttAutoSendCallback) {
+        constructor(sttResultCallback, sttErrorCallback, sttListeningStateCallback) {
             this.voices = [];
             this.recognition = null;
             this.synthesis = window.speechSynthesis;
@@ -12,6 +12,10 @@ if (typeof VoiceService === 'undefined') {
             // Initialize Azure TTS service
             this.azureTTS = null;
             this.useAzureTTS = false;
+            
+            // Initialize Azure STT service
+            this.azureSTT = null;
+            this.useAzureSTT = false;
             
             // Voice settings update callback (set by main.js)
             this.updateVoiceDropdownCallback = null;
@@ -33,22 +37,14 @@ if (typeof VoiceService === 'undefined') {
             };
         this.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
+        // STT callbacks (simplified)
         this.sttResultCallback = sttResultCallback || function() {};
         this.sttErrorCallback = sttErrorCallback || function() {};
         this.sttListeningStateCallback = sttListeningStateCallback || function() {};
-        this.sttAutoSendCallback = sttAutoSendCallback || function() {};
-
-        this.finalAutoSendTimer = null;
-        this.finalAutoSendDelay = 1000; // Default: Time to wait after the pause is confirmed
-
-        this.speechContinuationTimer = null;
-        // User wants 7000ms for this, as per their last log where it "worked" for waiting
-        // but STT wasn't active. Let's use a more typical value first and they can adjust.
-        this.speechContinuationDelay = 2000; // How long to wait for more speech before considering pause definitive
-
-        this.currentAccumulatedTranscript = "";
+        
+        // Simplified STT state
         this.isRecognitionActive = false;
-        this.speechDetectedSinceLastFinalSend = false;
+        this.currentTranscript = "";
         
         this._setupSpeechSynthesis();
         if (this.isRecognitionSupported()) {
@@ -211,16 +207,43 @@ if (typeof VoiceService === 'undefined') {
     }
 
     setAzureConfig(apiKey, region) {
+        // Initialize or update Azure TTS
         if (this.azureTTS) {
             this.azureTTS.updateConfig(apiKey, region);
             this.useAzureTTS = this.azureTTS.isConfigured();
         } else {
             this.initializeAzureTTS(apiKey, region);
         }
+        
+        // Initialize or update Azure STT (uses same credentials)
+        if (this.azureSTT) {
+            this.azureSTT.updateConfig(apiKey, region);
+            this.useAzureSTT = this.azureSTT.isConfigured();
+        } else {
+            this.initializeAzureSTT(apiKey, region);
+        }
     }
 
     isAzureTTSEnabled() {
         return this.useAzureTTS && this.azureTTS && this.azureTTS.isConfigured();
+    }
+
+    // Initialize Azure STT service
+    initializeAzureSTT(apiKey, region) {
+        try {
+            console.log('VoiceService: Initializing Azure STT...');
+            this.azureSTT = new AzureSTTService(apiKey, region);
+            this.useAzureSTT = this.azureSTT.isConfigured();
+            console.log('VoiceService: Azure STT initialized:', this.useAzureSTT ? 'SUCCESS' : 'FAILED');
+        } catch (error) {
+            console.error('VoiceService: Failed to initialize Azure STT:', error);
+            this.azureSTT = null;
+            this.useAzureSTT = false;
+        }
+    }
+
+    isAzureSTTEnabled() {
+        return this.useAzureSTT && this.azureSTT && this.azureSTT.isConfigured();
     }
 
     // Persona voice management methods
@@ -259,14 +282,14 @@ if (typeof VoiceService === 'undefined') {
         let femaleScore = 0;
         let maleScore = 0;
         
-        // Count occurrences of gender-specific keywords
+        // Count occurrences of gender-specific keywords using word boundaries
         femaleKeywords.forEach(keyword => {
-            const matches = (profileLower.match(new RegExp(keyword, 'g')) || []).length;
+            const matches = (profileLower.match(new RegExp(`\\b${keyword}\\b`, 'g')) || []).length;
             femaleScore += matches;
         });
         
         maleKeywords.forEach(keyword => {
-            const matches = (profileLower.match(new RegExp(keyword, 'g')) || []).length;
+            const matches = (profileLower.match(new RegExp(`\\b${keyword}\\b`, 'g')) || []).length;
             maleScore += matches;
         });
         
@@ -551,189 +574,175 @@ if (typeof VoiceService === 'undefined') {
         return !!this.SpeechRecognition;
     }
 
-    _clearFinalAutoSendTimer() {
-        if (this.finalAutoSendTimer) {
-            clearTimeout(this.finalAutoSendTimer);
-            this.finalAutoSendTimer = null;
-            console.log("VoiceService: DEBUG: Final Auto-Send Timer CLEARED.");
-        }
-    }
-
-    _clearSpeechContinuationTimer() {
-        if (this.speechContinuationTimer) {
-            clearTimeout(this.speechContinuationTimer);
-            this.speechContinuationTimer = null;
-            console.log("VoiceService: DEBUG: Speech Continuation Timer CLEARED.");
-        }
-    }
-
-    _updateListeningState(isActive) {
-        if (this.isRecognitionActive !== isActive) {
-            this.isRecognitionActive = isActive;
-            this.sttListeningStateCallback(isActive);
-            console.log("VoiceService: DEBUG: Recognition active state changed to:", this.isRecognitionActive);
-        }
-    }
 
     _setupSpeechRecognition() {
         this.recognition = new this.SpeechRecognition();
-        this.recognition.continuous = false; // Key: We are NOT using the browser's continuous mode.
+        this.recognition.continuous = true;
         this.recognition.lang = 'en-US';
         this.recognition.interimResults = true;
         this.recognition.maxAlternatives = 1;
 
-        console.log("VoiceService: DEBUG: _setupSpeechRecognition completed.");
+        console.log("VoiceService: Web Speech API setup completed");
 
         this.recognition.onstart = () => {
-            console.log("VoiceService: DEBUG: recognition.onstart FIRED.");
-            this._updateListeningState(true);
-            // Flags are reset by startRecognition()
+            console.log("VoiceService: Web Speech recognition started");
+            this.isRecognitionActive = true;
+            this.sttListeningStateCallback(true);
         };
 
         this.recognition.onresult = (event) => {
             let interimTranscript = "";
-            let finalTranscriptSegment = "";
-            let hasInterimResultInEvent = false;
+            let finalTranscript = "";
 
             for (let i = event.resultIndex; i < event.results.length; ++i) {
-                if (!event.results[i].isFinal) {
-                    hasInterimResultInEvent = true;
-                    break;
-                }
-            }
-
-            // If we receive an interim result, it means speech is actively ongoing.
-            // Clear any speechContinuationTimer that might have been set by a premature onspeechend.
-            if (hasInterimResultInEvent) {
-                this._clearSpeechContinuationTimer();
-            }
-
-            for (let i = event.resultIndex; i < event.results.length; ++i) {
+                const transcript = event.results[i][0].transcript;
                 if (event.results[i].isFinal) {
-                    finalTranscriptSegment += event.results[i][0].transcript;
+                    finalTranscript += transcript;
                 } else {
-                    interimTranscript += event.results[i][0].transcript;
+                    interimTranscript += transcript;
                 }
             }
 
-            if (finalTranscriptSegment.trim()) {
-                this.speechDetectedSinceLastFinalSend = true;
-                this.currentAccumulatedTranscript = (this.currentAccumulatedTranscript ? this.currentAccumulatedTranscript + " " : "") + finalTranscriptSegment.trim();
-                console.log('VoiceService: DEBUG: onresult (FINAL):', `"${finalTranscriptSegment}"`, 'Accumulated:', `"${this.currentAccumulatedTranscript}"`);
-                this.sttResultCallback(this.currentAccumulatedTranscript);
-                // DO NOT clear speechContinuationTimer here for a final result.
-                // If onspeechend has already set it, let that timer determine if this final segment is the actual end of speech after a pause.
-            } else if (interimTranscript.trim()) {
-                this.speechDetectedSinceLastFinalSend = true;
-                console.log('VoiceService: DEBUG: onresult (INTERIM):', `"${interimTranscript}"`);
+            // Update with interim or final results
+            const currentText = finalTranscript || interimTranscript;
+            if (currentText.trim()) {
+                this.currentTranscript = currentText;
+                this.sttResultCallback(currentText);
+                console.log('VoiceService: Web Speech result:', finalTranscript ? 'FINAL' : 'INTERIM', currentText.substring(0, 50));
             }
         };
 
-        this.recognition.onspeechend = () => {
-            console.log("VoiceService: DEBUG: recognition.onspeechend FIRED. isRecognitionActive:", this.isRecognitionActive);
-            // Clear any *previous* continuation timer. This onspeechend event starts a new decision point for a pause.
-                this._clearSpeechContinuationTimer();
-
-            if (this.isRecognitionActive) { // Only if STT is supposed to be running
-                console.log("VoiceService: DEBUG: onspeechend - Recognition active. Starting speechContinuationTimer.");
-                this.speechContinuationTimer = setTimeout(() => {
-                    console.log("VoiceService: DEBUG: speechContinuationTimer FIRED. Accumulated:", `"${this.currentAccumulatedTranscript}"`, "speechDetectedFlag:", this.speechDetectedSinceLastFinalSend);
-                    if (this.currentAccumulatedTranscript.trim() && this.speechDetectedSinceLastFinalSend) {
-                        this._startFinalAutoSendTimer(this.currentAccumulatedTranscript);
-                    } else {
-                        console.log("VoiceService: DEBUG: speechContinuationTimer - No valid accumulated transcript or speechDetected flag is false. Not starting final send timer.");
-                    }
-                }, this.speechContinuationDelay);
-            }
+        this.recognition.onend = () => {
+            console.log("VoiceService: Web Speech recognition ended");
+            this.isRecognitionActive = false;
+            this.sttListeningStateCallback(false);
         };
 
         this.recognition.onerror = (event) => {
-            console.error('VoiceService: DEBUG: recognition.onerror FIRED:', event.error, event.message);
-            this._clearFinalAutoSendTimer();
-            this._clearSpeechContinuationTimer();
-            this._updateListeningState(false);
+            console.error('VoiceService: Web Speech error:', event.error, event.message);
+            this.isRecognitionActive = false;
+            this.sttListeningStateCallback(false);
             this.sttErrorCallback(event.error);
         };
     }
 
-    _startFinalAutoSendTimer(transcript) {
-        this._clearFinalAutoSendTimer();
-        console.log("VoiceService: DEBUG: Starting finalAutoSendTimer for:", `"${transcript}"`);
-        this.finalAutoSendTimer = setTimeout(() => {
-            console.log("VoiceService: DEBUG: finalAutoSendTimer CALLBACK EXECUTED.");
-            // Check !this.isRecognitionActive because onend should have fired and set it to false
-            // before this timer callback executes.
-            if (transcript.trim() && !this.isRecognitionActive) {
-                console.log("VoiceService: DEBUG: finalAutoSendTimer - CONDITIONS MET. Sending:", `"${transcript}"`);
-                this.sttAutoSendCallback(transcript);
-                this.currentAccumulatedTranscript = "";
-                this.speechDetectedSinceLastFinalSend = false;
-            } else {
-                let reason = "VoiceService: DEBUG: finalAutoSendTimer - Conditions NOT MET. ";
-                if (!transcript.trim()) reason += "Transcript was empty. ";
-                if (this.isRecognitionActive) reason += "Recognition was still (or became) active. ";
-                console.log(reason.trim());
-            }
-        }, this.finalAutoSendDelay);
+
+    // Toggle STT on/off (simplified)
+    toggleSTT() {
+        if (this.isRecognitionActive) {
+            this.stopSTT();
+        } else {
+            this.startSTT();
+        }
+        return this.isRecognitionActive;
     }
 
-    startRecognition() {
-        console.log("VoiceService: DEBUG: startRecognition (EXTERNAL) called.");
-        if (!this.isRecognitionSupported() || !this.recognition) {
-            console.error("VoiceService: Speech recognition not supported or not initialized.");
-            return;
-        }
-
-        this._clearFinalAutoSendTimer();
-        this._clearSpeechContinuationTimer();
-        this.currentAccumulatedTranscript = "";
-        this.speechDetectedSinceLastFinalSend = false;
-
+    // Start STT (Azure primary, Web Speech fallback)
+    startSTT() {
         if (this.isRecognitionActive) {
-            console.warn("VoiceService: DEBUG: startRecognition called while recognition active. Stopping previous session first.");
-            // Setting this.isRecognitionActive = false here might be too soon if stop() is async.
-            // Let onend handle setting it to false.
-            this.recognition.stop();
+            console.warn("VoiceService: STT already active");
+            return false;
         }
+
+        console.log("VoiceService: Starting STT...");
+        this.currentTranscript = "";
+
+        // Try Azure STT first
+        if (this.isAzureSTTEnabled()) {
+            console.log("VoiceService: Using Azure STT");
+            return this.startAzureSTT();
+        } else {
+            console.log("VoiceService: Using Web Speech API STT");
+            return this.startWebSpeechSTT();
+        }
+    }
+
+    // Stop STT (no auto-send)
+    stopSTT() {
+        if (!this.isRecognitionActive) {
+            console.log("VoiceService: No active STT to stop");
+            return this.currentTranscript;
+        }
+
+        console.log("VoiceService: Stopping STT...");
         
+        if (this.isAzureSTTEnabled() && this.azureSTT.getIsRecognizing()) {
+            this.azureSTT.stopRecognition();
+        } else if (this.recognition) {
+            try {
+                this.recognition.stop();
+            } catch (error) {
+                console.error("VoiceService: Error stopping Web Speech recognition:", error);
+            }
+        }
+
+        const finalTranscript = this.currentTranscript.trim();
+        this.currentTranscript = "";
+        this.isRecognitionActive = false;
+        this.sttListeningStateCallback(false);
+        
+        console.log("VoiceService: STT stopped, final transcript:", finalTranscript);
+        return finalTranscript;
+    }
+
+    // Start Azure STT
+    startAzureSTT() {
         try {
-            console.log("VoiceService: DEBUG: Calling recognition.start().");
-            this.recognition.start();
-        } catch (e) {
-            console.error("VoiceService: DEBUG: Error calling recognition.start():", e);
-            this._updateListeningState(false);
-            this.sttErrorCallback(e.message || "Error starting recognition");
+            const success = this.azureSTT.startContinuousRecognition(
+                (interimText) => {
+                    // Update input box with interim results
+                    this.currentTranscript = interimText;
+                    this.sttResultCallback(interimText);
+                },
+                (finalText) => {
+                    // Update input box with final results
+                    this.currentTranscript = finalText;
+                    this.sttResultCallback(finalText);
+                },
+                (error) => {
+                    console.error("VoiceService: Azure STT error:", error);
+                    this.sttErrorCallback(error);
+                    this.isRecognitionActive = false;
+                    this.sttListeningStateCallback(false);
+                },
+                () => {
+                    // Recognition ended
+                    this.isRecognitionActive = false;
+                    this.sttListeningStateCallback(false);
+                }
+            );
+
+            if (success) {
+                this.isRecognitionActive = true;
+                this.sttListeningStateCallback(true);
+                return true;
+            }
+            return false;
+        } catch (error) {
+            console.error("VoiceService: Error starting Azure STT:", error);
+            this.sttErrorCallback(error.message || "Azure STT error");
+            return false;
         }
     }
 
-    stopRecognition() {
-        console.log("VoiceService: DEBUG: stopRecognition (EXTERNAL) called.");
-        if (!this.isRecognitionSupported() || !this.recognition) return;
-
-        this._clearFinalAutoSendTimer();
-        this._clearSpeechContinuationTimer();
-
-        const transcriptToSend = this.currentAccumulatedTranscript.trim();
-        this.currentAccumulatedTranscript = "";
-        this.speechDetectedSinceLastFinalSend = false;
-
-        if (this.isRecognitionActive) {
-            try {
-                this.recognition.stop(); // This will trigger onend
-            } catch (e) {
-                console.error("VoiceService: DEBUG: Error calling recognition.stop():", e);
-                this._updateListeningState(false); // Ensure UI updates if stop fails
-            }
-        } else {
-            // If not active, ensure UI state is correct.
-            this._updateListeningState(false);
+    // Start Web Speech STT
+    startWebSpeechSTT() {
+        if (!this.isRecognitionSupported() || !this.recognition) {
+            console.error("VoiceService: Web Speech API not supported");
+            this.sttErrorCallback("Speech recognition not supported");
+            return false;
         }
 
-        if (transcriptToSend) {
-            console.log("VoiceService: DEBUG: User stopped. Sending accumulated transcript immediately:", `"${transcriptToSend}"`);
-            this.sttAutoSendCallback(transcriptToSend);
-        } else {
-            console.log("VoiceService: DEBUG: User stopped. No accumulated transcript to send.");        }
+        try {
+            this.recognition.start();
+            this.isRecognitionActive = true;
+            this.sttListeningStateCallback(true);
+            return true;
+        } catch (error) {
+            console.error("VoiceService: Error starting Web Speech recognition:", error);
+            this.sttErrorCallback(error.message || "Recognition start error");
+            return false;
+        }
     }
 }
 }

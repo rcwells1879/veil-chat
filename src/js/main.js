@@ -255,7 +255,7 @@ async function initializeApp() {
     let imageService = new ImageService(SETTINGS.customImageApiUrl, SETTINGS.customImageProvider, SETTINGS.customOpenAIImageApiKey);
     let voiceService;
     try {
-        voiceService = new VoiceService(handleSttResult, handleSttError, handleSttListeningState, handleSttAutoSend);
+        voiceService = new VoiceService(handleSttResult, handleSttError, handleSttListeningState);
         // Make voiceService available globally for persona voice integration
         window.voiceService = voiceService;
     } catch (error) {
@@ -269,7 +269,6 @@ async function initializeApp() {
     const contextService = new ContextService();
     
     if (voiceService) {
-        voiceService.finalAutoSendDelay = 500;
         voiceService.setVoiceRate(SETTINGS.voiceSpeed);
         voiceService.setVoicePitch(SETTINGS.voicePitch);
         
@@ -365,6 +364,9 @@ async function initializeApp() {
 - **"show me [description]"** - Generate images based on your description
   - Example: "show me a sunset over mountains"
   - Example: "show me what you look like" (generates persona image)
+- **"xx [prompt]"** - Direct image generation (bypasses AI, faster)
+  - Example: "xx beautiful landscape, mountains, sunset"
+  - Example: "xx woman, silver hair, fantasy art"
 
 ## 🔬 Agent Research Workflow
 *Comprehensive research with web search and content extraction*
@@ -496,6 +498,12 @@ Type **"/list"** anytime to see this help again.`;
     }
 
     async function handleUserInput() {
+        // Stop STT if active
+        if (voiceService && voiceService.isRecognitionActive) {
+            const transcript = voiceService.stopSTT();
+            console.log('STT stopped by send button, final transcript:', transcript);
+        }
+        
         const message = userInput.value.trim();
         if (!message) return;
 
@@ -520,6 +528,49 @@ Type **"/list"** anytime to see this help again.`;
             // Display the keywords list
             addMessage(generateKeywordsList(), 'llm');
             return;
+        }
+
+        // Check for "xx" direct image prompt
+        if (message.toLowerCase().startsWith('xx')) {
+            // Extract image prompt (remove "xx" and trim)
+            const imagePrompt = message.substring(2).trim();
+            
+            if (!imagePrompt) {
+                addMessage('Please provide an image prompt after "xx"', 'system');
+                return;
+            }
+            
+            userInput.value = '';
+            
+            // Reset textarea height after clearing content
+            const minHeight = 44;
+            userInput.style.height = minHeight + 'px';
+            
+            // Contract the input expansion after sending
+            const inputArea = document.querySelector('.input-area');
+            if (inputArea) {
+                inputArea.classList.remove('expanded');
+                userInput.classList.remove('expanded');
+            }
+            
+            // Display user message in chat
+            addMessage(message, 'user');
+            
+            // Generate image directly (async, no LLM involved)
+            try {
+                addMessage('Generating image...', 'llm', false);
+                const imageUrl = await imageService.generateImage(imagePrompt);
+                if (imageUrl) {
+                    addMessage({ type: 'image', url: imageUrl, alt: imagePrompt }, 'llm');
+                } else {
+                    addMessage('Image generation failed. Please check your settings.', 'llm');
+                }
+            } catch (error) {
+                console.error('Direct image generation error:', error);
+                addMessage(`Image generation error: ${error.message}`, 'llm');
+            }
+            
+            return; // Exit early - don't process through LLM
         }
 
         userInput.value = '';
@@ -988,11 +1039,31 @@ Type **"/list"** anytime to see this help again.`;
 
     // Persona panel open logic should be attached to wherever you open persona (e.g., a button or menu)
     // Example: document.getElementById('open-persona-btn').onclick = showPersonaPanel;
-    // --- Close panels on ESC key ---
+    // --- Close panels on ESC key and clear input on double ESC ---
+    let lastEscapeTime = 0;
+    const doubleEscapeDelay = 500; // 500ms window for double ESC
+    
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape') {
+            const currentTime = Date.now();
+            
+            // Always close panels first
             closeSettingsPanel();
             closePersonaPanel();
+            
+            // Check for double ESC to clear input
+            if (currentTime - lastEscapeTime < doubleEscapeDelay) {
+                // Double ESC detected - clear input box
+                if (userInput) {
+                    userInput.value = '';
+                    userInput.style.height = '44px'; // Reset height
+                    console.log('Double ESC: Input box cleared');
+                }
+                lastEscapeTime = 0; // Reset to prevent triple ESC issues
+            } else {
+                // Single ESC - just update timestamp
+                lastEscapeTime = currentTime;
+            }
         }
     });
 
@@ -1142,7 +1213,6 @@ Type **"/list"** anytime to see this help again.`;
             background: SETTINGS.openaiBackground,
         });
         if (voiceService) {
-            voiceService.finalAutoSendDelay = parseInt(SETTINGS.sttFinalTimeout, 10);
             voiceService.setVoiceRate(SETTINGS.voiceSpeed);
             voiceService.setVoicePitch(SETTINGS.voicePitch);
             
@@ -1324,13 +1394,30 @@ Type **"/list"** anytime to see this help again.`;
     function handleSttError(error) { console.error("STT Error:", error); isContinuousConversationActive = false; }
     function handleSttListeningState(isListening) {
         if (micButton) {
-            micButton.textContent = isListening ? '...' : '🎤';
-            micButton.classList.toggle('listening', isListening);
+            micButton.textContent = isListening ? '🎤' : '🎤';
+            micButton.classList.toggle('recording', isListening);
         }
-    }
-    async function handleSttAutoSend(text) {
-        userInput.value = text;
-        await handleUserInput();
+        
+        // Expand/contract input area based on STT state
+        const inputArea = document.querySelector('.input-area');
+        if (inputArea && userInput) {
+            if (isListening) {
+                // Expand input area when STT starts (same as click/focus behavior)
+                inputArea.classList.add('expanded');
+                userInput.classList.add('expanded');
+                userInput.focus(); // Also focus to show cursor and enable text editing
+                console.log('Input expanded for STT');
+            } else {
+                // Contract input area when STT stops (only if input is empty)
+                if (userInput.value.trim() === '') {
+                    inputArea.classList.remove('expanded');
+                    userInput.classList.remove('expanded');
+                    userInput.style.height = '44px'; // Reset height
+                    console.log('Input contracted after STT');
+                }
+                // If input has content, leave it expanded so user can see/edit
+            }
+        }
     }
 
     // --- Document Attachment Functions ---
@@ -1456,10 +1543,8 @@ Type **"/list"** anytime to see this help again.`;
     if (micButton && voiceService && voiceService.isRecognitionSupported()) {
         addMobileCompatibleEvent(micButton, 'click', (e) => {
             e.preventDefault();
-            console.log('Mic button clicked/touched');
-            isContinuousConversationActive = !voiceService.isRecognitionActive;
-            if (isContinuousConversationActive) voiceService.startRecognition();
-            else voiceService.stopRecognition();
+            console.log('Mic button clicked/touched - toggling STT');
+            voiceService.toggleSTT();
         });
     } else if (micButton) {
         micButton.style.display = 'none';
@@ -1846,17 +1931,17 @@ Type **"/list"** anytime to see this help again.`;
                 try {
                     const contentObj = JSON.parse(message.content);
                     if (contentObj.type === 'image') {
-                        addMessage(contentObj, sender);
+                        addMessage(contentObj, sender, false); // Disable TTS for loaded conversations
                         return;
                     }
                 } catch (e) { /* Not a JSON object, treat as string */ }
             }
             
-            // Always render LLM messages as Markdown
+            // Always render LLM messages as Markdown, but disable TTS for loaded conversations
             if (sender === 'llm' && window.marked) {
-                addMessage(message.content, 'llm');
+                addMessage(message.content, 'llm', false); // Disable TTS for loaded conversations
             } else {
-                addMessage(message.content, sender);
+                addMessage(message.content, sender, false); // Disable TTS for loaded conversations
             }
         });
     }
