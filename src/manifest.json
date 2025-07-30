@@ -2,12 +2,12 @@
   "name": "VeilChat - AI Chat Interface",
   "short_name": "VeilChat",
   "description": "A powerful AI chat interface with voice interaction, image generation, and enhanced reasoning capabilities",
-  "start_url": "/",
+  "start_url": "./",
   "display": "standalone",
   "background_color": "#1a1a1a",
   "theme_color": "#2d2d2d",
   "orientation": "portrait-primary",
-  "scope": "/",
+  "scope": "./",
   "lang": "en",
   "categories": ["productivity", "utilities", "communication"],
   "icons": [
@@ -64,7 +64,7 @@
       "name": "New Chat",
       "short_name": "New Chat",
       "description": "Start a new conversation",
-      "url": "/",
+      "url": "./",
       "icons": [
         {
           "src": "icons/icon-96x96.png",
@@ -76,7 +76,7 @@
       "name": "Voice Chat",
       "short_name": "Voice",
       "description": "Start voice conversation",
-      "url": "/?mode=voice",
+      "url": "./?mode=voice",
       "icons": [
         {
           "src": "icons/icon-96x96.png",
@@ -86,7 +86,7 @@
     }
   ],
   "share_target": {
-    "action": "/",
+    "action": "./",
     "method": "GET",
     "enctype": "application/x-www-form-urlencoded",
     "params": {

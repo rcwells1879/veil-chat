@@ -5,26 +5,26 @@ const API_CACHE = 'veilchat-api-v2';
 
 // Static assets to cache immediately
 const STATIC_ASSETS = [
-  '/',
-  '/index.html',
-  '/css/style.css',
-  '/js/main.js',
-  '/js/llmService.js',
-  '/js/voiceService.js',
-  '/js/imageService.js',
-  '/js/contextservice.js',
-  '/js/azureTTSService.js',
-  '/js/mcpClient.js',
-  '/pages/user-settings.html',
-  '/pages/persona.html',
-  '/manifest.json',
+  './',
+  'index.html',
+  'css/style.css',
+  'js/main.js',
+  'js/llmService.js',
+  'js/voiceService.js',
+  'js/imageService.js',
+  'js/contextservice.js',
+  'js/azureTTSService.js',
+  'js/mcpClient.js',
+  'pages/user-settings.html',
+  'pages/persona.html',
+  'manifest.json',
   // External CDN resources (cache for offline use)
   'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js',
   'https://cdn.jsdelivr.net/npm/marked/marked.min.js'
 ];
 
-// API endpoints that should be cached
+// API endpoints that should be cached (these remain absolute as they're server endpoints)
 const API_CACHE_PATTERNS = [
   '/api/mcp/call'
 ];
@@ -127,7 +127,7 @@ self.addEventListener('fetch', event => {
         .catch(() => {
           // Return offline fallback for HTML pages
           if (request.headers.get('accept')?.includes('text/html')) {
-            return caches.match('/index.html');
+            return caches.match('index.html');
           }
         })
     );
@@ -233,8 +233,8 @@ self.addEventListener('push', event => {
     const data = event.data.json();
     const options = {
       body: data.body || 'New message in VeilChat',
-      icon: '/icons/icon-192x192.png',
-      badge: '/icons/icon-96x96.png',
+      icon: 'icons/icon-192x192.png',
+      badge: 'icons/icon-96x96.png',
       tag: 'veilchat-notification',
       actions: [
         {
@@ -260,7 +260,7 @@ self.addEventListener('notificationclick', event => {
   
   if (event.action === 'open' || !event.action) {
     event.waitUntil(
-      clients.openWindow('/')
+      clients.openWindow('./')
     );
   }
 });

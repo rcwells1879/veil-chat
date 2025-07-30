@@ -923,7 +923,7 @@ Type **"/list"** anytime to see this help again.`;
 
     async function loadPersonaPanel() {
         try {
-            const response = await fetch('/pages/persona.html');
+            const response = await fetch('pages/persona.html');
             if (!response.ok) throw new Error(`Failed to load persona.html: ${response.statusText}`);
             const html = await response.text();
 
@@ -1321,7 +1321,7 @@ Type **"/list"** anytime to see this help again.`;
 
     async function loadSettingsPanel() {
         try {
-            const response = await fetch('/pages/user-settings.html');
+            const response = await fetch('pages/user-settings.html');
             if (!response.ok) throw new Error(`Failed to load user-settings.html: ${response.statusText}`);
             const html = await response.text();
 
