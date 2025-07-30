@@ -3,60 +3,165 @@
 <head>
     <title>Icon Generator for VeilChat PWA</title>
     <style>
-        body { font-family: Arial, sans-serif; padding: 20px; }
-        .icon-preview { margin: 10px; display: inline-block; }
-        canvas { border: 1px solid #ccc; margin: 5px; }
+        body { font-family: Arial, sans-serif; padding: 20px; max-width: 1200px; }
+        .icon-preview { margin: 10px; display: inline-block; text-align: center; }
+        canvas { border: 1px solid #ccc; margin: 5px; display: block; }
+        .controls { margin-bottom: 20px; padding: 20px; border: 1px solid #ddd; border-radius: 8px; background: #f9f9f9; }
+        .file-input { margin: 10px 0; }
+        .preview-section { margin: 20px 0; }
+        .source-preview { max-width: 200px; max-height: 200px; border: 2px solid #ddd; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+        .generated-icons { display: flex; flex-wrap: wrap; gap: 10px; }
+        .status { margin: 10px 0; font-weight: bold; }
+        .success { color: green; }
+        .error { color: red; }
     </style>
 </head>
 <body>
     <h1>VeilChat PWA Icon Generator</h1>
-    <p>This page generates placeholder icons. Replace with proper designed icons.</p>
+    <p>Generate all required PWA icons from a custom source image (1024x1024 recommended).</p>
     
-    <div id="icons-container"></div>
+    <div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; margin: 10px 0; border-radius: 8px;">
+        <h4 style="margin-top: 0; color: #856404;">🚀 Quick Start Instructions:</h4>
+        <ol style="margin: 10px 0;">
+            <li><strong>For best results:</strong> Use the file upload method below (avoids CORS issues)</li>
+            <li><strong>Alternative:</strong> Serve this page through a web server (e.g., <code>python -m http.server</code>)</li>
+            <li><strong>Source image:</strong> 1024x1024px PNG works best for sharp results at all sizes</li>
+        </ol>
+    </div>
     
-    <button onclick="downloadAll()">Download All Icons</button>
+    <div class="controls">
+        <h3>Source Image</h3>
+        <div class="file-input">
+            <label for="imageInput">Upload custom image (or it will auto-load Veil-Icon.png):</label><br>
+            <input type="file" id="imageInput" accept="image/*">
+        </div>
+        
+        <div class="preview-section">
+            <h4>Source Preview:</h4>
+            <img id="sourcePreview" class="source-preview" style="display: none;">
+            <canvas id="sourceCanvas" style="display: none;"></canvas>
+        </div>
+        
+        <div class="status" id="status">Ready to generate icons...</div>
+        
+        <button onclick="generateIcons()">Generate All Icons</button>
+        <button onclick="downloadAll()" id="downloadBtn" style="display: none;">Download All Icons</button>
+    </div>
+    
+    <div id="icons-container" class="generated-icons"></div>
     
     <script>
         const sizes = [16, 32, 48, 96, 144, 192, 256, 512, 180]; // 180 for Apple touch icon
         const container = document.getElementById('icons-container');
+        const imageInput = document.getElementById('imageInput');
+        const sourcePreview = document.getElementById('sourcePreview');
+        const status = document.getElementById('status');
+        const downloadBtn = document.getElementById('downloadBtn');
         
-        function createIcon(size) {
+        let sourceImage = null;
+        let generatedCanvases = [];
+        
+        // Auto-load Veil-Icon.png on page load
+        window.addEventListener('load', () => {
+            loadVeilIcon();
+        });
+        
+        // Handle file input
+        imageInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                loadImageFromFile(file);
+            }
+        });
+        
+        function loadVeilIcon() {
+            status.textContent = 'Loading Veil-Icon.png...';
+            status.className = 'status';
+            
+            const img = new Image();
+            img.crossOrigin = 'anonymous'; // Enable CORS
+            img.onload = () => {
+                sourceImage = img;
+                displaySourcePreview();
+                status.textContent = 'Veil-Icon.png loaded successfully! Click "Generate All Icons" to create icon set.';
+                status.className = 'status success';
+            };
+            img.onerror = () => {
+                status.textContent = 'Could not load Veil-Icon.png. Please upload a custom image using the file input below.';
+                status.className = 'status error';
+            };
+            img.src = 'Veil-Icon.png';
+        }
+        
+        function loadImageFromFile(file) {
+            status.textContent = 'Loading custom image...';
+            status.className = 'status';
+            
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    sourceImage = img;
+                    displaySourcePreview();
+                    status.textContent = 'Custom image loaded successfully! Click "Generate All Icons" to create icon set.';
+                    status.className = 'status success';
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+        
+        function displaySourcePreview() {
+            sourcePreview.src = sourceImage.src;
+            sourcePreview.style.display = 'block';
+            sourcePreview.title = `Source: ${sourceImage.width}x${sourceImage.height}px`;
+        }
+        
+        function createIconFromSource(size) {
+            if (!sourceImage) return null;
+            
             const canvas = document.createElement('canvas');
             canvas.width = size;
             canvas.height = size;
             const ctx = canvas.getContext('2d');
             
-            // Background
-            ctx.fillStyle = '#2d2d2d';
-            ctx.fillRect(0, 0, size, size);
+            // Enable high-quality scaling
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
             
-            // Simple chat bubble design
-            ctx.fillStyle = '#4CAF50';
-            const bubbleSize = size * 0.6;
-            const x = (size - bubbleSize) / 2;
-            const y = (size - bubbleSize) / 2;
-            
-            // Rounded rectangle for chat bubble
-            ctx.beginPath();
-            ctx.roundRect(x, y, bubbleSize, bubbleSize * 0.7, size * 0.1);
-            ctx.fill();
-            
-            // Small tail for bubble
-            ctx.beginPath();
-            ctx.moveTo(x + bubbleSize * 0.2, y + bubbleSize * 0.7);
-            ctx.lineTo(x + bubbleSize * 0.1, y + bubbleSize * 0.9);
-            ctx.lineTo(x + bubbleSize * 0.35, y + bubbleSize * 0.7);
-            ctx.fill();
-            
-            // Add "AI" text for larger icons
-            if (size >= 48) {
-                ctx.fillStyle = 'white';
-                ctx.font = `bold ${size * 0.15}px Arial`;
-                ctx.textAlign = 'center';
-                ctx.fillText('AI', size / 2, y + bubbleSize * 0.45);
-            }
+            // Draw the source image scaled to fit the canvas
+            ctx.drawImage(sourceImage, 0, 0, size, size);
             
             return canvas;
+        }
+        
+        function generateIcons() {
+            if (!sourceImage) {
+                status.textContent = 'Please load an image first!';
+                status.className = 'status error';
+                return;
+            }
+            
+            status.textContent = 'Generating icons...';
+            status.className = 'status';
+            
+            // Clear previous results
+            container.innerHTML = '';
+            generatedCanvases = [];
+            
+            // Generate all icon sizes
+            sizes.forEach(size => {
+                const canvas = createIconFromSource(size);
+                if (canvas) {
+                    generatedCanvases.push({canvas, size});
+                    addIconToPage(canvas, size);
+                }
+            });
+            
+            status.textContent = `Successfully generated ${generatedCanvases.length} icons!`;
+            status.className = 'status success';
+            downloadBtn.style.display = 'inline-block';
         }
         
         function addIconToPage(canvas, size) {
@@ -64,40 +169,76 @@
             div.className = 'icon-preview';
             
             const label = document.createElement('div');
-            label.textContent = `${size}x${size}`;
+            label.textContent = `${size}x${size}px`;
+            label.style.fontWeight = 'bold';
+            label.style.marginBottom = '5px';
             
             const downloadLink = document.createElement('a');
-            downloadLink.href = canvas.toDataURL('image/png');
             
-            if (size === 180) {
-                downloadLink.download = 'apple-touch-icon.png';
-            } else {
-                downloadLink.download = `icon-${size}x${size}.png`;
+            try {
+                downloadLink.href = canvas.toDataURL('image/png');
+                downloadLink.style.display = 'block';
+                downloadLink.style.marginTop = '5px';
+                downloadLink.style.padding = '5px 10px';
+                downloadLink.style.backgroundColor = '#007cba';
+                downloadLink.style.color = 'white';
+                downloadLink.style.textDecoration = 'none';
+                downloadLink.style.borderRadius = '4px';
+                downloadLink.style.fontSize = '12px';
+                
+                if (size === 180) {
+                    downloadLink.download = 'apple-touch-icon.png';
+                } else {
+                    downloadLink.download = `icon-${size}x${size}.png`;
+                }
+                
+                downloadLink.textContent = 'Download';
+            } catch (error) {
+                downloadLink.href = '#';
+                downloadLink.style.display = 'block';
+                downloadLink.style.marginTop = '5px';
+                downloadLink.style.padding = '5px 10px';
+                downloadLink.style.backgroundColor = '#dc3545';
+                downloadLink.style.color = 'white';
+                downloadLink.style.textDecoration = 'none';
+                downloadLink.style.borderRadius = '4px';
+                downloadLink.style.fontSize = '12px';
+                downloadLink.textContent = 'CORS Error';
+                downloadLink.title = 'Canvas tainted by cross-origin data. Please use file upload instead.';
+                downloadLink.onclick = (e) => {
+                    e.preventDefault();
+                    alert('CORS Error: Please use the file upload method instead of auto-loading Veil-Icon.png');
+                };
             }
-            
-            downloadLink.textContent = 'Download';
             
             div.appendChild(label);
             div.appendChild(canvas);
-            div.appendChild(document.createElement('br'));
             div.appendChild(downloadLink);
             
             container.appendChild(div);
         }
         
-        // Generate all icons
-        sizes.forEach(size => {
-            const canvas = createIcon(size);
-            addIconToPage(canvas, size);
-        });
-        
         function downloadAll() {
+            if (generatedCanvases.length === 0) {
+                status.textContent = 'No icons generated yet!';
+                status.className = 'status error';
+                return;
+            }
+            
+            status.textContent = 'Downloading all icons...';
+            status.className = 'status';
+            
             const links = document.querySelectorAll('a[download]');
             links.forEach((link, index) => {
                 setTimeout(() => {
                     link.click();
-                }, index * 100);
+                }, index * 150); // Slight delay between downloads
             });
+            
+            setTimeout(() => {
+                status.textContent = `Downloaded ${links.length} icons successfully!`;
+                status.className = 'status success';
+            }, links.length * 150 + 500);
         }
     </script>
 </body>
