@@ -30,7 +30,8 @@
       "WebFetch(domain:www.yelp.com)",
       "WebFetch(domain:platform.openai.com)",
       "WebFetch(domain:ai.google.dev)",
-      "WebFetch(domain:simonwillison.net)"
+      "WebFetch(domain:simonwillison.net)",
+      "WebFetch(domain:lmstudio.ai)"
     ],
     "deny": []
   }
