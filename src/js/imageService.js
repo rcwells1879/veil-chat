@@ -1,9 +1,13 @@
 if (typeof ImageService === 'undefined') {
     window.ImageService = class ImageService {
         constructor(apiBaseUrl, provider = 'a1111', openaiApiKey = null) {
-            this.apiBaseUrl = apiBaseUrl; // e.g., 'http://127.0.0.1:7860' for Automatic1111
-            this.provider = provider; // 'a1111' or 'openai'
+            this.apiBaseUrl = apiBaseUrl; // e.g., 'http://127.0.0.1:7860' for Automatic1111, 'http://localhost:7801' for SwarmUI
+            this.provider = provider; // 'a1111', 'openai', or 'swarmui'
             this.openaiApiKey = openaiApiKey;
+            
+            // SwarmUI-specific properties
+            this.swarmSessionId = null;
+            this.swarmSessionExpiry = null;
         
         // Set default settings for A1111
         this.width = 1024;
@@ -17,6 +21,14 @@ if (typeof ImageService === 'undefined') {
         this.quality = "auto";
         this.output_format = "png";
         this.background = "auto";
+        
+        // Set default settings for SwarmUI
+        this.swarm_width = 1024;
+        this.swarm_height = 1024;
+        this.swarm_steps = 20;
+        this.swarm_cfg_scale = 7.5;
+        this.swarm_model = null; // Auto-detect or user-specified
+        this.swarm_sampler = "Euler a";
         
         console.log(`ImageService initialized. Provider: ${this.provider}`);
     }
@@ -34,6 +46,14 @@ if (typeof ImageService === 'undefined') {
         if (settings.quality !== undefined) this.quality = settings.quality;
         if (settings.output_format !== undefined) this.output_format = settings.output_format;
         if (settings.background !== undefined) this.background = settings.background;
+        
+        // SwarmUI settings
+        if (settings.swarm_width !== undefined) this.swarm_width = settings.swarm_width;
+        if (settings.swarm_height !== undefined) this.swarm_height = settings.swarm_height;
+        if (settings.swarm_steps !== undefined) this.swarm_steps = settings.swarm_steps;
+        if (settings.swarm_cfg_scale !== undefined) this.swarm_cfg_scale = settings.swarm_cfg_scale;
+        if (settings.swarm_model !== undefined) this.swarm_model = settings.swarm_model;
+        if (settings.swarm_sampler !== undefined) this.swarm_sampler = settings.swarm_sampler;
         
         // Provider settings
         if (settings.provider !== undefined) {
@@ -55,6 +75,8 @@ if (typeof ImageService === 'undefined') {
         
         if (this.provider === 'openai') {
             return await this.generateOpenAIImage(prompt);
+        } else if (this.provider === 'swarmui') {
+            return await this.generateSwarmUIImage(prompt);
         } else {
             return await this.generateA1111Image(prompt);
         }
@@ -171,6 +193,153 @@ if (typeof ImageService === 'undefined') {
         } catch (error) {
             console.error('Error communicating with Image Service (Automatic1111):', error);
             throw error;
+        }
+    }
+
+    async ensureSwarmSession() {
+        // Check if we have a valid session that hasn't expired
+        const now = Date.now();
+        if (this.swarmSessionId && this.swarmSessionExpiry && now < this.swarmSessionExpiry) {
+            console.log('Using existing SwarmUI session:', this.swarmSessionId);
+            return this.swarmSessionId;
+        }
+
+        console.log('Getting new SwarmUI session...');
+        try {
+            const response = await fetch(`${this.apiBaseUrl}/API/GetNewSession`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({})
+            });
+
+            if (!response.ok) {
+                const errorData = await response.text();
+                console.error('SwarmUI Session API Error Response:', errorData);
+                throw new Error(`SwarmUI Session API request failed with status ${response.status}: ${errorData}`);
+            }
+
+            const data = await response.json();
+            
+            if (data.session_id) {
+                this.swarmSessionId = data.session_id;
+                // Set session to expire in 30 minutes (SwarmUI default is usually longer, but this is safe)
+                this.swarmSessionExpiry = now + (30 * 60 * 1000);
+                console.log('New SwarmUI session obtained:', this.swarmSessionId);
+                return this.swarmSessionId;
+            } else {
+                console.error('No session_id in SwarmUI response:', data);
+                throw new Error('Failed to obtain SwarmUI session');
+            }
+        } catch (error) {
+            console.error('Error getting SwarmUI session:', error);
+            throw error;
+        }
+    }
+
+    async generateSwarmUIImage(prompt) {
+        // Add quality tags like in the A1111 version
+        const qualityTags = "best quality, dynamic lighting";
+        const userOrLlmPrompt = prompt.trim();
+        const currentPrompt = userOrLlmPrompt 
+            ? `${qualityTags}, ${userOrLlmPrompt}` 
+            : qualityTags;
+
+        try {
+            // Ensure we have a valid session
+            const sessionId = await this.ensureSwarmSession();
+
+            const payload = {
+                session_id: sessionId,
+                prompt: currentPrompt,
+                negativeprompt: "young, underage, nsfw, child, big eyes, bad anatomy, worst quality, low quality, normal quality, jpeg artifacts, signature, camera, username, blurry",
+                images: 1,
+                width: this.swarm_width || 1024,
+                height: this.swarm_height || 1024,
+                steps: this.swarm_steps || 20,
+                cfgscale: this.swarm_cfg_scale || 7.5,
+                seed: -1 // Random seed
+            };
+
+            // Add model if specified (don't send empty model parameter)
+            if (this.swarm_model && this.swarm_model.trim() !== '') {
+                payload.model = this.swarm_model;
+            }
+
+            console.log('SwarmUI generation payload:', payload);
+
+            const response = await fetch(`${this.apiBaseUrl}/API/GenerateText2Image`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                const errorData = await response.text();
+                console.error('SwarmUI Generation API Error Response:', errorData);
+                
+                // Check if it's a session error and retry once
+                if (errorData.includes('invalid_session_id') || response.status === 401) {
+                    console.log('Session invalid, getting new session and retrying...');
+                    this.swarmSessionId = null;
+                    this.swarmSessionExpiry = null;
+                    
+                    const newSessionId = await this.ensureSwarmSession();
+                    payload.session_id = newSessionId;
+                    
+                    const retryResponse = await fetch(`${this.apiBaseUrl}/API/GenerateText2Image`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(payload)
+                    });
+                    
+                    if (!retryResponse.ok) {
+                        const retryErrorData = await retryResponse.text();
+                        console.error('SwarmUI Generation API Error Response (retry):', retryErrorData);
+                        throw new Error(`SwarmUI API request failed after retry with status ${retryResponse.status}: ${retryErrorData}`);
+                    }
+                    
+                    const retryData = await retryResponse.json();
+                    return this.processSwarmUIResponse(retryData);
+                }
+                
+                throw new Error(`SwarmUI API request failed with status ${response.status}: ${errorData}`);
+            }
+
+            const data = await response.json();
+            return this.processSwarmUIResponse(data);
+
+        } catch (error) {
+            console.error('Error communicating with SwarmUI Service:', error);
+            throw error;
+        }
+    }
+
+    processSwarmUIResponse(data) {
+        console.log('SwarmUI full response:', data);
+        
+        // SwarmUI returns {images: Array} format
+        if (data && data.images && Array.isArray(data.images) && data.images.length > 0) {
+            const imagePath = data.images[0];
+            console.log('Received image path from SwarmUI:', imagePath);
+            
+            // SwarmUI returns relative paths that already include the correct path
+            // Just prepend the base URL without additional path prefix
+            const imageUrl = `${this.apiBaseUrl}/${imagePath}`;
+            console.log('Constructed SwarmUI image URL:', imageUrl);
+            
+            return imageUrl;
+        } else if (data && data.error) {
+            console.error('SwarmUI returned error:', data.error);
+            throw new Error(`SwarmUI error: ${data.error}`);
+        } else {
+            console.error('No image data received from SwarmUI:', data);
+            throw new Error('No image data received from SwarmUI API');
         }
     }
 }

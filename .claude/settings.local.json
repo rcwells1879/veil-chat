@@ -31,7 +31,8 @@
       "WebFetch(domain:platform.openai.com)",
       "WebFetch(domain:ai.google.dev)",
       "WebFetch(domain:simonwillison.net)",
-      "WebFetch(domain:lmstudio.ai)"
+      "WebFetch(domain:lmstudio.ai)",
+      "WebFetch(domain:developers.cloudflare.com)"
     ],
     "deny": []
   }

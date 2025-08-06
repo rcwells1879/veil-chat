@@ -218,6 +218,14 @@ async function initializeApp() {
         openaiQuality: localStorage.getItem('openaiQuality') || 'auto',
         openaiOutputFormat: localStorage.getItem('openaiOutputFormat') || 'png',
         openaiBackground: localStorage.getItem('openaiBackground') || 'auto',
+        // SwarmUI
+        swarmuiApiUrl: localStorage.getItem('swarmuiApiUrl') || 'http://localhost:7801',
+        swarmuiWidth: parseInt(localStorage.getItem('swarmuiWidth') || '1024'),
+        swarmuiHeight: parseInt(localStorage.getItem('swarmuiHeight') || '1024'),
+        swarmuiSteps: parseInt(localStorage.getItem('swarmuiSteps') || '20'),
+        swarmuiCfgScale: parseFloat(localStorage.getItem('swarmuiCfgScale') || '7.5'),
+        swarmuiModel: localStorage.getItem('swarmuiModel') || '',
+        swarmuiSampler: localStorage.getItem('swarmuiSampler') || 'Euler a',
         // Voice & UI
         ttsVoice: localStorage.getItem('ttsVoice') || 'Sonia',
         voiceSpeed: parseFloat(localStorage.getItem('voiceSpeed')) || 1.0,
@@ -251,7 +259,11 @@ async function initializeApp() {
             googleApiKey: SETTINGS.googleApiKey
         }
     );
-    let imageService = new ImageService(SETTINGS.customImageApiUrl, SETTINGS.customImageProvider, SETTINGS.openaiApiKey);
+    let imageService = new ImageService(
+        SETTINGS.customImageProvider === 'swarmui' ? SETTINGS.swarmuiApiUrl : SETTINGS.customImageApiUrl, 
+        SETTINGS.customImageProvider, 
+        SETTINGS.openaiApiKey
+    );
     let voiceService;
     try {
         voiceService = new VoiceService(handleSttResult, handleSttError, handleSttListeningState);
@@ -1094,6 +1106,13 @@ Type **"/list"** anytime to see this help again.`;
         openaiQuality: 'openai-quality',
         openaiOutputFormat: 'openai-output-format',
         openaiBackground: 'openai-background',
+        swarmuiApiUrl: 'swarmui-api-url',
+        swarmuiWidth: 'swarmui-width',
+        swarmuiHeight: 'swarmui-height',
+        swarmuiSteps: 'swarmui-steps',
+        swarmuiCfgScale: 'swarmui-cfg-scale',
+        swarmuiModel: 'swarmui-model',
+        swarmuiSampler: 'swarmui-sampler',
         ttsVoice: 'select-tts-voice',
         voiceSpeed: 'slider-voice-speed',
         voicePitch: 'slider-voice-pitch',
@@ -1138,7 +1157,10 @@ Type **"/list"** anytime to see this help again.`;
                                    SETTINGS.anthropicApiKey !== (llmService.directProviders && llmService.directProviders.anthropicApiKey) ||
                                    SETTINGS.googleModelIdentifier !== (llmService.directProviders && llmService.directProviders.googleModel) ||
                                    SETTINGS.googleApiKey !== (llmService.directProviders && llmService.directProviders.googleApiKey);
-        const imageSettingsChanged = SETTINGS.customImageApiUrl !== imageService.apiBaseUrl || SETTINGS.customImageProvider !== imageService.provider || SETTINGS.openaiApiKey !== imageService.openaiApiKey;
+        const imageSettingsChanged = SETTINGS.customImageApiUrl !== imageService.apiBaseUrl || 
+                                      SETTINGS.customImageProvider !== imageService.provider || 
+                                      SETTINGS.openaiApiKey !== imageService.openaiApiKey ||
+                                      (SETTINGS.customImageProvider === 'swarmui' && SETTINGS.swarmuiApiUrl !== imageService.apiBaseUrl);
         const mcpSettingsChanged = SETTINGS.mcpEnabled !== mcpEnabled;
 
         if (llmSettingsChanged) {
@@ -1187,7 +1209,11 @@ Type **"/list"** anytime to see this help again.`;
             });
         }
         if (imageSettingsChanged) {
-            imageService = new ImageService(SETTINGS.customImageApiUrl, SETTINGS.customImageProvider, SETTINGS.openaiApiKey);
+            imageService = new ImageService(
+                SETTINGS.customImageProvider === 'swarmui' ? SETTINGS.swarmuiApiUrl : SETTINGS.customImageApiUrl, 
+                SETTINGS.customImageProvider, 
+                SETTINGS.openaiApiKey
+            );
         }
         
         // Handle MCP settings changes
@@ -1215,7 +1241,13 @@ Type **"/list"** anytime to see this help again.`;
             quality: SETTINGS.openaiQuality,
             output_format: SETTINGS.openaiOutputFormat,
             background: SETTINGS.openaiBackground,
-            openaiApiKey: SETTINGS.openaiApiKey
+            openaiApiKey: SETTINGS.openaiApiKey,
+            swarm_width: parseInt(SETTINGS.swarmuiWidth),
+            swarm_height: parseInt(SETTINGS.swarmuiHeight),
+            swarm_steps: parseInt(SETTINGS.swarmuiSteps),
+            swarm_cfg_scale: parseFloat(SETTINGS.swarmuiCfgScale),
+            swarm_model: SETTINGS.swarmuiModel,
+            swarm_sampler: SETTINGS.swarmuiSampler
         });
         if (voiceService) {
             voiceService.setVoiceRate(SETTINGS.voiceSpeed);
@@ -1235,17 +1267,24 @@ Type **"/list"** anytime to see this help again.`;
         const imageProviderSelect = container.querySelector('#image-provider');
         const a1111Settings = container.querySelector('.a1111-settings');
         const openaiSettings = container.querySelector('.openai-settings');
+        const swarmuiSettings = container.querySelector('.swarmui-settings');
 
         function toggleProviderSettings() {
-            if (!imageProviderSelect || !a1111Settings || !openaiSettings) return;
+            if (!imageProviderSelect || !a1111Settings || !openaiSettings || !swarmuiSettings) return;
             
             const provider = imageProviderSelect.value;
 
+            // Hide all settings first
+            a1111Settings.style.display = 'none';
+            openaiSettings.style.display = 'none';
+            swarmuiSettings.style.display = 'none';
+
+            // Show the selected provider's settings
             if (provider === 'openai') {
                 openaiSettings.style.display = 'block';
-                a1111Settings.style.display = 'none';
+            } else if (provider === 'swarmui') {
+                swarmuiSettings.style.display = 'block';
             } else { // a1111
-                openaiSettings.style.display = 'none';
                 a1111Settings.style.display = 'block';
             }
         }
