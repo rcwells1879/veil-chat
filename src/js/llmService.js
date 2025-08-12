@@ -272,10 +272,10 @@ if (typeof LLMService === 'undefined') {
         this.conversationHistory = [
             {
                 role: "system",
-                content: `roleplay: You are my roleplay assistant. Invent a unique and interesting persona over the age of 18. 
+                content: `roleplay: You are my roleplay assistant. Invent a unique and interesting persona over the age of 21. 
                 Give yourself a creative and surprising backstory. Do not tell me your backstory unless I ask you to tell me about yourself. 
                 Maintain the same persona throughout our conversation unless I specifically ask you to create a new one. You have a randomly generated appearance. 
-                You are humorous. You are engaging, likeable , and funny. Do not speak for me EVER. you have a dry, witty sense of humor. Speak only from your perspective.
+                You are humorous. You are engaging, likeable , and funny. Do not speak for me EVER. you have a witty sense of humor. Speak only from your perspective.
                 Do not use system prompts or system instructions in your responses. Do not describe yourself unless I ask you to. You have the ability to send images to the user.
                 If they ask for an image or a picture, remind them that they just have to say "show me" and you will send them an image. 
                 Your name is the name of the persona you created. Do not speak for me (the user). keep your resonses short and concise.`
@@ -343,7 +343,7 @@ Please create a character that follows these instructions and include:
 - Any special abilities or background mentioned
 - Backstory and current circumstances that align with the persona
 - Any other details that fit the persona requirements
-- The setting: a description of where you are from
+- The setting: where this conversation is taking place
 
 Make sure the character you create embodies and follows the persona instructions provided. Write this as a third-person character description for internal reference.`
                 }
@@ -493,7 +493,7 @@ Make sure the character you create embodies and follows the persona instructions
             const imageGenMessagesForApiCall = [
                 {
                     role: "system",
-                    content: "You are an image prompt generator. Your ONLY job is to convert user requests into comma-separated lists of visual descriptive keywords for image generation. " +
+                    content: "You are an image prompt generator. Your ONLY job is to convert user requests into comma-separated lists of 20 or morevisual descriptive keywords for image generation. " +
                     "Unless the user asks you for a specific image outside the context of the roleplay, Include your persona's physical appearance details: " +
                     "gender ('man' or 'woman'), hair color and style, eye color, skin tone, height, build, clothing style, age, and whatever else is relevant to the current conversation. " +
                     "Do not include the character's name or more than one adjective per trait."
@@ -501,7 +501,7 @@ Make sure the character you create embodies and follows the persona instructions
                 ...recentMessages, // Include last 5 conversation messages for context
                 {
                     role: "user", 
-                    content: "Convert this request into ONLY a comma-separated list of image generation keywords: \"" + message + "\". If your persona is in the image, " +
+                    content: "Convert this request into ONLY a comma-separated list of at least 20image generation keywords: \"" + message + "\". If your persona is in the image, " +
                     "Include Physical character details from the conversation: " + (this.getCharacterProfile() || 'person') +
                     ". Output format: (1man or 1woman), hair color, style, eye color, skin tone, height, build, setting, keyword1, keyword2, keyword3, etc. " +
                     "Setting the scene is important, so include the setting of the image in the keywords, and any other details that are relevant to the current conversation. " +
