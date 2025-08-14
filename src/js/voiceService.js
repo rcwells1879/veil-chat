@@ -86,6 +86,17 @@ if (typeof VoiceService === 'undefined') {
         return new Promise(async (resolve, reject) => { 
             const voiceToUse = preferredVoiceKeyword;
             
+            // Initialize SSML processor for clean text extraction
+            let cleanTextForFallback = textToSpeak;
+            if (typeof SSMLProcessor !== 'undefined') {
+                const ssmlProcessor = new SSMLProcessor();
+                const ssmlResult = ssmlProcessor.extractSSML(textToSpeak);
+                if (ssmlResult.hasSSML) {
+                    cleanTextForFallback = ssmlResult.cleanText;
+                    console.log('🎵 VoiceService: Extracted clean text for fallback:', cleanTextForFallback.substring(0, 50) + '...');
+                }
+            }
+            
             // Try Azure TTS first if available
             if (this.isAzureTTSEnabled()) {
                 try {
@@ -95,7 +106,8 @@ if (typeof VoiceService === 'undefined') {
                     return;
                 } catch (error) {
                     console.warn('VoiceService: Azure TTS failed, falling back to Web Speech API:', error);
-                    // Fall through to Web Speech API
+                    console.warn('VoiceService: Using clean text for fallback TTS');
+                    // Fall through to Web Speech API with clean text
                 }
             } else {
                 console.log('VoiceService: Azure TTS not enabled, using Web Speech API');
@@ -123,13 +135,13 @@ if (typeof VoiceService === 'undefined') {
                 if (this.voices.length === 0 && isMobile) {
                     setTimeout(() => {
                         this._populateVoiceList("mobile fallback");
-                        this._executeSpeech(textToSpeak, voiceToUse, resolve, reject, isMobile);
+                        this._executeSpeech(cleanTextForFallback, voiceToUse, resolve, reject, isMobile);
                     }, 1000);
                     return;
                 }
             }
             
-            this._executeSpeech(textToSpeak, voiceToUse, resolve, reject, isMobile);
+            this._executeSpeech(cleanTextForFallback, voiceToUse, resolve, reject, isMobile);
         });
     }
 

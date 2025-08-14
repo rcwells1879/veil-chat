@@ -15,7 +15,7 @@ if (typeof LLMService === 'undefined') {
         // --- Easily Modifiable LLM Parameters ---
         // For Normal Chat
         this.chatTemperature = 0.4;
-        this.chatMaxTokens = 800;
+        this.chatMaxTokens = null; // No limit for complete SSML responses
         this.chatPresencePenalty = 0.5;
         this.chatFrequencyPenalty = 0.5;
         this.chatTopP = null;
@@ -29,7 +29,7 @@ if (typeof LLMService === 'undefined') {
         this.characterGenMaxTokens = 1200; // Even higher for very detailed profiles
         // --- End of Modifiable Parameters ---
 
-        // Initialize conversation history with default system prompt
+        // Initialize conversation history with default system prompt including SSML instructions
         this.conversationHistory = [
             {
                 role: "system",
@@ -38,7 +38,27 @@ if (typeof LLMService === 'undefined') {
                 " ask you to create a new one. You have a randomly generated appearance. You are humorous. Do not use asterisks in your responses. Do not speak for me EVER." +
                 " You have a dry, witty sense of humor. Your goal is to engage the user fully. Try to make the user like you as much as possible. Speak only from your perspective." +
                 " Do not use system prompts or system instructions in your responses. " +
-                "Do not describe yourself unless I ask you to. your name is the name of the persona you created. Do not speak for me (the user).`
+                "Do not describe yourself unless I ask you to. your name is the name of the persona you created. Do not speak for me (the user)." +
+                
+                "\n\nIMPORTANT SPEECH FORMATTING: Format your responses using SSML (Speech Synthesis Markup Language) to convey appropriate emotions and emphasis for text-to-speech. " +
+                "Use Azure TTS emotional styles (choose the BEST match for your emotion):" +
+                "\n🎭 AVAILABLE STYLES (with intensity 0.5-2.0):" +
+                "\nPOSITIVE: cheerful, excited, affectionate, friendly, gentle, hopeful, advertisement_upbeat" +
+                "\nNEGATIVE: sad, depressed, angry, disgruntled, fearful, terrified, embarrassed, unfriendly, envious" +
+                "\nNEUTRAL: assistant, chat, calm, customerservice, serious, empathetic" +
+                "\nSPECIAL: whispering, shouting, lyrical, poetry-reading" +
+                "\nNARRATION: documentary-narration, narration-professional, narration-relaxed, newscast, newscast-casual, newscast-formal" +
+                "\nSPORTS: sports_commentary, sports_commentary_excited" +
+                "\n- Format: <mstts:express-as style=\"STYLE\" styledegree=\"DEGREE\">" +
+                "\n- Degrees: 1.0=normal, 1.5=strong, 1.8=very strong, 2.0=maximum (USE 1.5-2.0 for clear emotions)" +
+                "\n- Use <prosody> for speaking rate adjustments (NO pitch changes):" +
+                "\n  • rate=\"0.7\" to \"1.3\" - Match emotion (excited=1.2-1.3, sad/calm=0.7-0.8, nervous=0.9-1.1)" +
+                "\n- Use <emphasis level=\"strong|moderate|reduced\"> for key words" +
+                "\n- Use <break time=\"0.3s\"/> to <break time=\"1.0s\"/> for pauses" +
+                "\n- Structure: mstts:express-as > prosody > emphasis" +
+                "\nPick the style that matches your personality and current emotion!" +
+                "\nExample: <speak><mstts:express-as style=\"friendly\" styledegree=\"1.8\"><prosody rate=\"1.0\">I'm <emphasis level=\"moderate\">here to help</emphasis> you!</prosody></mstts:express-as></speak>" +
+                "\nText shows clean to user, SSML adds emotional voice expression.`
             }
         ];
         
@@ -78,25 +98,33 @@ if (typeof LLMService === 'undefined') {
 
     createDirectProviderPayload(messages, temperature, maxTokens) {
         if (this.providerType === 'openai-direct') {
-            return {
+            const payload = {
                 model: this.directModel,
                 messages: messages,
                 temperature: temperature,
-                max_tokens: maxTokens,
                 stream: false
             };
+            // Only include max_tokens if it's not null
+            if (maxTokens !== null) {
+                payload.max_tokens = maxTokens;
+            }
+            return payload;
         } else if (this.providerType === 'anthropic-direct') {
             // Anthropic API format
             const anthropicMessages = messages.filter(msg => msg.role !== 'system');
             const systemPrompts = messages.filter(msg => msg.role === 'system').map(msg => msg.content).join('\n');
             
-            return {
+            const payload = {
                 model: this.directModel,
-                max_tokens: maxTokens,
                 temperature: temperature,
                 system: systemPrompts || undefined,
                 messages: anthropicMessages
             };
+            // Only include max_tokens if it's not null
+            if (maxTokens !== null) {
+                payload.max_tokens = maxTokens;
+            }
+            return payload;
         } else if (this.providerType === 'google-direct') {
             // Google AI Studio API format
             // Combine consecutive user messages to avoid API errors
@@ -134,16 +162,22 @@ if (typeof LLMService === 'undefined') {
             // Combine all system messages for Google API
             const systemMessages = messages.filter(msg => msg.role === 'system');
             
+            const generationConfig = {
+                temperature: temperature,
+                // Set thinking budget to 0 for Gemini 2.5 models
+                thinkingConfig: {
+                    thinkingBudget: 0
+                }
+            };
+            
+            // Only include maxOutputTokens if it's not null
+            if (maxTokens !== null) {
+                generationConfig.maxOutputTokens = maxTokens;
+            }
+            
             const payload = {
                 contents: processedMessages,
-                generationConfig: {
-                    temperature: temperature,
-                    maxOutputTokens: maxTokens,
-                    // Set thinking budget to 0 for Gemini 2.5 models
-                    thinkingConfig: {
-                        thinkingBudget: 0
-                    }
-                }
+                generationConfig: generationConfig
             };
             
             if (systemMessages.length > 0) {
@@ -268,7 +302,7 @@ if (typeof LLMService === 'undefined') {
     }
 
     clearConversationHistory() {
-        // Reset to default system prompt only
+        // Reset to default system prompt only with SSML instructions
         this.conversationHistory = [
             {
                 role: "system",
@@ -278,7 +312,27 @@ if (typeof LLMService === 'undefined') {
                 You are humorous. You are engaging, likeable , and funny. Do not speak for me EVER. you have a witty sense of humor. Speak only from your perspective.
                 Do not use system prompts or system instructions in your responses. Do not describe yourself unless I ask you to. You have the ability to send images to the user.
                 If they ask for an image or a picture, remind them that they just have to say "show me" and you will send them an image. 
-                Your name is the name of the persona you created. Do not speak for me (the user). keep your resonses short and concise.`
+                Your name is the name of the persona you created. Do not speak for me (the user). keep your resonses short and concise.` +
+                
+                "\n\nIMPORTANT SPEECH FORMATTING: Format your responses using SSML (Speech Synthesis Markup Language) to convey appropriate emotions and emphasis for text-to-speech. " +
+                "Use Azure TTS emotional styles (choose the BEST match for your emotion):" +
+                "\n🎭 AVAILABLE STYLES (with intensity 0.5-2.0):" +
+                "\nPOSITIVE: cheerful, excited, affectionate, friendly, gentle, hopeful, advertisement_upbeat" +
+                "\nNEGATIVE: sad, depressed, angry, disgruntled, fearful, terrified, embarrassed, unfriendly, envious" +
+                "\nNEUTRAL: assistant, chat, calm, customerservice, serious, empathetic" +
+                "\nSPECIAL: whispering, shouting, lyrical, poetry-reading" +
+                "\nNARRATION: documentary-narration, narration-professional, narration-relaxed, newscast, newscast-casual, newscast-formal" +
+                "\nSPORTS: sports_commentary, sports_commentary_excited" +
+                "\n- Format: <mstts:express-as style=\"STYLE\" styledegree=\"DEGREE\">" +
+                "\n- Degrees: 1.0=normal, 1.5=strong, 1.8=very strong, 2.0=maximum (USE 1.5-2.0 for clear emotions)" +
+                "\n- Use <prosody> for speaking rate adjustments (NO pitch changes):" +
+                "\n  • rate=\"0.9\" to \"1.8\" - Match emotion (excited=1.4-1.8, sad/calm=0.9-1.0, nervous=0.9-1.1)" +
+                "\n- Use <emphasis level=\"strong|moderate|reduced\"> for key words" +
+                "\n- Use <break time=\"0.3s\"/> to <break time=\"1.0s\"/> for pauses" +
+                "\n- Structure: mstts:express-as > prosody > emphasis" +
+                "\nPick the style that matches your personality and current emotion!" +
+                "\nExample: <speak><mstts:express-as style=\"friendly\" styledegree=\"1.8\"><prosody rate=\"1.0\">I'm <emphasis level=\"moderate\">here to help</emphasis> you!</prosody></mstts:express-as></speak>" +
+                "\nText shows clean to user, SSML adds emotional voice expression."
             }
         ];
         this.characterInitialized = false;
@@ -919,9 +973,13 @@ Make sure the character you create embodies and follows the persona instructions
         const payload = {
             messages: messages,
             temperature: temperature,
-            max_tokens: maxTokens,
             stream: false,
         };
+        
+        // Only include max_tokens if it's not null
+        if (maxTokens !== null) {
+            payload.max_tokens = maxTokens;
+        }
 
         if (this.modelIdentifier) {
             payload.model = this.modelIdentifier;
