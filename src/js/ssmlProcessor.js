@@ -1,7 +1,7 @@
 if (typeof SSMLProcessor === 'undefined') {
     window.SSMLProcessor = class SSMLProcessor {
         constructor() {
-            this.debugMode = localStorage.getItem('debugMode') === 'true' || true; // Enable by default for development
+            this.debugMode = localStorage.getItem('debugMode') === 'true' || false; // Disable by default
         }
 
         /**
@@ -19,18 +19,14 @@ if (typeof SSMLProcessor === 'undefined') {
             }
 
             // Check if text contains SSML speak tags (full SSML)
-            const ssmlPattern = /<speak[^>]*>[\s\S]*?<\/speak>/i;
-            const match = text.match(ssmlPattern);
+            const ssmlPattern = /<speak[^>]*>[\s\S]*?<\/speak>/gi;
+            const matches = text.match(ssmlPattern);
 
-            if (match) {
-                const ssml = match[0];
-                const cleanText = this.stripSSML(ssml);
+            if (matches && matches.length > 0) {
+                const ssml = matches[0]; // Use first SSML block for TTS
+                const cleanText = this.stripSSML(text); // Strip ALL SSML from entire text
                 
-                if (this.debugMode) {
-                    console.log('🎵 SSML Processor: Full SSML detected in response');
-                    console.log('🎵 Original SSML:', ssml);
-                    console.log('🎵 Clean text:', cleanText);
-                }
+                // SSML detected and processed
 
                 return {
                     hasSSML: true,
@@ -59,12 +55,7 @@ if (typeof SSMLProcessor === 'undefined') {
                 
                 const cleanText = this.stripSSML(text);
                 
-                if (this.debugMode) {
-                    console.log('🎵 SSML Processor: Partial SSML detected');
-                    console.log('🎵 Had speak tags:', hasSpeak);
-                    console.log('🎵 Processed SSML:', processedSSML);
-                    console.log('🎵 Clean text:', cleanText);
-                }
+                // Partial SSML detected and processed
 
                 return {
                     hasSSML: true,

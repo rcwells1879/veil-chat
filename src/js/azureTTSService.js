@@ -13,7 +13,7 @@ if (typeof AzureTTSService === 'undefined') {
             // Track active audio elements for stopping
             this.activeAudioElements = new Set();
             
-            console.log(`AzureTTSService initialized. Region: ${this.region}, Endpoint: ${this.endpoint}`);
+            // Azure TTS initialized
         }
 
         // Check if Azure TTS is properly configured
@@ -25,7 +25,7 @@ if (typeof AzureTTSService === 'undefined') {
         setVoiceRate(rate) {
             // Clamp rate between 0.5 and 2.0 for Azure compatibility
             this.voiceRate = Math.max(0.5, Math.min(2.0, parseFloat(rate) || 1.0));
-            console.log(`AzureTTSService: Voice rate set to ${this.voiceRate}`);
+            // Voice rate set
         }
 
         getVoiceRate() {
@@ -35,7 +35,7 @@ if (typeof AzureTTSService === 'undefined') {
         setVoicePitch(pitch) {
             // Clamp pitch between 0.5 and 2.0
             this.voicePitch = Math.max(0.5, Math.min(2.0, parseFloat(pitch) || 1.0));
-            console.log(`AzureTTSService: Voice pitch set to ${this.voicePitch}`);
+            // Voice pitch set
         }
 
         getVoicePitch() {
@@ -44,7 +44,7 @@ if (typeof AzureTTSService === 'undefined') {
 
         setVoice(voice) {
             this.currentVoice = voice || 'en-US-JennyNeural';
-            console.log(`AzureTTSService: Voice set to ${this.currentVoice}`);
+            // Voice set
         }
 
         getVoice() {
@@ -138,9 +138,7 @@ if (typeof AzureTTSService === 'undefined') {
                             
                             // Skip local validation - let Azure TTS handle SSML validation
                             // Our local validator has issues with complex nested SSML
-                            console.log('🎵 AzureTTSService: SSML detected, bypassing local validation');
-                            console.log('🎵 AzureTTSService: Using direct SSML synthesis - Azure will validate');
-                            this.ssmlProcessor.logSSMLForDebugging(ssmlResult.ssml, cleanedText, 'Azure TTS');
+                            // Using SSML synthesis with Azure validation
                         }
                     }
                     
@@ -150,8 +148,8 @@ if (typeof AzureTTSService === 'undefined') {
                         console.log('AzureTTSService: Final safety strip - ensuring no SSML tags in plain text fallback');
                     }
                     
-                    console.log(`AzureTTSService: Starting TTS for text: "${cleanedText.substring(0, 50)}..."`);
-                    console.log(`AzureTTSService: Using ${isSSML ? 'SSML' : 'plain text'} synthesis`);
+                    // Starting TTS synthesis
+                    // Using TTS synthesis
                     
                     // Map voice keyword to Azure voice (only needed for plain text)
                     const azureVoice = preferredVoiceKeyword ? 
@@ -166,7 +164,7 @@ if (typeof AzureTTSService === 'undefined') {
                     // Play audio using HTML Audio Element
                     await this.playAudio(audioBuffer);
                     
-                    console.log(`AzureTTSService: TTS completed for text: "${cleanedText.substring(0, 30)}..."`);
+                    // TTS synthesis completed
                     resolve();
                     
                 } catch (error) {
@@ -208,8 +206,7 @@ if (typeof AzureTTSService === 'undefined') {
 
         // Synthesize SSML directly to audio using Azure Speech Services
         async synthesizeSSML(ssml, voiceKeyword = null) {
-            console.log('🎵 AzureTTSService: Processing SSML for Azure format');
-            console.log('🎵 Original SSML:', ssml);
+            // Processing SSML for Azure format
 
             // Fix SSML format for Azure requirements
             const processedSSML = this.processSSMLForAzure(ssml, voiceKeyword);
@@ -232,7 +229,7 @@ if (typeof AzureTTSService === 'undefined') {
                 throw new Error(`Azure TTS SSML API failed: ${response.status} ${response.statusText} - ${errorText}`);
             }
 
-            console.log('🎵 AzureTTSService: SSML synthesis successful');
+            // SSML synthesis successful
             return response.arrayBuffer();
         }
 

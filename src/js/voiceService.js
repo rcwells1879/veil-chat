@@ -93,14 +93,13 @@ if (typeof VoiceService === 'undefined') {
                 const ssmlResult = ssmlProcessor.extractSSML(textToSpeak);
                 if (ssmlResult.hasSSML) {
                     cleanTextForFallback = ssmlResult.cleanText;
-                    console.log('🎵 VoiceService: Extracted clean text for fallback:', cleanTextForFallback.substring(0, 50) + '...');
+                    // Extracted clean text for fallback TTS
                 }
             }
             
             // Try Azure TTS first if available
             if (this.isAzureTTSEnabled()) {
                 try {
-                    console.log(`VoiceService: Using Azure TTS with voice: ${voiceToUse}`);
                     await this.azureTTS.speak(textToSpeak, voiceToUse);
                     resolve();
                     return;
@@ -146,17 +145,17 @@ if (typeof VoiceService === 'undefined') {
     }
 
     stopSpeaking() {
-        console.log("VoiceService: stopSpeaking called");
+        // Stopping all TTS
         
         // Stop Azure TTS if active
         if (this.azureTTS) {
-            console.log("VoiceService: Stopping Azure TTS");
+            // Stopping Azure TTS
             this.azureTTS.stopSpeaking();
         }
         
         // Stop Web Speech API if active
         if (this.isSynthesisSupported() && (this.synthesis.speaking || this.synthesis.pending)) {
-            console.log("VoiceService: Stopping Web Speech API");
+            // Stopping Web Speech API
             this.synthesis.cancel();
         }
         

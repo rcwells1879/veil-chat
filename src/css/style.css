@@ -1,3 +1,8 @@
+/* --- CSS Variables --- */
+:root {
+    --chat-font-size: 16px;
+}
+
 /* --- Foundational Layout (Mobile-First & iOS Fixes) --- */
 html, body {
     margin: 0;
@@ -58,6 +63,7 @@ body {
     display: flex;
     flex-direction: column;
     min-height: 0;
+    font-size: var(--chat-font-size, 16px);
 }
 
 .message {
@@ -66,6 +72,23 @@ body {
     border-radius: 8px;
     line-height: 1.45;
     word-wrap: break-word;
+    font-size: var(--chat-font-size, 16px);
+}
+
+/* Ensure all HTML content within messages respects the font size */
+.message * {
+    font-size: inherit !important;
+}
+
+/* Make all headers one font size larger than standard text */
+.message h1,
+.message h2,
+.message h3,
+.message h4,
+.message h5,
+.message h6 {
+    font-size: calc(var(--chat-font-size, 16px) + 2px) !important;
+    font-weight: bold;
 }
 
 .user-message {

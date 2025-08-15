@@ -232,6 +232,8 @@ async function initializeApp() {
         voicePitch: parseFloat(localStorage.getItem('voicePitch')) || 1.0,
         azureApiKey: localStorage.getItem('azureApiKey') || '',
         azureRegion: localStorage.getItem('azureRegion') || 'eastus',
+        // UI
+        fontSize: parseInt(localStorage.getItem('fontSize') || '16'),
         // MCP
         mcpEnabled: mcpEnabled,
         mcpServerUrl: localStorage.getItem('mcpServerUrl') || '',
@@ -294,6 +296,31 @@ async function initializeApp() {
 
     // Initialize MCP Client
     await initializeMCPClient();
+    
+    // Apply initial font size from settings
+    applyFontSize(SETTINGS.fontSize);
+
+    // --- Font Size Management ---
+    function applyFontSize(fontSize) {
+        const size = parseInt(fontSize);
+        
+        // Apply font size to all chat messages
+        const chatWindow = document.getElementById('chat-window');
+        if (chatWindow) {
+            chatWindow.style.fontSize = size + 'px';
+        }
+        
+        // Also apply to any existing messages
+        const messages = document.querySelectorAll('.message');
+        messages.forEach(message => {
+            message.style.fontSize = size + 'px';
+        });
+        
+        // Set CSS custom property for future messages
+        document.documentElement.style.setProperty('--chat-font-size', size + 'px');
+        
+        console.log('🎨 Font size applied:', size + 'px');
+    }
 
     // --- Helper Functions ---
     function updateVoiceDropdown(selectedVoice) {
@@ -333,8 +360,7 @@ async function initializeApp() {
                     // Log SSML processing for debugging
                     ssmlProcessor.logSSMLForDebugging(ssmlResult.ssml, displayText, 'Main.js - addMessage');
                     
-                    console.log('🎵 SSML detected in LLM response');
-                    console.log('🎵 Clean text for display:', displayText.substring(0, 100) + '...');
+                    // SSML detected and processed for TTS
                 } else {
                     // No SSML, use original text for both
                     textToSpeak = message;
@@ -403,14 +429,14 @@ async function initializeApp() {
                 // Pass the original text (which may contain SSML) to voice service
                 // The voice service will handle SSML detection and processing
                 await voiceService.speak(textToSpeak, SETTINGS.ttsVoice);
-                console.log('🎤 TTS completed');
+                // TTS completed
             } catch (error) {
                 console.error("TTS Error:", error);
             }
         } else if (sender === 'user' && textToSpeak) {
-            console.log('🎤 TTS skipped for user message');
+            // TTS skipped for user message
         } else if (!enableTTS && textToSpeak) {
-            console.log('🎤 TTS disabled for this message');
+            // TTS disabled for this message
         }
     }
 
@@ -1201,7 +1227,8 @@ Type **"/list"** anytime to see this help again.`;
         searchApiKey: 'search-api-key',
         searchResultsLimit: 'search-results-limit',
         searchAutoSummarize: 'search-auto-summarize',
-        searchTimeFilter: 'search-time-filter'
+        searchTimeFilter: 'search-time-filter',
+        fontSize: 'slider-font-size'
     };
 
     function saveAllSettings() {
@@ -1488,6 +1515,26 @@ Type **"/list"** anytime to see this help again.`;
                 if (voicePitchSlider && voicePitchValue) {
                     voicePitchSlider.addEventListener('input', () => {
                         voicePitchValue.textContent = voicePitchSlider.value;
+                    });
+                }
+                
+                // Font Size slider functionality
+                const fontSizeSlider = settingsPanelContainer.querySelector('#slider-font-size');
+                const fontSizeValue = settingsPanelContainer.querySelector('#font-size-value');
+                
+                if (fontSizeSlider && fontSizeValue) {
+                    // Apply current font size on load
+                    applyFontSize(fontSizeSlider.value);
+                    fontSizeValue.textContent = fontSizeSlider.value + 'px';
+                    
+                    fontSizeSlider.addEventListener('input', () => {
+                        const fontSize = fontSizeSlider.value;
+                        fontSizeValue.textContent = fontSize + 'px';
+                        applyFontSize(fontSize);
+                        
+                        // Save to localStorage immediately for font size changes
+                        localStorage.setItem('fontSize', fontSize);
+                        SETTINGS.fontSize = parseInt(fontSize);
                     });
                 }
 
@@ -1847,9 +1894,7 @@ Type **"/list"** anytime to see this help again.`;
         }, { passive: true });
         
         userInput.addEventListener('mousedown', (e) => {
-            console.log('MouseDown: Event fired! voiceService available:', !!window.voiceService);
             if (window.voiceService && window.voiceService.stopSpeaking) {
-                console.log('MouseDown: Calling stopSpeaking()');
                 window.voiceService.stopSpeaking();
             } else {
                 console.log('MouseDown: voiceService.stopSpeaking not available');
@@ -1857,9 +1902,7 @@ Type **"/list"** anytime to see this help again.`;
         });
         
         userInput.addEventListener('focus', (e) => {
-            console.log('Focus: Event fired! voiceService available:', !!window.voiceService);
             if (window.voiceService && window.voiceService.stopSpeaking) {
-                console.log('Focus: Calling stopSpeaking()');
                 window.voiceService.stopSpeaking();
             } else {
                 console.log('Focus: voiceService.stopSpeaking not available');
