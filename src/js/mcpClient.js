@@ -108,6 +108,24 @@ if (typeof MCPClient === 'undefined') {
         async callToolViaHTTP(toolName, args) {
             console.log('🌐 MCP Client calling tool:', toolName, 'with args:', args);
             
+            // 🔒 SECURITY: Validate MCP tool parameters
+            if (window.securityValidator) {
+                const validation = window.securityValidator.validateMCPParameters(toolName, args);
+                if (!validation.isValid) {
+                    console.warn('🔒 Security: MCP tool parameters blocked:', validation.violations);
+                    window.securityValidator.logSecurityEvent('MCP_PARAMS_BLOCKED', {
+                        toolName: toolName,
+                        args: args,
+                        violations: validation.violations,
+                        riskLevel: validation.riskLevel
+                    });
+                    throw new Error(`Tool parameters validation failed: ${validation.violations.join(', ')}`);
+                }
+                // Use sanitized parameters
+                args = validation.sanitizedParams;
+                console.log('🔒 Security: MCP parameters validated and sanitized');
+            }
+            
             // Get LLM settings from localStorage - support both traditional and direct providers
             const provider = localStorage.getItem('customLlmProvider') || 'litellm';
             

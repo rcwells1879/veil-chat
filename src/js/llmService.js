@@ -381,6 +381,22 @@ if (typeof LLMService === 'undefined') {
             // Extract the actual custom persona text
             const customPersonaText = customPersonaMessage.content.replace('[CUSTOM PERSONA - INTERNAL REFERENCE] ', '');
             
+            // 🔒 SECURITY: Validate custom persona text before processing
+            if (window.securityValidator) {
+                const validation = window.securityValidator.validateUserInput(customPersonaText, 'characterPrompt');
+                if (!validation.isValid) {
+                    console.warn('🔒 Security: Custom persona blocked due to security violations:', validation.violations);
+                    window.securityValidator.logSecurityEvent('PERSONA_BLOCKED', {
+                        personaText: customPersonaText,
+                        violations: validation.violations,
+                        riskLevel: validation.riskLevel
+                    });
+                    
+                    throw new Error(`Custom persona contains potentially unsafe content: ${validation.violations.join(', ')}`);
+                }
+                console.log('🔒 Security: Custom persona validated and approved');
+            }
+            
             characterGenMessages = [
                 {
                     role: "system",

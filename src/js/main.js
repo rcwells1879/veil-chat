@@ -570,8 +570,29 @@ Type **"/list"** anytime to see this help again.`;
         const message = userInput.value.trim();
         if (!message) return;
 
+        // 🔒 SECURITY: Validate user input before processing
+        const validation = window.securityValidator.validateUserInput(message, 'userMessage');
+        if (!validation.isValid) {
+            console.warn('🔒 Security: User input blocked due to validation failure:', validation.violations);
+            window.securityValidator.logSecurityEvent('INPUT_BLOCKED', {
+                message: message,
+                violations: validation.violations,
+                riskLevel: validation.riskLevel
+            });
+            
+            addMessage('⚠️ Your message contains potentially unsafe content and was blocked for security reasons. Please rephrase your request.', 'system');
+            return;
+        }
+        
+        // Use sanitized input for processing
+        const sanitizedMessage = validation.sanitizedInput;
+        console.log('🔒 Security: Input validated and sanitized');
+        
+        // Update the display message to show sanitized version
+        userInput.value = sanitizedMessage;
+
         // Check for /list command first
-        if (message.toLowerCase().startsWith('/list')) {
+        if (sanitizedMessage.toLowerCase().startsWith('/list')) {
             userInput.value = '';
             
             // Reset textarea height after clearing content
@@ -594,9 +615,17 @@ Type **"/list"** anytime to see this help again.`;
         }
 
         // Check for "xx" direct image prompt
-        if (message.toLowerCase().startsWith('xx')) {
-            // Extract image prompt (remove "xx" and trim)
-            const imagePrompt = message.substring(2).trim();
+        if (sanitizedMessage.toLowerCase().startsWith('xx')) {
+            // Extract image prompt (remove "xx" and trim) - validate the image prompt too
+            const imagePrompt = sanitizedMessage.substring(2).trim();
+            
+            // 🔒 SECURITY: Validate image prompt
+            const imageValidation = window.securityValidator.validateUserInput(imagePrompt, 'imagePrompt');
+            if (!imageValidation.isValid) {
+                console.warn('🔒 Security: Image prompt blocked:', imageValidation.violations);
+                addMessage('⚠️ Your image prompt contains potentially unsafe content. Please rephrase your request.', 'system');
+                return;
+            }
             
             if (!imagePrompt) {
                 addMessage('Please provide an image prompt after "xx"', 'system');
@@ -617,7 +646,7 @@ Type **"/list"** anytime to see this help again.`;
             }
             
             // Display user message in chat
-            addMessage(message, 'user');
+            addMessage(sanitizedMessage, 'user');
             
             // Generate image directly (async, no LLM involved)
             try {
@@ -650,10 +679,10 @@ Type **"/list"** anytime to see this help again.`;
         }
         
         // Check if this is a "show me" image request - if so, don't add to conversation history
-        const isImageRequest = message.toLowerCase().includes("show me");
-        addMessage(message, 'user'); // Always show user message in chat
+        const isImageRequest = sanitizedMessage.toLowerCase().includes("show me");
+        addMessage(sanitizedMessage, 'user'); // Always show user message in chat
         if (isImageRequest) {
-            console.log('📸 Image request detected - excluding from conversation history:', message);
+            console.log('📸 Image request detected - excluding from conversation history:', sanitizedMessage);
         }
 
         // Prepare conversation context for MCP
@@ -665,19 +694,19 @@ Type **"/list"** anytime to see this help again.`;
             .join('\n');
 
         // Check for search keywords FIRST (basic search has priority)
-        if (SETTINGS.searchEnabled && detectSearchKeywords(message)) {
+        if (SETTINGS.searchEnabled && detectSearchKeywords(sanitizedMessage)) {
             console.log('🔍 Search keywords detected in message');
             
             // Add user message to conversation history immediately for search
             if (llmService) {
                 llmService.conversationHistory.push({
                     role: "user",
-                    content: message
+                    content: sanitizedMessage
                 });
-                console.log('📝 User message added to conversation history for search:', message);
+                console.log('📝 User message added to conversation history for search:', sanitizedMessage);
             }
             
-            const searchQuery = extractSearchQuery(message);
+            const searchQuery = extractSearchQuery(sanitizedMessage);
             console.log('📝 Extracted search query:', searchQuery);
             
             const searchResult = await performWebSearch(searchQuery);
@@ -719,7 +748,7 @@ Type **"/list"** anytime to see this help again.`;
         if (mcpClient && mcpClient.isConnected) {
             console.log('🔍 MCP Client is connected, checking if message should be handled...');
             try {
-                const mcpResult = await mcpClient.integrateWithChat(message, conversationContext, llmService);
+                const mcpResult = await mcpClient.integrateWithChat(sanitizedMessage, conversationContext, llmService);
                 if (mcpResult && mcpResult.content && mcpResult.content[0]) {
                     console.log('✅ MCP handled the message');
                     
@@ -733,7 +762,7 @@ Type **"/list"** anytime to see this help again.`;
                         if (llmService) {
                             llmService.conversationHistory.push({
                                 role: "user",
-                                content: message
+                                content: sanitizedMessage
                             });
                             llmService.conversationHistory.push({
                                 role: "assistant", 
@@ -763,7 +792,7 @@ Type **"/list"** anytime to see this help again.`;
                         if (llmService) {
                             llmService.conversationHistory.push({
                                 role: "user",
-                                content: message
+                                content: sanitizedMessage
                             });
                             llmService.conversationHistory.push({
                                 role: "assistant",
@@ -787,7 +816,7 @@ Type **"/list"** anytime to see this help again.`;
         const documentContext = contextService.getDocumentContext();
         // Skip adding user message for image requests, allow for normal messages
         const skipAddingUserMessage = isImageRequest;
-        const response = await llmService.sendMessage(message, documentContext, skipAddingUserMessage);
+        const response = await llmService.sendMessage(sanitizedMessage, documentContext, skipAddingUserMessage);
         
         if (response.type === 'image_request') {
             console.log("Image request detected, generating image...");
@@ -1993,14 +2022,87 @@ Type **"/list"** anytime to see this help again.`;
                     throw new Error("Invalid conversation file format.");
                 }
 
-                currentPersonaPrompt = loadedState.personaPrompt || null;
-                llmService.conversationHistory = loadedState.llmServiceState.conversationHistory;
+                // 🔒 SECURITY: Validate and sanitize loaded conversation history
+                const originalHistory = loadedState.llmServiceState.conversationHistory;
+                const sanitizedHistory = [];
+                let blockedMessages = 0;
+                
+                for (const message of originalHistory) {
+                    if (message && message.content) {
+                        // Validate message content using SecurityValidator
+                        const validation = window.securityValidator.validateUserInput(
+                            message.content, 
+                            'userMessage'
+                        );
+                        
+                        if (!validation.isValid) {
+                            console.warn('🔒 Security: Blocked malicious content in loaded conversation:', validation.violations);
+                            window.securityValidator.logSecurityEvent('CONVERSATION_LOAD_BLOCKED', {
+                                messageRole: message.role,
+                                violations: validation.violations,
+                                riskLevel: validation.riskLevel
+                            });
+                            blockedMessages++;
+                            
+                            // Replace with sanitized placeholder
+                            sanitizedHistory.push({
+                                role: message.role,
+                                content: '[Message blocked for security - contained potentially malicious content]',
+                                timestamp: message.timestamp || new Date().toISOString()
+                            });
+                        } else {
+                            // Use sanitized content
+                            sanitizedHistory.push({
+                                ...message,
+                                content: validation.sanitizedInput
+                            });
+                        }
+                    } else {
+                        // Keep non-content messages as-is (but still copy to avoid reference issues)
+                        sanitizedHistory.push({...message});
+                    }
+                }
+
+                if (blockedMessages > 0) {
+                    console.warn(`🔒 Security: ${blockedMessages} messages blocked during conversation load`);
+                    addMessage(`⚠️ Security notice: ${blockedMessages} messages were blocked for containing potentially malicious content.`, 'system');
+                }
+
+                // Validate persona prompt if present
+                let sanitizedPersonaPrompt = loadedState.personaPrompt || null;
+                if (sanitizedPersonaPrompt) {
+                    const personaValidation = window.securityValidator.validateUserInput(
+                        sanitizedPersonaPrompt, 
+                        'characterPrompt'
+                    );
+                    
+                    if (!personaValidation.isValid) {
+                        console.warn('🔒 Security: Blocked malicious persona prompt in loaded conversation');
+                        window.securityValidator.logSecurityEvent('PERSONA_LOAD_BLOCKED', {
+                            violations: personaValidation.violations,
+                            riskLevel: personaValidation.riskLevel
+                        });
+                        sanitizedPersonaPrompt = null;
+                        addMessage('⚠️ Security notice: Persona prompt was blocked for containing potentially malicious content.', 'system');
+                    } else {
+                        sanitizedPersonaPrompt = personaValidation.sanitizedInput;
+                    }
+                }
+
+                currentPersonaPrompt = sanitizedPersonaPrompt;
+                llmService.conversationHistory = sanitizedHistory;
                 llmService.characterInitialized = loadedState.llmServiceState.characterInitialized;
 
                 if (loadedState.documentContext) {
                     const imported = contextService.importContext(loadedState.documentContext);
                     if (imported) {
                         updateAttachedDocsDisplay();
+                        
+                        // Check if any documents were blocked and notify user
+                        const blockedDocs = contextService.attachedDocuments.filter(doc => doc.originallyBlocked);
+                        if (blockedDocs.length > 0) {
+                            addMessage(`⚠️ Security notice: ${blockedDocs.length} document(s) were blocked for containing potentially malicious content.`, 'system');
+                        }
                     }
                 }
 

@@ -2,7 +2,12 @@
 
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { SequentialThinkingMCPServer } from './mcp-server.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 class MCPHTTPServer {
     constructor(port = 3001) {
@@ -14,16 +19,48 @@ class MCPHTTPServer {
     }
 
     setupMiddleware() {
-        // CORS and JSON parsing
+        // CORS is handled by Cloudflare Zero Trust Access policies
         this.app.use(cors());
         this.app.use(express.json());
-        this.app.use(express.static('..')); // Serve static files from parent directory
+        
+        // 🔒 SECURITY: Restrict static file serving to safe directories only
+        // Use path.join to ensure correct paths from server directory
+        const srcPath = path.join(__dirname, '..');
+        
+        this.app.use('/js', express.static(path.join(srcPath, 'js')));
+        this.app.use('/css', express.static(path.join(srcPath, 'css')));
+        this.app.use('/icons', express.static(path.join(srcPath, 'icons')));
+        this.app.use('/pages', express.static(path.join(srcPath, 'pages')));
+        
+        // Serve PWA files
+        this.app.get('/manifest.json', (req, res) => {
+            res.sendFile(path.join(srcPath, 'manifest.json'));
+        });
+        
+        this.app.get('/service-worker.js', (req, res) => {
+            res.sendFile(path.join(srcPath, 'service-worker.js'));
+        });
+        
+        // Block access to sensitive files
+        this.app.use('/server', (req, res) => {
+            res.status(403).json({ error: 'Access to server files is forbidden' });
+        });
+        this.app.use('/node_modules', (req, res) => {
+            res.status(403).json({ error: 'Access to node_modules is forbidden' });
+        });
         
         // Security is handled by Cloudflare Access policies
         // No additional authentication middleware needed
     }
 
     setupRoutes() {
+        // Serve main application at root
+        const srcPath = path.join(__dirname, '..');
+        
+        this.app.get('/', (req, res) => {
+            res.sendFile(path.join(srcPath, 'index.html'));
+        });
+        
         // Health check endpoint
         this.app.get('/api/mcp/health', (req, res) => {
             res.json({ status: 'ok', message: 'MCP HTTP Server is running' });
@@ -510,8 +547,10 @@ class MCPHTTPServer {
     async start() {
         try {
             await new Promise((resolve, reject) => {
-                this.server = this.app.listen(this.port, () => {
+                // Bind to all interfaces (0.0.0.0) to allow external access
+                this.server = this.app.listen(this.port, '0.0.0.0', () => {
                     console.log(`MCP HTTP Server running on http://localhost:${this.port}`);
+                    console.log(`External access available at http://0.0.0.0:${this.port}`);
                     console.log(`Chat interface available at http://localhost:${this.port}`);
                     console.log(`API endpoints:`);
                     console.log(`  GET  /api/mcp/health - Health check`);

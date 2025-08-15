@@ -6,31 +6,7 @@ import { CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 
 // Web extraction functionality
 import WebExtractor from './extractors/web-extractor.js';
-
-// Shared blocklist of sites with aggressive bot detection that should be skipped entirely
-const BLOCKED_SITES = [
-    'yelp.com',
-    'tripadvisor.com',
-    'facebook.com',
-    'twitter.com',
-    'x.com',
-    'linkedin.com',
-    'instagram.com',
-    'tiktok.com',
-    'pinterest.com',
-    'beeradvocate.com',
-    'ubereats.com'
-];
-
-// Helper function to check if a URL is from a blocked site
-function isBlockedSite(url) {
-    try {
-        const domain = new URL(url).hostname.toLowerCase();
-        return BLOCKED_SITES.some(blockedSite => domain.includes(blockedSite));
-    } catch (error) {
-        return false; // Invalid URL, don't block
-    }
-}
+import SecurityManager from './security-manager.js';
 
 // Search Provider Classes
 class BraveSearchProvider {
@@ -348,6 +324,12 @@ class SequentialThinkingMCPServer {
             }
         );
 
+        // Initialize security manager
+        this.securityManager = new SecurityManager();
+        
+        // Block file system writes for security
+        this.securityManager.blockFileSystemWrites();
+
         // Initialize web extractor
         this.webExtractor = new WebExtractor();
 
@@ -363,18 +345,19 @@ class SequentialThinkingMCPServer {
         // Store for active agent tasks
         this.agentTasks = new Map();
         
-        // Maximum number of concurrent tasks
-        this.maxTasks = 100;
-        
-        // Task timeout (30 minutes)
-        this.taskTimeout = 30 * 60 * 1000;
+        // 🔒 SECURITY: Enhanced memory limits to prevent abuse
+        this.maxTasks = 100; // Maximum concurrent tasks
+        this.taskTimeout = 30 * 60 * 1000; // 30 minutes
+        this.maxMemoryPerTask = 1024 * 1024; // 1MB per task
+        this.maxTotalMemory = 50 * 1024 * 1024; // 50MB total
         
         // Start cleanup interval (every 5 minutes)
         this.cleanupInterval = setInterval(() => {
             this.cleanupExpiredTasks();
+            this.enforceMemoryLimits();
         }, 5 * 60 * 1000);
         
-        console.log('🧠 Memory management system initialized');
+        console.log('🧠 Memory management system initialized with security limits');
     }
 
     // Generate unique task ID
@@ -468,6 +451,56 @@ class SequentialThinkingMCPServer {
 
         if (cleaned > 0) {
             console.log(`🧠 Cleaned up ${cleaned} expired agent tasks`);
+        }
+    }
+    
+    // 🔒 SECURITY: Enforce memory limits
+    enforceMemoryLimits() {
+        // Calculate total memory usage
+        let totalMemory = 0;
+        const memoryPerTask = new Map();
+        
+        for (const [taskId, task] of this.agentTasks.entries()) {
+            const taskMemory = JSON.stringify(task.memory || {}).length;
+            memoryPerTask.set(taskId, taskMemory);
+            totalMemory += taskMemory;
+        }
+        
+        // If total memory exceeds limit, remove oldest tasks
+        if (totalMemory > this.maxTotalMemory) {
+            const sortedTasks = [...this.agentTasks.entries()]
+                .sort((a, b) => a[1].lastAccessed - b[1].lastAccessed);
+            
+            for (const [taskId, task] of sortedTasks) {
+                if (totalMemory <= this.maxTotalMemory) break;
+                
+                const taskMemory = memoryPerTask.get(taskId);
+                this.agentTasks.delete(taskId);
+                totalMemory -= taskMemory;
+                
+                this.securityManager.logSecurityEvent('MEMORY_LIMIT_ENFORCED', {
+                    taskId: taskId,
+                    memoryFreed: taskMemory,
+                    totalMemoryAfter: totalMemory
+                });
+                
+                console.warn(`🔒 Removed task ${taskId} due to memory limits`);
+            }
+        }
+        
+        // Check individual task limits
+        for (const [taskId, taskMemory] of memoryPerTask.entries()) {
+            if (taskMemory > this.maxMemoryPerTask) {
+                this.agentTasks.delete(taskId);
+                
+                this.securityManager.logSecurityEvent('TASK_MEMORY_EXCEEDED', {
+                    taskId: taskId,
+                    memoryUsed: taskMemory,
+                    limit: this.maxMemoryPerTask
+                });
+                
+                console.warn(`🔒 Removed task ${taskId} - exceeded individual memory limit`);
+            }
         }
     }
 
@@ -1282,8 +1315,36 @@ Please provide a natural, conversational response about this information. Stay i
             throw new Error('URL is required for web content extraction');
         }
 
+        // 🔒 SECURITY: Validate URL and check rate limits
+        const urlValidation = this.securityManager.validateURL(url);
+        if (!urlValidation.isValid) {
+            this.securityManager.logSecurityEvent('URL_BLOCKED', {
+                url: url,
+                reason: urlValidation.reason,
+                riskLevel: urlValidation.riskLevel
+            });
+            throw new Error(`URL blocked for security: ${urlValidation.reason}`);
+        }
+        
+        const rateLimitCheck = this.securityManager.checkRateLimit(url);
+        if (!rateLimitCheck.allowed) {
+            this.securityManager.logSecurityEvent('RATE_LIMIT_EXCEEDED', {
+                url: url,
+                reason: rateLimitCheck.reason
+            });
+            throw new Error(`Rate limit exceeded: ${rateLimitCheck.reason}`);
+        }
+        
+        const concurrentCheck = this.securityManager.checkConcurrentLimit();
+        if (!concurrentCheck.allowed) {
+            throw new Error(`Too many concurrent requests: ${concurrentCheck.reason}`);
+        }
+
+        const requestId = `extract_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        this.securityManager.registerRequest(requestId);
+
         try {
-            console.log(`🔍 MCP Server: Extracting content from ${url}`);
+            console.log(`🔍 MCP Server: Extracting content from ${url} (Request ID: ${requestId})`);
             const extractedData = await this.webExtractor.extract(url, options);
             
             return {
@@ -1295,28 +1356,10 @@ Please provide a natural, conversational response about this information. Stay i
                 ]
             };
         } catch (error) {
-            // Handle blocked sites differently from extraction failures
-            if (error.message.includes('is blocked due to aggressive bot detection')) {
-                console.log(`🚫 Skipped blocked site: ${url}`);
-                return {
-                    content: [
-                        {
-                            type: 'text',
-                            text: `🚫 Skipped ${url}: Site blocked due to aggressive bot detection`
-                        }
-                    ]
-                };
-            } else {
-                console.error(`❌ MCP Server: Web extraction failed for ${url}:`, error.message);
-                return {
-                    content: [
-                        {
-                            type: 'text',
-                            text: `⚠️ Failed to extract content from ${url}: ${error.message}`
-                        }
-                    ]
-                };
-            }
+            throw error;
+        } finally {
+            // Always cleanup the request registration
+            this.securityManager.unregisterRequest(requestId);
         }
     }
 
@@ -1327,37 +1370,80 @@ Please provide a natural, conversational response about this information. Stay i
             throw new Error('URL is required for web content extraction');
         }
 
+        // 🔒 SECURITY: Validate URL and check rate limits (same as handleExtractWebContent)
+        const urlValidation = this.securityManager.validateURL(url);
+        if (!urlValidation.isValid) {
+            this.securityManager.logSecurityEvent('URL_BLOCKED', {
+                url: url,
+                reason: urlValidation.reason,
+                riskLevel: urlValidation.riskLevel
+            });
+            throw new Error(`URL blocked for security: ${urlValidation.reason}`);
+        }
+        
+        const rateLimitCheck = this.securityManager.checkRateLimit(url);
+        if (!rateLimitCheck.allowed) {
+            this.securityManager.logSecurityEvent('RATE_LIMIT_EXCEEDED', {
+                url: url,
+                reason: rateLimitCheck.reason
+            });
+            throw new Error(`Rate limit exceeded: ${rateLimitCheck.reason}`);
+        }
+        
+        const concurrentCheck = this.securityManager.checkConcurrentLimit();
+        if (!concurrentCheck.allowed) {
+            throw new Error(`Too many concurrent requests: ${concurrentCheck.reason}`);
+        }
+
+        const requestId = `extract_summary_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        this.securityManager.registerRequest(requestId);
+
         try {
-            console.log(`📝 MCP Server: Extracting content for summarization from ${url}`);
+            console.log(`📝 MCP Server: Extracting content for summarization from ${url} (Request ID: ${requestId})`);
             const extractedData = await this.webExtractor.extractForSummarization(url, options);
             
-            // Format for LLM consumption
             return {
                 content: [
                     {
                         type: 'text',
-                        text: `**${extractedData.title}**\n\nSource: ${extractedData.url}\n\n${extractedData.content}`
+                        text: `**URL:** ${extractedData.url}\n**Extracted:** ${extractedData.extractedAt}\n**Method:** ${extractedData.extractionMethod}\n\n${extractedData.content}`
                     }
                 ]
             };
         } catch (error) {
-            console.error(`❌ MCP Server: Web extraction for summary failed for ${url}:`, error.message);
-            return {
-                content: [
-                    {
-                        type: 'text',
-                        text: `⚠️ Failed to extract content from ${url}: ${error.message}`
-                    }
-                ]
-            };
+            throw error;
+        } finally {
+            // Always cleanup the request registration
+            this.securityManager.unregisterRequest(requestId);
         }
     }
+
 
     async handleExtractMultipleUrls(args) {
         const { urls, options = {} } = args;
         
         if (!urls || !Array.isArray(urls) || urls.length === 0) {
             throw new Error('URLs array is required for batch extraction');
+        }
+
+        // 🔒 SECURITY: Limit batch size to prevent abuse
+        if (urls.length > 10) {
+            throw new Error('Batch extraction limited to 10 URLs for security');
+        }
+
+        // 🔒 SECURITY: Validate all URLs before processing
+        const urlValidations = [];
+        for (const url of urls) {
+            const validation = this.securityManager.validateURL(url);
+            if (!validation.isValid) {
+                this.securityManager.logSecurityEvent('BATCH_URL_BLOCKED', {
+                    url: url,
+                    reason: validation.reason,
+                    batchSize: urls.length
+                });
+                throw new Error(`URL blocked for security: ${url} - ${validation.reason}`);
+            }
+            urlValidations.push(validation);
         }
 
         try {
@@ -1891,7 +1977,7 @@ Goal: "Latest developments in renewable energy" → "latest renewable energy dev
         const uniqueUrls = [...new Set(urls)]
             .filter(url => url && url.startsWith('http'))
             .filter(url => {
-                if (isBlockedSite(url)) {
+                if (this.securityManager.isBlockedSite(url)) {
                     console.log(`🚫 Filtered out blocked site: ${url}`);
                     return false;
                 }
@@ -1926,7 +2012,7 @@ Goal: "Latest developments in renewable energy" → "latest renewable energy dev
         const uniqueUrls = [...new Set(urls)]
             .filter(url => url && url.startsWith('http'))
             .filter(url => {
-                if (isBlockedSite(url)) {
+                if (this.securityManager.isBlockedSite(url)) {
                     console.log(`🚫 Filtered out blocked site: ${url}`);
                     return false;
                 }
@@ -1941,8 +2027,8 @@ Goal: "Latest developments in renewable energy" → "latest renewable energy dev
     async extractWithIntelligentMethod(url, options = {}) {
         const domain = new URL(url).hostname.toLowerCase();
         
-        // Check if site is blocked using shared blocklist
-        if (isBlockedSite(url)) {
+        // Check if site is blocked using security manager
+        if (this.securityManager.isBlockedSite(url)) {
             console.log(`🚫 Skipping blocked site: ${domain}`);
             throw new Error(`Site ${domain} is blocked due to aggressive bot detection`);
         }

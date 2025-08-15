@@ -63,14 +63,44 @@ if (typeof ContextService === 'undefined') {
 
                 const extractedText = await this.extractText(file, fileType);
                 
+                // 🔒 SECURITY: Validate and sanitize extracted file content
+                let finalContent = extractedText;
+                let securityValidated = false;
+                
+                if (window.securityValidator) {
+                    const validation = window.securityValidator.validateAttachedFileContent(
+                        extractedText, 
+                        file.name, 
+                        fileType
+                    );
+                    
+                    if (!validation.isValid) {
+                        console.warn('🔒 Security: File content blocked:', validation.violations);
+                        window.securityValidator.logSecurityEvent('FILE_CONTENT_BLOCKED', {
+                            fileName: file.name,
+                            fileType: fileType,
+                            violations: validation.violations,
+                            riskLevel: validation.riskLevel
+                        });
+                        
+                        throw new Error(`File "${file.name}" contains potentially unsafe content: ${validation.violations.join(', ')}`);
+                    }
+                    
+                    // Use sanitized content
+                    finalContent = validation.sanitizedContent;
+                    securityValidated = true;
+                    console.log('🔒 Security: File content validated and sanitized');
+                }
+                
                 const document = {
                     id: Date.now() + Math.random(),
                     name: file.name,
                     type: fileType,
                     size: file.size,
-                    content: extractedText,
-                    preview: this.generatePreview(extractedText),
-                    addedAt: new Date().toISOString()
+                    content: finalContent,
+                    preview: this.generatePreview(finalContent),
+                    addedAt: new Date().toISOString(),
+                    securityValidated: securityValidated
                 };
 
                 this.attachedDocuments.push(document);
@@ -262,8 +292,72 @@ if (typeof ContextService === 'undefined') {
         };
     }
 
-    importContext(contextData) {        if (contextData && contextData.documents && Array.isArray(contextData.documents)) {
-            this.attachedDocuments = contextData.documents;
+    importContext(contextData) {
+        if (contextData && contextData.documents && Array.isArray(contextData.documents)) {
+            // 🔒 SECURITY: Validate and sanitize imported document content
+            const sanitizedDocuments = [];
+            let blockedDocuments = 0;
+            
+            for (const doc of contextData.documents) {
+                if (doc && doc.content) {
+                    // Validate document content using SecurityValidator
+                    if (window.securityValidator) {
+                        const validation = window.securityValidator.validateAttachedFileContent(
+                            doc.content,
+                            doc.name || 'imported-document',
+                            doc.type || 'unknown'
+                        );
+                        
+                        if (!validation.isValid) {
+                            console.warn('🔒 Security: Blocked malicious document in imported context:', validation.violations);
+                            window.securityValidator.logSecurityEvent('DOCUMENT_IMPORT_BLOCKED', {
+                                documentName: doc.name,
+                                documentType: doc.type,
+                                violations: validation.violations,
+                                riskLevel: validation.riskLevel
+                            });
+                            blockedDocuments++;
+                            
+                            // Replace with sanitized placeholder
+                            sanitizedDocuments.push({
+                                ...doc,
+                                content: '[Document content blocked for security - contained potentially malicious content]',
+                                securityValidated: false,
+                                originallyBlocked: true
+                            });
+                        } else {
+                            // Use sanitized content
+                            sanitizedDocuments.push({
+                                ...doc,
+                                content: validation.sanitizedContent,
+                                securityValidated: true,
+                                originallyBlocked: false
+                            });
+                        }
+                    } else {
+                        // Fallback if SecurityValidator not available
+                        sanitizedDocuments.push({
+                            ...doc,
+                            securityValidated: false,
+                            originallyBlocked: false
+                        });
+                    }
+                } else {
+                    // Keep documents without content as-is
+                    sanitizedDocuments.push({
+                        ...doc,
+                        securityValidated: false,
+                        originallyBlocked: false
+                    });
+                }
+            }
+            
+            this.attachedDocuments = sanitizedDocuments;
+            
+            if (blockedDocuments > 0) {
+                console.warn(`🔒 Security: ${blockedDocuments} documents blocked during context import`);
+            }
+            
             return true;
         }
         return false;

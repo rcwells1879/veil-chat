@@ -92,6 +92,36 @@ class PuppeteerExtractor extends BaseExtractor {
                 '--password-store=basic',
                 '--use-mock-keychain',
                 '--disable-javascript-harmony-shipping',
+                
+                // 🔒 SECURITY: Chrome sandboxing arguments to prevent file access
+                '--disable-file-system-api',
+                '--disable-web-auth',
+                '--disable-reading-from-canvas',
+                '--disable-webgl',
+                '--disable-accelerated-2d-canvas',
+                '--disable-gpu',
+                '--disable-features=VizDisplayCompositor,VizHitTestDrawQuad',
+                '--disable-software-rasterizer',
+                '--disable-background-mode',
+                '--disable-default-apps',
+                '--disable-extensions',
+                '--disable-plugins',
+                '--disable-preconnect',
+                '--disable-file-access-from-files',
+                '--no-experiments',
+                '--no-service-autorun',
+                '--deny-permission-prompts',
+                '--autoplay-policy=user-gesture-required',
+                '--disable-notifications',
+                '--disable-geolocation',
+                '--disable-camera',
+                '--disable-microphone',
+                '--block-new-web-contents',
+                '--disable-client-side-phishing-detection',
+                '--disable-sync',
+                '--disable-speech-api',
+                '--disable-file-system',
+                
                 '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
             ],
             defaultViewport: {
@@ -147,6 +177,70 @@ class PuppeteerExtractor extends BaseExtractor {
             this.resetInactivityTimer(browser);
             
             page = await browser.newPage();
+
+            // 🔒 SECURITY: Block downloads and file uploads
+            await page._client.send('Page.setDownloadBehavior', {
+                behavior: 'deny'
+            });
+            
+            // Block file uploads by intercepting requests
+            await page.setRequestInterception(true);
+            page.on('request', (request) => {
+                const resourceType = request.resourceType();
+                const url = request.url();
+                
+                // Block potentially dangerous resource types
+                if (['websocket', 'eventsource'].includes(resourceType)) {
+                    console.log(`🔒 Blocked ${resourceType} request to ${url}`);
+                    request.abort();
+                    return;
+                }
+                
+                // Block file:// and other dangerous schemes
+                if (url.startsWith('file://') || url.startsWith('chrome://') || url.startsWith('about://')) {
+                    console.log(`🔒 Blocked dangerous URL scheme: ${url}`);
+                    request.abort();
+                    return;
+                }
+                
+                request.continue();
+            });
+            
+            // Block permission requests (camera, microphone, location, etc.)
+            await page.evaluateOnNewDocument(() => {
+                // Override permission APIs
+                if (navigator.permissions && navigator.permissions.query) {
+                    navigator.permissions.query = () => Promise.resolve({ state: 'denied' });
+                }
+                
+                // Block geolocation
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition = () => {};
+                    navigator.geolocation.watchPosition = () => {};
+                }
+                
+                // Block media devices
+                if (navigator.mediaDevices) {
+                    navigator.mediaDevices.getUserMedia = () => Promise.reject(new Error('Permission denied'));
+                    navigator.mediaDevices.getDisplayMedia = () => Promise.reject(new Error('Permission denied'));
+                }
+                
+                // Block notifications
+                if (window.Notification) {
+                    window.Notification.requestPermission = () => Promise.resolve('denied');
+                }
+                
+                // Block file APIs
+                if (window.showOpenFilePicker) {
+                    window.showOpenFilePicker = () => Promise.reject(new Error('File access blocked'));
+                }
+                if (window.showSaveFilePicker) {
+                    window.showSaveFilePicker = () => Promise.reject(new Error('File access blocked'));
+                }
+                if (window.showDirectoryPicker) {
+                    window.showDirectoryPicker = () => Promise.reject(new Error('File access blocked'));
+                }
+            });
 
             // Set timeout and configure page
             await page.setDefaultNavigationTimeout(this.timeout);

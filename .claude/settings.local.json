@@ -32,7 +32,8 @@
       "WebFetch(domain:ai.google.dev)",
       "WebFetch(domain:simonwillison.net)",
       "WebFetch(domain:lmstudio.ai)",
-      "WebFetch(domain:developers.cloudflare.com)"
+      "WebFetch(domain:developers.cloudflare.com)",
+      "WebSearch"
     ],
     "deny": []
   }
