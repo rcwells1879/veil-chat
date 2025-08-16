@@ -441,7 +441,7 @@ Make sure the character you create embodies and follows the persona instructions
             
             if (isDirectProvider) {
                 payload = this.createDirectProviderPayload(characterGenMessages, this.characterGenTemperature, this.characterGenMaxTokens);
-                console.log('Sending direct provider character generation request:', JSON.stringify(payload, null, 2));
+                console.log('Sending direct provider character generation request:', JSON.stringify(this.sanitizePayloadForLogging(payload), null, 2));
                 data = await this.sendDirectProviderRequest(payload);
                 characterProfile = this.extractDirectProviderResponse(data);
             } else {
@@ -455,7 +455,7 @@ Make sure the character you create embodies and follows the persona instructions
                     headers['Authorization'] = `Bearer ${this.apiKey}`;
                 }
 
-                console.log('Sending traditional character generation request:', JSON.stringify(payload, null, 2));
+                console.log('Sending traditional character generation request:', JSON.stringify(this.sanitizePayloadForLogging(payload), null, 2));
 
                 const response = await fetch(endpoint, {
                     method: 'POST',
@@ -559,23 +559,18 @@ Make sure the character you create embodies and follows the persona instructions
                 .filter(msg => msg.role !== 'system' && !msg.content.includes('[INTERNAL'))
                 .slice(-5);
 
-            // For image generation, create a completely separate context that forces the LLM to generate keywords
+            // Create a clean, focused context for image generation
+            const characterProfile = this.getCharacterProfile() || 'person';
+            const conversationContext = recentMessages.slice(-8).map(msg => `${msg.role}: ${msg.content}`).join('\n');
+            
             const imageGenMessagesForApiCall = [
                 {
                     role: "system",
-                    content: "You are an image prompt generator. Your ONLY job is to convert user requests into comma-separated lists of 20 or morevisual descriptive keywords for image generation. " +
-                    "Unless the user asks you for a specific image outside the context of the roleplay, Include your persona's physical appearance details: " +
-                    "gender ('man' or 'woman'), hair color and style, eye color, skin tone, height, build, clothing style, age, and whatever else is relevant to the current conversation. " +
-                    "Do not include the character's name or more than one adjective per trait."
+                    content: "You are an image keyword generator. Create detailed comma-separated keywords for image generation. Include at least 20 descriptive keywords focusing on visual elements that can be depicted in an image."
                 },
-                ...recentMessages, // Include last 5 conversation messages for context
                 {
-                    role: "user", 
-                    content: "Convert this request into ONLY a comma-separated list of at least 20image generation keywords: \"" + message + "\". If your persona is in the image, " +
-                    "Include Physical character details from the conversation: " + (this.getCharacterProfile() || 'person') +
-                    ". Output format: (1man or 1woman), hair color, style, eye color, skin tone, height, build, setting, keyword1, keyword2, keyword3, etc. " +
-                    "Setting the scene is important, so include the setting of the image in the keywords, and any other details that are relevant to the current conversation. " +
-                    "If the user asks you to send them an image of something or a place outside of the current conversation, do not include any character details in the keywords."
+                    role: "user",
+                    content: `Create image keywords for: "${message}"\n\nCharacter appearance: ${characterProfile}\n\nRecent conversation context: ${conversationContext}\n\nOutput format: 1woman, hair-color, hair-style, eye-color, build, clothing-style, setting, mood, lighting, pose, expression, background-details, weather, time-of-day, camera-angle, art-style, quality-tags, additional-descriptors\n\nProvide at least 20 comma-separated keywords. Respond with ONLY the keywords.`
                 }
             ];
 
@@ -585,7 +580,7 @@ Make sure the character you create embodies and follows the persona instructions
             
             if (isDirectProvider) {
                 payload = this.createDirectProviderPayload(imageGenMessagesForApiCall, this.imagePromptTemperature, this.imagePromptMaxTokens);
-                console.log('Sending direct provider image prompt request:', JSON.stringify(payload, null, 2));
+                console.log('Sending direct provider image prompt request:', JSON.stringify(this.sanitizePayloadForLogging(payload), null, 2));
                 try {
                     data = await this.sendDirectProviderRequest(payload);
                     rawReply = this.extractDirectProviderResponse(data);
@@ -608,7 +603,7 @@ Make sure the character you create embodies and follows the persona instructions
                     headers['Authorization'] = `Bearer ${this.apiKey}`;
                 }
 
-                console.log('Sending traditional image prompt request:', JSON.stringify(payload, null, 2));
+                console.log('Sending traditional image prompt request:', JSON.stringify(this.sanitizePayloadForLogging(payload), null, 2));
 
                 const response = await fetch(endpoint, {
                     method: 'POST',
@@ -669,7 +664,7 @@ Make sure the character you create embodies and follows the persona instructions
                 
                 if (isDirectProvider) {
                     payload = this.createDirectProviderPayload(messagesForAPI, this.chatTemperature, this.chatMaxTokens);
-                    console.log('Sending direct provider normal chat request:', JSON.stringify(payload, null, 2));
+                    console.log('Sending direct provider normal chat request:', JSON.stringify(this.sanitizePayloadForLogging(payload), null, 2));
                     data = await this.sendDirectProviderRequest(payload);
                     rawReply = this.extractDirectProviderResponse(data);
                     if (!rawReply) {
@@ -686,7 +681,7 @@ Make sure the character you create embodies and follows the persona instructions
                         headers['Authorization'] = `Bearer ${this.apiKey}`;
                     }
 
-                    console.log('Sending traditional normal chat request:', JSON.stringify(payload, null, 2));
+                    console.log('Sending traditional normal chat request:', JSON.stringify(this.sanitizePayloadForLogging(payload), null, 2));
 
                     const response = await fetch(endpoint, {
                         method: 'POST',
@@ -739,6 +734,13 @@ Make sure the character you create embodies and follows the persona instructions
         console.log("Character profile reset. Will regenerate on next message.");
     }
 
+    // Helper function to sanitize payload for logging (removes safety settings)
+    sanitizePayloadForLogging(payload) {
+        const sanitized = { ...payload };
+        delete sanitized.safetySettings;
+        return sanitized;
+    }
+    
     // Method to get character profile (for debugging)
     getCharacterProfile() {
         const profileMessage = this.conversationHistory.find(msg => 
@@ -802,29 +804,37 @@ Make sure the character you create embodies and follows the persona instructions
         console.log("Generating initial persona image and greeting...");
         
         try {
-            // Use the character profile context for image generation
+            // Create context for image generation with character profile but no roleplay instructions
+            const characterProfile = this.getCharacterProfile() || 'person';
+            
+            // Get character profile system message (the hidden one with appearance details)
+            const characterProfileMessage = this.conversationHistory.find(msg => 
+                msg.role === 'system' && msg.content.includes('[INTERNAL CHARACTER PROFILE')
+            );
+            
+            // Get last 8 non-system messages for conversational context
+            const recentMessages = this.conversationHistory
+                .filter(msg => msg.role !== 'system')
+                .slice(-8);
+            const conversationContext = recentMessages.map(msg => `${msg.role}: ${msg.content}`).join('\n');
+            
             const imageGenMessages = [
-                ...this.conversationHistory, // This includes the character profile
-                {
-                    role: "user",
-                    content: "show me what you look like"
-                },
                 {
                     role: "system",
-                    content: "You are an image prompt generator. Your ONLY job is to convert user requests into comma-separated lists of visual descriptive keywords for image generation. " +
-                    "Unless the user asks you for a specific image outside the context of the roleplay, Include your persona's physical appearance details: " +
-                    "gender ('man' or 'woman'), hair color and style, eye color, skin tone, height, build, clothing style, age, and whatever else is relevant to the current conversation. " +
-                    "Do not include the character's name or more than one adjective per trait."
-                },
-                {
-                    role: "user",
-                    content: "Convert this request into ONLY a comma-separated list of image generation keywords." +
-                    "Include Physical character details from the conversation: " + (this.getCharacterProfile() || 'person') +
-                    ". Output format: (1man or 1woman), hair color, style, eye color, skin tone, height, build, setting, keyword1, keyword2, keyword3, etc. " +
-                    "Setting the scene is important, so include the setting of the image in the keywords, and any other details that are relevant to the current conversation. " +
-                    "If the user asks you to send them an image of something or a place outside of the current conversation, do not include any character details in the keywords."
+                    content: "You are an image keyword generator. Create detailed comma-separated keywords for image generation. Include at least 20 descriptive keywords focusing on visual elements. Output ONLY keywords, no other text."
                 }
             ];
+            
+            // Include the character profile system message if it exists
+            if (characterProfileMessage) {
+                imageGenMessages.push(characterProfileMessage);
+            }
+            
+            // Add the user request with context
+            imageGenMessages.push({
+                role: "user",
+                content: `Generate image keywords for: "show me what you look like"\n\nRecent conversation context: ${conversationContext}\n\nOutput format: 1woman, hair-color, hair-style, eye-color, build, clothing-style, setting, mood, lighting, pose, expression, background-details, weather, time-of-day, activity, art-style, quality-tags\n\nProvide at least 20 comma-separated keywords. Respond with ONLY the keywords.`
+            });
             
             const isDirectProvider = ['openai-direct', 'anthropic-direct', 'google-direct'].includes(this.providerType);
             let imagePrompt = null;
