@@ -45,3 +45,6 @@ build/
 # Temporary folders
 tmp/
 temp/
+
+# Claude Code settings
+.claude/
