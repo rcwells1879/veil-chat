@@ -300,17 +300,202 @@ async function initializeApp() {
     // Apply initial font size from settings
     applyFontSize(SETTINGS.fontSize);
 
-    // --- Font Size Management ---
+    // --- Service Reinitialization ---
+    // Ensure all services are properly configured with current settings
+    async function reinitializeServicesWithCurrentSettings() {
+        console.log('🔧 Reinitializing services with current settings...');
+        
+        // Check if ImageService needs reinitialization based on provider
+        const currentImageApiUrl = imageService.apiBaseUrl;
+        const expectedImageApiUrl = SETTINGS.customImageProvider === 'swarmui' ? SETTINGS.swarmuiApiUrl : SETTINGS.customImageApiUrl;
+        
+        console.log('🔧 Image provider check:', {
+            provider: SETTINGS.customImageProvider,
+            currentApiUrl: currentImageApiUrl,
+            expectedApiUrl: expectedImageApiUrl,
+            swarmuiApiUrl: SETTINGS.swarmuiApiUrl,
+            customImageApiUrl: SETTINGS.customImageApiUrl
+        });
+        
+        if (currentImageApiUrl !== expectedImageApiUrl || 
+            imageService.provider !== SETTINGS.customImageProvider) {
+            
+            console.log('🔧 Image settings need reinitialization - recreating ImageService...');
+            imageService = new ImageService(
+                expectedImageApiUrl,
+                SETTINGS.customImageProvider, 
+                SETTINGS.openaiApiKey
+            );
+            console.log('🔧 ImageService reinitialized with:', {
+                provider: SETTINGS.customImageProvider,
+                apiUrl: expectedImageApiUrl
+            });
+        }
+        
+        // Always update ImageService settings to ensure all parameters are current
+        imageService.updateSettings({
+            // A1111 settings
+            width: parseInt(SETTINGS.imageWidth) || 1024,
+            height: parseInt(SETTINGS.imageHeight) || 1536,
+            steps: parseInt(SETTINGS.imageSteps) || 20,
+            cfg_scale: parseFloat(SETTINGS.imageCfgScale) || 1.4,
+            sampler_name: SETTINGS.imageSampler || 'Euler a',
+            
+            // OpenAI settings
+            size: SETTINGS.imageSize || 'auto',
+            quality: SETTINGS.openaiQuality || 'auto',
+            output_format: SETTINGS.openaiOutputFormat || 'png',
+            background: SETTINGS.openaiBackground || 'auto',
+            
+            // SwarmUI settings - this is the critical part that was missing!
+            swarm_width: parseInt(SETTINGS.swarmuiWidth) || 1024,
+            swarm_height: parseInt(SETTINGS.swarmuiHeight) || 1024,
+            swarm_steps: parseInt(SETTINGS.swarmuiSteps) || 20,
+            swarm_cfg_scale: parseFloat(SETTINGS.swarmuiCfgScale) || 7.5,
+            swarm_model: SETTINGS.swarmuiModel || null,
+            swarm_sampler: SETTINGS.swarmuiSampler || 'Euler a',
+            
+            // Provider and API settings
+            provider: SETTINGS.customImageProvider,
+            openaiApiKey: SETTINGS.openaiApiKey,
+            apiBaseUrl: expectedImageApiUrl
+        });
+        
+        console.log('🔧 ImageService settings updated with current values:', {
+            provider: SETTINGS.customImageProvider,
+            swarmWidth: SETTINGS.swarmuiWidth,
+            swarmHeight: SETTINGS.swarmuiHeight,
+            swarmSteps: SETTINGS.swarmuiSteps,
+            swarmCfgScale: SETTINGS.swarmuiCfgScale,
+            swarmModel: SETTINGS.swarmuiModel,
+            swarmSampler: SETTINGS.swarmuiSampler
+        });
+        
+        // Check if LLMService needs reinitialization
+        if (llmService.apiBaseUrl !== SETTINGS.customLlmApiUrl || 
+            llmService.providerType !== SETTINGS.customLlmProvider ||
+            llmService.modelIdentifier !== SETTINGS.customLlmModelIdentifier) {
+            
+            console.log('🔧 LLM settings need reinitialization - recreating LLMService...');
+            llmService = new LLMService(
+                SETTINGS.customLlmApiUrl, 
+                SETTINGS.customLlmProvider, 
+                SETTINGS.customLlmModelIdentifier, 
+                SETTINGS.customLlmApiKey,
+                {
+                    openaiModel: SETTINGS.openaiModelIdentifier,
+                    openaiApiKey: SETTINGS.openaiApiKey,
+                    anthropicModel: SETTINGS.anthropicModelIdentifier,
+                    anthropicApiKey: SETTINGS.anthropicApiKey,
+                    googleModel: SETTINGS.googleModelIdentifier,
+                    googleApiKey: SETTINGS.googleApiKey
+                }
+            );
+            console.log('🔧 LLMService reinitialized');
+        }
+        
+        // Update voice service settings
+        if (voiceService) {
+            voiceService.setVoiceRate(SETTINGS.voiceSpeed);
+            voiceService.setVoicePitch(SETTINGS.voicePitch);
+            
+            if (SETTINGS.azureApiKey && SETTINGS.azureApiKey.trim()) {
+                voiceService.setAzureConfig(SETTINGS.azureApiKey, SETTINGS.azureRegion);
+            }
+        }
+        
+        // Check if MCP client needs reinitialization
+        const needsMCPReinit = !mcpClient || 
+                              (mcpClient && mcpClient.serverUrl !== SETTINGS.mcpServerUrl) ||
+                              (SETTINGS.mcpEnabled && !mcpClient);
+        
+        if (needsMCPReinit && SETTINGS.mcpEnabled && SETTINGS.mcpServerUrl) {
+            console.log('🔧 MCP settings need reinitialization:', {
+                enabled: SETTINGS.mcpEnabled,
+                serverUrl: SETTINGS.mcpServerUrl,
+                currentUrl: mcpClient ? mcpClient.serverUrl : 'none'
+            });
+            
+            // Update the global mcpEnabled variable
+            mcpEnabled = SETTINGS.mcpEnabled;
+            
+            // Reinitialize MCP client with current settings
+            await initializeMCPClient();
+        } else if (!SETTINGS.mcpEnabled) {
+            console.log('🔧 MCP disabled in settings');
+            mcpClient = null;
+        }
+        
+        console.log('🔧 All services reinitialized with current settings');
+    }
+    
+    // Run service reinitialization to ensure everything is properly configured
+    await reinitializeServicesWithCurrentSettings();
+    
+    // --- Initial Settings Loading ---
+    // Load settings into UI elements if settings panel is loaded
+    function loadInitialSettingsToUI() {
+        // This ensures that when the settings panel is opened later, 
+        // it will have the correct values from localStorage
+        console.log('🔧 Preparing initial settings for UI loading...');
+        
+        // Settings will be loaded into UI elements when the settings panel is opened
+        // by loadAllSettings() function, but we ensure the SETTINGS object is current
+        console.log('🔧 Current SETTINGS object ready:', {
+            imageProvider: SETTINGS.customImageProvider,
+            swarmuiApiUrl: SETTINGS.swarmuiApiUrl,
+            customImageApiUrl: SETTINGS.customImageApiUrl,
+            llmProvider: SETTINGS.customLlmProvider
+        });
+    }
+    
+    loadInitialSettingsToUI();
+
+    // --- Proactive Settings Panel Loading ---
+    // Load mobile settings panel immediately to support desktop sync
+    async function ensureSettingsPanelLoaded() {
+        const panelExists = settingsPanelContainer.querySelector('.settings-panel');
+        if (!panelExists) {
+            console.log('🔧 Proactively loading mobile settings panel for desktop sync...');
+            try {
+                await loadSettingsPanel();
+                console.log('🔧 Mobile settings panel loaded successfully');
+                
+                // Verify panel was actually loaded
+                const verifyPanel = settingsPanelContainer.querySelector('.settings-panel');
+                if (verifyPanel) {
+                    console.log('✅ Settings panel verification passed');
+                } else {
+                    console.error('❌ Settings panel failed verification - panel not found after load');
+                }
+            } catch (error) {
+                console.error('🔧 Failed to load mobile settings panel:', error);
+                // Don't rethrow to avoid breaking app initialization
+            }
+        } else {
+            console.log('🔧 Mobile settings panel already exists');
+        }
+    }
+    
+    // Settings panel will be loaded after settingsIdMap is defined
+
+    // --- Universal Font Size Management (Mobile + Desktop) ---
     function applyFontSize(fontSize) {
         const size = parseInt(fontSize);
         
-        // Apply font size to all chat messages
-        const chatWindow = document.getElementById('chat-window');
-        if (chatWindow) {
-            chatWindow.style.fontSize = size + 'px';
+        // Apply font size to both mobile and desktop chat windows
+        const mobileChat = document.getElementById('chat-window');
+        const desktopChat = document.getElementById('desktop-chat-window');
+        
+        if (mobileChat) {
+            mobileChat.style.fontSize = size + 'px';
         }
         
-        // Also apply to any existing messages
+        if (desktopChat) {
+            desktopChat.style.fontSize = size + 'px';
+        }
+        
+        // Apply to all existing messages in both interfaces
         const messages = document.querySelectorAll('.message');
         messages.forEach(message => {
             message.style.fontSize = size + 'px';
@@ -319,19 +504,30 @@ async function initializeApp() {
         // Set CSS custom property for future messages
         document.documentElement.style.setProperty('--chat-font-size', size + 'px');
         
-        console.log('🎨 Font size applied:', size + 'px');
+        console.log('🎨 Font size applied to all interfaces:', size + 'px');
     }
 
-    // --- Helper Functions ---
+    // --- Universal Helper Functions (Mobile + Desktop) ---
     function updateVoiceDropdown(selectedVoice) {
-        const voiceDropdown = document.getElementById('select-tts-voice');
-        if (voiceDropdown) {
-            voiceDropdown.value = selectedVoice;
-            // Also update the SETTINGS object to keep it in sync
-            SETTINGS.ttsVoice = selectedVoice;
-            console.log(`Voice dropdown updated to: ${selectedVoice}`);
-        } else {
-            console.warn('Voice dropdown not found, cannot update UI');
+        // Update both mobile and desktop voice dropdowns
+        const mobileVoiceDropdown = document.getElementById('select-tts-voice');
+        const desktopVoiceDropdown = document.getElementById('desktop-tts-voice');
+        
+        if (mobileVoiceDropdown) {
+            mobileVoiceDropdown.value = selectedVoice;
+            console.log(`Mobile voice dropdown updated to: ${selectedVoice}`);
+        }
+        
+        if (desktopVoiceDropdown) {
+            desktopVoiceDropdown.value = selectedVoice;
+            console.log(`Desktop voice dropdown updated to: ${selectedVoice}`);
+        }
+        
+        // Update the SETTINGS object to keep it in sync
+        SETTINGS.ttsVoice = selectedVoice;
+        
+        if (!mobileVoiceDropdown && !desktopVoiceDropdown) {
+            console.warn('No voice dropdowns found, cannot update UI');
         }
     }
 
@@ -886,15 +1082,17 @@ Type **"/list"** anytime to see this help again.`;
         }
     }
 
-    // --- Enhanced Mobile Event Handling ---
-    function addMobileCompatibleEvent(element, eventType, handler) {
+    // --- Universal Event Handling (Mobile + Desktop) ---
+    function addUniversalEvent(element, eventType, handler) {
         if (!element) return;
         // Modern browsers handle touch-to-click translation well.
-        // The 'setTimeout(0)' trick in the panel handlers is the robust way
-        // to deal with any residual "ghost click" issues.
-        // This simplified function prevents the previous double-firing of events.
+        // This function works for both mobile and desktop interfaces
+        // by using passive: false to allow preventDefault when needed.
         element.addEventListener(eventType, handler, { passive: false });
     }
+    
+    // Alias for backward compatibility
+    const addMobileCompatibleEvent = addUniversalEvent;
 
     // --- Persona Management ---
     async function createPersona(customPrompt) {
@@ -1185,8 +1383,9 @@ Type **"/list"** anytime to see this help again.`;
         }
     });
 
-    // --- Settings Management ---
+    // --- Universal Settings Management (Mobile + Desktop) ---
     const settingsIdMap = {
+        // Mobile IDs (primary)
         customLlmProvider: 'llm-provider',
         customLlmApiUrl: 'llm-api-url',
         customLlmModelIdentifier: 'llm-model-identifier',
@@ -1230,25 +1429,90 @@ Type **"/list"** anytime to see this help again.`;
         searchTimeFilter: 'search-time-filter',
         fontSize: 'slider-font-size'
     };
+    
+    // Desktop element mapping for dual sync
+    const desktopSettingsIdMap = {
+        customLlmProvider: 'desktop-llm-provider',
+        customLlmApiUrl: 'desktop-llm-api-url',
+        customLlmModelIdentifier: 'desktop-llm-model',
+        customLlmApiKey: 'desktop-llm-api-key',
+        customImageProvider: 'desktop-image-provider',
+        customImageApiUrl: 'desktop-image-api-url',
+        swarmuiModel: 'desktop-swarmui-model',
+        ttsVoice: 'desktop-tts-voice',
+        voiceSpeed: 'desktop-voice-speed',
+        azureApiKey: 'desktop-azure-api-key',
+        mcpEnabled: 'desktop-mcp-enabled',
+        mcpServerUrl: 'desktop-mcp-url',
+        fontSize: 'desktop-font-size'
+    };
+
+    // --- Load Settings Panel Now That Mappings Are Defined ---
+    // This ensures mobile settings panel is available for desktop sync
+    async function initializeSettingsPanel() {
+        await ensureSettingsPanelLoaded();
+    }
+    
+    // Execute immediately but don't block the rest of initialization
+    initializeSettingsPanel().catch(error => {
+        console.error('Settings panel initialization failed:', error);
+    });
 
     function saveAllSettings() {
         console.log('🔧 saveAllSettings: Starting to save settings...');
         Object.keys(SETTINGS).forEach(key => {
-            const elementId = settingsIdMap[key];
-            if (!elementId) return;
+            const mobileElementId = settingsIdMap[key];
+            const desktopElementId = desktopSettingsIdMap[key];
+            
+            let element = null;
+            let sourceInterface = '';
+            
+            // Try mobile element first
+            if (mobileElementId && settingsPanelContainer) {
+                element = settingsPanelContainer.querySelector(`#${mobileElementId}`);
+                if (element) sourceInterface = 'mobile';
+            }
+            
+            // If not found in mobile, try desktop
+            if (!element && desktopElementId) {
+                element = document.getElementById(desktopElementId);
+                if (element) sourceInterface = 'desktop';
+            }
 
-            const element = settingsPanelContainer.querySelector(`#${elementId}`);
             if (element) {
                 const value = element.type === 'checkbox' ? element.checked : element.value;
                 localStorage.setItem(key, value);
                 SETTINGS[key] = value;
-                // Log direct provider settings specifically
-                if (key.includes('openai') || key.includes('anthropic') || key.includes('google')) {
-                    console.log(`🔧 saveAllSettings: ${key} = ${value ? (key.includes('ApiKey') ? 'PRESENT' : value) : 'EMPTY'}`);
+                
+                console.log(`🔧 saveAllSettings (${sourceInterface}): ${key} = ${value ? (key.includes('ApiKey') ? 'PRESENT' : value) : 'EMPTY'}`);
+                
+                // Sync to the other interface if available
+                if (sourceInterface === 'mobile' && desktopElementId) {
+                    const desktopElement = document.getElementById(desktopElementId);
+                    if (desktopElement) {
+                        if (desktopElement.type === 'checkbox') {
+                            desktopElement.checked = element.checked;
+                        } else {
+                            desktopElement.value = element.value;
+                        }
+                    }
+                } else if (sourceInterface === 'desktop' && mobileElementId && settingsPanelContainer) {
+                    const mobileElement = settingsPanelContainer.querySelector(`#${mobileElementId}`);
+                    if (mobileElement) {
+                        if (mobileElement.type === 'checkbox') {
+                            mobileElement.checked = element.checked;
+                        } else {
+                            mobileElement.value = element.value;
+                        }
+                    }
                 }
             }
         });
         
+        // Apply font size to all interfaces
+        if (SETTINGS.fontSize) {
+            applyFontSize(SETTINGS.fontSize);
+        }
         
         const llmSettingsChanged = SETTINGS.customLlmApiUrl !== llmService.apiBaseUrl || 
                                    SETTINGS.customLlmModelIdentifier !== llmService.modelIdentifier || 
@@ -1264,7 +1528,8 @@ Type **"/list"** anytime to see this help again.`;
                                       SETTINGS.customImageProvider !== imageService.provider || 
                                       SETTINGS.openaiApiKey !== imageService.openaiApiKey ||
                                       (SETTINGS.customImageProvider === 'swarmui' && SETTINGS.swarmuiApiUrl !== imageService.apiBaseUrl);
-        const mcpSettingsChanged = SETTINGS.mcpEnabled !== mcpEnabled;
+        const mcpSettingsChanged = SETTINGS.mcpEnabled !== mcpEnabled || 
+                                   (mcpClient && mcpClient.serverUrl !== SETTINGS.mcpServerUrl);
 
         if (llmSettingsChanged) {
             console.log('🔧 saveAllSettings: LLM settings changed, recreating LLMService...');
@@ -1361,6 +1626,51 @@ Type **"/list"** anytime to see this help again.`;
                 voiceService.setAzureConfig(SETTINGS.azureApiKey, SETTINGS.azureRegion);
             }
         }
+    }
+
+    // --- Universal Settings Loading (Mobile + Desktop) ---
+    function loadAllSettings() {
+        console.log('🔧 loadAllSettings: Loading settings to all interfaces...');
+        
+        Object.keys(SETTINGS).forEach(key => {
+            const mobileElementId = settingsIdMap[key];
+            const desktopElementId = desktopSettingsIdMap[key];
+            const storedValue = SETTINGS[key];
+            
+            // Load into mobile interface
+            if (mobileElementId && settingsPanelContainer) {
+                const mobileElement = settingsPanelContainer.querySelector(`#${mobileElementId}`);
+                if (mobileElement) {
+                    if (mobileElement.type === 'checkbox') {
+                        mobileElement.checked = storedValue === true || storedValue === 'true';
+                    } else {
+                        mobileElement.value = storedValue;
+                    }
+                }
+            }
+            
+            // Load into desktop interface
+            if (desktopElementId) {
+                const desktopElement = document.getElementById(desktopElementId);
+                if (desktopElement) {
+                    if (desktopElement.type === 'checkbox') {
+                        desktopElement.checked = storedValue === true || storedValue === 'true';
+                    } else {
+                        desktopElement.value = storedValue;
+                    }
+                    
+                    // Trigger any display updates for sliders
+                    if (desktopElement.type === 'range') {
+                        desktopElement.dispatchEvent(new Event('input'));
+                    }
+                }
+            }
+        });
+        
+        // Apply font size to all interfaces
+        applyFontSize(SETTINGS.fontSize);
+        
+        console.log('🔧 loadAllSettings: Settings loaded to all available interfaces');
     }
 
     function setupImageControls() {
@@ -1554,7 +1864,12 @@ Type **"/list"** anytime to see this help again.`;
 
         } catch (error) {
             console.error('Error loading settings panel:', error);
-            settingsPanelContainer.innerHTML = `<p style="color:red; text-align:center;">Error: Could not load settings.</p>`;
+            settingsPanelContainer.innerHTML = `
+                <div style="color: red; text-align: center; padding: 20px; background: rgba(255,0,0,0.1); border-radius: 8px; margin: 20px;">
+                    <h3>Settings Loading Error</h3>
+                    <p>Could not load settings panel: ${error.message}</p>
+                    <p style="font-size: 12px; opacity: 0.8;">Check console for details</p>
+                </div>`;
         }
     }
 
@@ -2199,6 +2514,18 @@ Type **"/list"** anytime to see this help again.`;
         });
     }
 
+    // Expose functions globally for desktop interface
+    window.createPersona = createPersona;
+    window.clearConversation = clearConversation;
+    window.saveAllSettings = saveAllSettings;
+    window.loadAllSettings = loadAllSettings;
+    window.applyFontSize = applyFontSize;
+    window.updateVoiceDropdown = updateVoiceDropdown;
+    window.addUniversalEvent = addUniversalEvent;
+    window.closeSettingsPanel = closeSettingsPanel;
+    window.saveConversationToFile = saveConversationToFile;
+    window.loadConversationFromFile = loadConversationFromFile;
+    
     console.log('App initialization complete');
 }
 

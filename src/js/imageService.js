@@ -33,6 +33,25 @@ if (typeof ImageService === 'undefined') {
         console.log(`ImageService initialized. Provider: ${this.provider}`);
     }
 
+    // --- CONSOLIDATED HELPER FUNCTIONS ---
+    processPromptWithQualityTags(prompt) {
+        const qualityTags = "best quality, dynamic lighting";
+        const userOrLlmPrompt = prompt.trim();
+        return userOrLlmPrompt 
+            ? `${qualityTags}, ${userOrLlmPrompt}` 
+            : qualityTags;
+    }
+
+    createNegativePrompt() {
+        return "young, underage, nsfw, child, big eyes, bad anatomy, worst quality, low quality, normal quality, jpeg artifacts, signature, camera, username, blurry";
+    }
+
+    async handleAPIError(response, provider) {
+        const errorData = await response.text();
+        console.error(`${provider} API Error Response:`, errorData);
+        throw new Error(`${provider} API request failed with status ${response.status}: ${errorData}`);
+    }
+
     updateSettings(settings) {
         // A1111 settings
         if (settings.width !== undefined) this.width = settings.width;
@@ -141,12 +160,7 @@ if (typeof ImageService === 'undefined') {
     }
 
     async generateA1111Image(prompt) {
-        // Add quality tags like in the Python version
-        const qualityTags = "best quality, dynamic lighting";
-        const userOrLlmPrompt = prompt.trim();
-        const currentPrompt = userOrLlmPrompt 
-            ? `${qualityTags}, ${userOrLlmPrompt}` 
-            : qualityTags;
+        const currentPrompt = this.processPromptWithQualityTags(prompt);
 
         try {
             const response = await fetch(`${this.apiBaseUrl}/sdapi/v1/txt2img`, {
@@ -156,7 +170,7 @@ if (typeof ImageService === 'undefined') {
                 },
                 body: JSON.stringify({
                     prompt: currentPrompt,
-                    negative_prompt: "young, underage, nsfw, child, big eyes, bad anatomy, worst quality, low quality, normal quality, jpeg artifacts, signature, camera, username, blurry", 
+                    negative_prompt: this.createNegativePrompt(), 
                     width: this.width || 1024,
                     height: this.height || 1536,
                     steps: this.steps || 20,
@@ -175,9 +189,7 @@ if (typeof ImageService === 'undefined') {
             });
 
             if (!response.ok) {
-                const errorData = await response.text(); 
-                console.error('Automatic1111 API Error Response:', errorData);
-                throw new Error(`Automatic1111 API request failed with status ${response.status}: ${errorData}`);
+                await this.handleAPIError(response, 'Automatic1111');
             }
 
             const data = await response.json();
@@ -215,9 +227,7 @@ if (typeof ImageService === 'undefined') {
             });
 
             if (!response.ok) {
-                const errorData = await response.text();
-                console.error('SwarmUI Session API Error Response:', errorData);
-                throw new Error(`SwarmUI Session API request failed with status ${response.status}: ${errorData}`);
+                await this.handleAPIError(response, 'SwarmUI Session');
             }
 
             const data = await response.json();
@@ -239,12 +249,7 @@ if (typeof ImageService === 'undefined') {
     }
 
     async generateSwarmUIImage(prompt) {
-        // Add quality tags like in the A1111 version
-        const qualityTags = "best quality, dynamic lighting";
-        const userOrLlmPrompt = prompt.trim();
-        const currentPrompt = userOrLlmPrompt 
-            ? `${qualityTags}, ${userOrLlmPrompt}` 
-            : qualityTags;
+        const currentPrompt = this.processPromptWithQualityTags(prompt);
 
         try {
             // Ensure we have a valid session
@@ -253,7 +258,7 @@ if (typeof ImageService === 'undefined') {
             const payload = {
                 session_id: sessionId,
                 prompt: currentPrompt,
-                negativeprompt: "young, underage, nsfw, child, big eyes, bad anatomy, worst quality, low quality, normal quality, jpeg artifacts, signature, camera, username, blurry",
+                negativeprompt: this.createNegativePrompt(),
                 images: 1,
                 width: this.swarm_width || 1024,
                 height: this.swarm_height || 1024,
@@ -279,7 +284,6 @@ if (typeof ImageService === 'undefined') {
 
             if (!response.ok) {
                 const errorData = await response.text();
-                console.error('SwarmUI Generation API Error Response:', errorData);
                 
                 // Check if it's a session error and retry once
                 if (errorData.includes('invalid_session_id') || response.status === 401) {
@@ -299,16 +303,14 @@ if (typeof ImageService === 'undefined') {
                     });
                     
                     if (!retryResponse.ok) {
-                        const retryErrorData = await retryResponse.text();
-                        console.error('SwarmUI Generation API Error Response (retry):', retryErrorData);
-                        throw new Error(`SwarmUI API request failed after retry with status ${retryResponse.status}: ${retryErrorData}`);
+                        await this.handleAPIError(retryResponse, 'SwarmUI (retry)');
                     }
                     
                     const retryData = await retryResponse.json();
                     return this.processSwarmUIResponse(retryData);
                 }
                 
-                throw new Error(`SwarmUI API request failed with status ${response.status}: ${errorData}`);
+                await this.handleAPIError(response, 'SwarmUI');
             }
 
             const data = await response.json();

@@ -23,6 +23,7 @@
     
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/pwa-styles.css">
+    <link rel="stylesheet" href="css/desktop-styles.css">
     <script>
         // Remove or comment out the dynamic viewport height code
         /*
@@ -47,6 +48,562 @@
     </script>
 </head>
 <body>
+    <!-- Desktop Layout -->
+    <div class="desktop-layout">
+        <!-- Left Sidebar -->
+        <div class="desktop-sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <h2>VeilChat</h2>
+                    <span class="logo-subtitle">AI Chat Interface</span>
+                </div>
+            </div>
+            <div class="sidebar-nav">
+                <button class="nav-item active" id="desktop-chat-nav">
+                    <span class="nav-icon">💬</span>
+                    <span class="nav-text">Chats</span>
+                </button>
+                <button class="nav-item" id="desktop-persona-nav">
+                    <span class="nav-icon">🎭</span>
+                    <span class="nav-text">Persona</span>
+                </button>
+                <button class="nav-item" id="desktop-settings-nav">
+                    <span class="nav-icon">⚙️</span>
+                    <span class="nav-text">Settings</span>
+                </button>
+            </div>
+            <div class="sidebar-footer">
+                <div class="user-profile">
+                    <div class="user-avatar">
+                        <span>👤</span>
+                    </div>
+                    <div class="user-info">
+                        <div class="user-name">User</div>
+                        <div class="user-email">user@example.com</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content Area -->
+        <div class="desktop-main">
+            <!-- Dashboard Welcome -->
+            <div class="desktop-dashboard">
+                <div class="dashboard-header">
+                    <h1>Hi, I'm Chat Bot</h1>
+                    <p>Tell me your goal, and get complete Learning Plans.</p>
+                </div>
+                
+                <!-- Feature Grid -->
+                <div class="feature-grid">
+                    <div class="feature-card" data-feature="guided-learning">
+                        <div class="card-header">
+                            <span class="card-icon">🎯</span>
+                            <h3>Guided Learning</h3>
+                        </div>
+                        <div class="card-progress">
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: 75%"></div>
+                            </div>
+                            <span class="progress-value">75%</span>
+                        </div>
+                    </div>
+                    
+                    <div class="feature-card" data-feature="course-links">
+                        <div class="card-header">
+                            <span class="card-icon">🔗</span>
+                            <h3>Links To Course</h3>
+                        </div>
+                        <div class="card-progress">
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: 60%"></div>
+                            </div>
+                            <span class="progress-value">60%</span>
+                        </div>
+                    </div>
+                    
+                    <div class="feature-card" data-feature="voice-interaction">
+                        <div class="card-header">
+                            <span class="card-icon">🎤</span>
+                            <h3>Voice Interaction</h3>
+                        </div>
+                        <div class="card-progress">
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: 90%"></div>
+                            </div>
+                            <span class="progress-value">90%</span>
+                        </div>
+                    </div>
+                    
+                    <div class="feature-card" data-feature="image-generation">
+                        <div class="card-header">
+                            <span class="card-icon">🎨</span>
+                            <h3>Image Generation</h3>
+                        </div>
+                        <div class="card-progress">
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: 45%"></div>
+                            </div>
+                            <span class="progress-value">45%</span>
+                        </div>
+                    </div>
+                    
+                    <div class="feature-card" data-feature="reasoning">
+                        <div class="card-header">
+                            <span class="card-icon">🧠</span>
+                            <h3>Enhanced Reasoning</h3>
+                        </div>
+                        <div class="card-progress">
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: 85%"></div>
+                            </div>
+                            <span class="progress-value">85%</span>
+                        </div>
+                    </div>
+                    
+                    <div class="feature-card" data-feature="web-search">
+                        <div class="card-header">
+                            <span class="card-icon">🌐</span>
+                            <h3>Web Search</h3>
+                        </div>
+                        <div class="card-progress">
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: 55%"></div>
+                            </div>
+                            <span class="progress-value">55%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Desktop Chat Area (hidden initially) -->
+            <div class="desktop-chat" style="display: none;">
+                <div class="desktop-chat-window" id="desktop-chat-window">
+                    <!-- Messages will appear here -->
+                </div>
+                <div class="desktop-input-area">
+                    <div class="desktop-input-wrapper">
+                        <button id="desktop-attach-files-button" title="Attach Files">
+                            <span class="attach-icon">📎</span>
+                        </button>
+                        <textarea id="desktop-user-input" placeholder="Enter your goal/prompts here........" rows="1"></textarea>
+                        <button id="desktop-stt-button" title="Voice Input">
+                            <span class="stt-icon">🎤</span>
+                        </button>
+                        <button id="desktop-send-button">
+                            <span class="send-icon">→</span>
+                        </button>
+                    </div>
+                </div>
+                <div id="desktop-attached-docs-container"></div>
+            </div>
+
+            <!-- Desktop Settings Area (hidden initially) -->
+            <div class="desktop-settings" style="display: none;">
+                <div class="desktop-settings-header">
+                    <h1>Settings</h1>
+                    <p>Configure your VeilChat experience</p>
+                </div>
+                
+                <!-- Font Settings -->
+                <div class="desktop-settings-section">
+                    <h3><span class="section-icon">🔤</span>Font Settings</h3>
+                    <div class="desktop-setting-item">
+                        <label for="desktop-font-size">Font Size</label>
+                        <input type="range" id="desktop-font-size" min="10" max="24" value="16">
+                        <span id="desktop-font-size-value">16px</span>
+                    </div>
+                </div>
+
+                <!-- LLM Provider Settings -->
+                <div class="desktop-settings-section">
+                    <h3><span class="section-icon">🤖</span>LLM Provider</h3>
+                    <div class="desktop-setting-item">
+                        <label for="desktop-llm-provider">Provider</label>
+                        <select id="desktop-llm-provider">
+                            <option value="litellm">LiteLLM (OpenAI Compatible)</option>
+                            <option value="lmstudio">LMStudio (OpenAI Compatible)</option>
+                            <option value="ollama">Ollama (Direct - OpenAI Compatible)</option>
+                            <option value="openai-direct">OpenAI (Direct API)</option>
+                            <option value="anthropic-direct">Anthropic (Direct API)</option>
+                            <option value="google-direct">Google AI Studio (Direct API)</option>
+                        </select>
+                    </div>
+                    <div class="desktop-setting-item">
+                        <label for="desktop-llm-api-url">API Base URL</label>
+                        <input type="text" id="desktop-llm-api-url" placeholder="e.g., http://localhost:4000">
+                    </div>
+                    <div class="desktop-setting-item">
+                        <label for="desktop-llm-model">Model</label>
+                        <select id="desktop-llm-model">
+                            <option value="gemma3">gemma3</option>
+                            <option value="gpt-4.1-mini">gpt-4.1-mini</option>
+                            <option value="gpt-4.1">gpt-4.1</option>
+                            <option value="claude4">claude4</option>
+                            <option value="gemini2.5-flash">gemini2.5-flash</option>
+                        </select>
+                    </div>
+                    <div class="desktop-setting-item">
+                        <label for="desktop-llm-api-key">API Key</label>
+                        <input type="password" id="desktop-llm-api-key" placeholder="Enter API Key if required">
+                    </div>
+                </div>
+
+                <!-- Voice Settings -->
+                <div class="desktop-settings-section">
+                    <h3><span class="section-icon">🎤</span>Voice Settings</h3>
+                    <div class="desktop-setting-item">
+                        <label for="desktop-tts-voice">TTS Voice</label>
+                        <select id="desktop-tts-voice">
+                            <option value="AUTO">Auto (Default)</option>
+                            <!-- US Female Voices -->
+                            <option value="Ava">Ava (US Female)</option>
+                            <option value="Jenny">Jenny (US Female)</option>
+                            <option value="Emma">Emma (US Female)</option>
+                            <option value="Sara">Sara (US Female)</option>
+                            <option value="Aria">Aria (US Female)</option>
+                            <option value="Ashley">Ashley (US Female)</option>
+                            <!-- US Male Voices -->
+                            <option value="Andrew">Andrew (US Male)</option>
+                            <option value="Brian">Brian (US Male)</option>
+                            <option value="Guy">Guy (US Male)</option>
+                            <option value="Jason">Jason (US Male)</option>
+                            <option value="Tony">Tony (US Male)</option>
+                            <!-- UK Female Voices -->
+                            <option value="Sonia" selected>Sonia (UK Female)</option>
+                            <option value="Libby">Libby (UK Female)</option>
+                            <option value="Olivia">Olivia (UK Female)</option>
+                            <option value="Hollie">Hollie (UK Female)</option>
+                            <!-- UK Male Voices -->
+                            <option value="Ryan">Ryan (UK Male)</option>
+                            <option value="Alfie">Alfie (UK Male)</option>
+                            <option value="Oliver">Oliver (UK Male)</option>
+                            <!-- AU Female Voices -->
+                            <option value="Natasha">Natasha (AU Female)</option>
+                            <option value="Freya">Freya (AU Female)</option>
+                            <!-- AU Male Voices -->
+                            <option value="William">William (AU Male)</option>
+                            <option value="Neil">Neil (AU Male)</option>
+                            <!-- CA Voices -->
+                            <option value="Clara">Clara (CA Female)</option>
+                            <option value="Liam">Liam (CA Male)</option>
+                        </select>
+                    </div>
+                    <div class="desktop-setting-item">
+                        <label for="desktop-voice-speed">Voice Speed</label>
+                        <input type="range" id="desktop-voice-speed" min="0.1" max="2.0" step="0.1" value="1.0">
+                        <span id="desktop-voice-speed-value">1.0x</span>
+                    </div>
+                    <div class="desktop-setting-item">
+                        <label for="desktop-voice-pitch">Voice Pitch</label>
+                        <input type="range" id="desktop-voice-pitch" min="0.5" max="2.0" step="0.1" value="1.0">
+                        <span id="desktop-voice-pitch-value">1.0</span>
+                    </div>
+                    <div class="desktop-setting-item">
+                        <label for="desktop-azure-api-key">Azure Speech API Key</label>
+                        <input type="password" id="desktop-azure-api-key" placeholder="Enter Azure Speech Services API key">
+                    </div>
+                    <div class="desktop-setting-item">
+                        <label for="desktop-azure-region">Azure Region</label>
+                        <select id="desktop-azure-region">
+                            <option value="eastus">East US</option>
+                            <option value="westus">West US</option>
+                            <option value="westus2">West US 2</option>
+                            <option value="centralus">Central US</option>
+                            <option value="northeurope">North Europe</option>
+                            <option value="westeurope">West Europe</option>
+                            <option value="uksouth">UK South</option>
+                            <option value="southeastasia">Southeast Asia</option>
+                            <option value="eastasia">East Asia</option>
+                            <option value="australiaeast">Australia East</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Direct API Provider Settings -->
+                <div class="desktop-settings-section" id="desktop-openai-direct-settings" style="display: none;">
+                    <h3><span class="section-icon">🔧</span>OpenAI Direct API</h3>
+                    <div class="desktop-setting-item">
+                        <label for="desktop-openai-model-identifier">OpenAI Model</label>
+                        <select id="desktop-openai-model-identifier">
+                            <option value="gpt-4.1">GPT-4.1</option>
+                            <option value="gpt-4.1-mini">GPT-4.1 Mini</option>
+                            <option value="gpt-4.1-nano">GPT-4.1 Nano</option>
+                            <option value="gpt-4.5">GPT-4.5</option>
+                            <option value="o3-mini">o3-mini</option>
+                        </select>
+                    </div>
+                    <div class="desktop-setting-item">
+                        <label for="desktop-openai-api-key">OpenAI API Key</label>
+                        <input type="password" id="desktop-openai-api-key" placeholder="Enter OpenAI API Key">
+                    </div>
+                </div>
+
+                <div class="desktop-settings-section" id="desktop-anthropic-direct-settings" style="display: none;">
+                    <h3><span class="section-icon">🔧</span>Anthropic Direct API</h3>
+                    <div class="desktop-setting-item">
+                        <label for="desktop-anthropic-model-identifier">Anthropic Model</label>
+                        <select id="desktop-anthropic-model-identifier">
+                            <option value="claude-opus-4-20250514">Claude Opus 4</option>
+                            <option value="claude-sonnet-4-20250514">Claude Sonnet 4</option>
+                            <option value="claude-3-7-sonnet-20250219">Claude 3.7 Sonnet</option>
+                            <option value="claude-3-5-sonnet-latest">Claude 3.5 Sonnet</option>
+                            <option value="claude-3-5-haiku-latest">Claude 3.5 Haiku</option>
+                        </select>
+                    </div>
+                    <div class="desktop-setting-item">
+                        <label for="desktop-anthropic-api-key">Anthropic API Key</label>
+                        <input type="password" id="desktop-anthropic-api-key" placeholder="Enter Anthropic API Key">
+                    </div>
+                </div>
+
+                <div class="desktop-settings-section" id="desktop-google-direct-settings" style="display: none;">
+                    <h3><span class="section-icon">🔧</span>Google AI Studio Direct API</h3>
+                    <div class="desktop-setting-item">
+                        <label for="desktop-google-model-identifier">Google AI Model</label>
+                        <select id="desktop-google-model-identifier">
+                            <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+                            <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                            <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash Lite</option>
+                            <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                            <option value="gemini-2.0-flash-lite">Gemini 2.0 Flash Lite</option>
+                        </select>
+                    </div>
+                    <div class="desktop-setting-item">
+                        <label for="desktop-google-api-key">Google AI API Key</label>
+                        <input type="password" id="desktop-google-api-key" placeholder="Enter Google AI Studio API Key">
+                    </div>
+                </div>
+
+                <!-- MCP Settings -->
+                <div class="desktop-settings-section">
+                    <h3><span class="section-icon">🧠</span>Enhanced Reasoning (MCP)</h3>
+                    <div class="desktop-setting-item">
+                        <label for="desktop-mcp-enabled">Enable Sequential Thinking</label>
+                        <input type="checkbox" id="desktop-mcp-enabled">
+                    </div>
+                    <div class="desktop-setting-item">
+                        <label for="desktop-mcp-url">MCP Server URL</label>
+                        <input type="text" id="desktop-mcp-url" placeholder="http://localhost:3001">
+                    </div>
+                </div>
+
+                <!-- Web Search Settings -->
+                <div class="desktop-settings-section">
+                    <h3><span class="section-icon">🌐</span>Web Search</h3>
+                    <div class="desktop-setting-item">
+                        <label for="desktop-search-enabled">Enable Web Search</label>
+                        <input type="checkbox" id="desktop-search-enabled">
+                    </div>
+                    <div class="desktop-setting-item">
+                        <label for="desktop-search-provider">Search Provider</label>
+                        <select id="desktop-search-provider">
+                            <option value="brave">Brave Search (Recommended)</option>
+                            <option value="duckduckgo">DuckDuckGo</option>
+                            <option value="google">Google Custom Search</option>
+                            <option value="bing">Bing Search</option>
+                        </select>
+                    </div>
+                    <div class="desktop-setting-item">
+                        <label for="desktop-search-api-key">Search API Key</label>
+                        <input type="password" id="desktop-search-api-key" placeholder="Enter search API key">
+                    </div>
+                    <div class="desktop-setting-item">
+                        <label for="desktop-search-results-limit">Results Limit</label>
+                        <select id="desktop-search-results-limit">
+                            <option value="5">5 results</option>
+                            <option value="10" selected>10 results</option>
+                            <option value="20">20 results</option>
+                        </select>
+                    </div>
+                    <div class="desktop-setting-item">
+                        <label for="desktop-search-auto-summarize">Auto-Summarize Results</label>
+                        <input type="checkbox" id="desktop-search-auto-summarize" checked>
+                    </div>
+                    <div class="desktop-setting-item">
+                        <label for="desktop-search-time-filter">Time Filter</label>
+                        <select id="desktop-search-time-filter">
+                            <option value="any">Any time</option>
+                            <option value="day">Past 24 hours</option>
+                            <option value="week">Past week</option>
+                            <option value="month">Past month</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Image Generation Settings -->
+                <div class="desktop-settings-section">
+                    <h3><span class="section-icon">🎨</span>Image Generation</h3>
+                    <div class="desktop-setting-item">
+                        <label for="desktop-image-provider">Provider</label>
+                        <select id="desktop-image-provider">
+                            <option value="a1111">Local A1111</option>
+                            <option value="swarmui">SwarmUI</option>
+                            <option value="openai">OpenAI (GPT-image-1)</option>
+                        </select>
+                    </div>
+                    
+                    <!-- A1111 Settings -->
+                    <div id="desktop-a1111-settings">
+                        <div class="desktop-setting-item">
+                            <label for="desktop-image-api-url">A1111 API URL</label>
+                            <input type="text" id="desktop-image-api-url" placeholder="e.g., http://localhost:7860">
+                        </div>
+                        <div class="desktop-setting-item">
+                            <label for="desktop-image-width">Width (px)</label>
+                            <input type="number" id="desktop-image-width" min="256" max="2048" step="64" value="1024">
+                        </div>
+                        <div class="desktop-setting-item">
+                            <label for="desktop-image-height">Height (px)</label>
+                            <input type="number" id="desktop-image-height" min="256" max="2048" step="64" value="1536">
+                        </div>
+                        <div class="desktop-setting-item">
+                            <label for="desktop-image-steps">Steps</label>
+                            <input type="number" id="desktop-image-steps" min="1" max="100" step="1" value="20">
+                        </div>
+                        <div class="desktop-setting-item">
+                            <label for="desktop-image-cfg-scale">CFG Scale</label>
+                            <input type="number" id="desktop-image-cfg-scale" min="1" max="20" step="0.1" value="1.4">
+                        </div>
+                        <div class="desktop-setting-item">
+                            <label for="desktop-image-sampler">Sampler</label>
+                            <select id="desktop-image-sampler">
+                                <option value="Euler a" selected>Euler a</option>
+                                <option value="DPM++ 2M">DPM++ 2M</option>
+                                <option value="LCM">LCM</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- SwarmUI Settings -->
+                    <div id="desktop-swarmui-settings" style="display: none;">
+                        <div class="desktop-setting-item">
+                            <label for="desktop-swarmui-api-url">SwarmUI API URL</label>
+                            <input type="text" id="desktop-swarmui-api-url" placeholder="e.g., http://localhost:7801">
+                        </div>
+                        <div class="desktop-setting-item">
+                            <label for="desktop-swarmui-width">Width (px)</label>
+                            <input type="number" id="desktop-swarmui-width" min="256" max="2048" step="64" value="1024">
+                        </div>
+                        <div class="desktop-setting-item">
+                            <label for="desktop-swarmui-height">Height (px)</label>
+                            <input type="number" id="desktop-swarmui-height" min="256" max="2048" step="64" value="1024">
+                        </div>
+                        <div class="desktop-setting-item">
+                            <label for="desktop-swarmui-steps">Steps</label>
+                            <input type="number" id="desktop-swarmui-steps" min="1" max="100" step="1" value="20">
+                        </div>
+                        <div class="desktop-setting-item">
+                            <label for="desktop-swarmui-cfg-scale">CFG Scale</label>
+                            <input type="number" id="desktop-swarmui-cfg-scale" min="1" max="20" step="0.1" value="7.5">
+                        </div>
+                        <div class="desktop-setting-item">
+                            <label for="desktop-swarmui-model">Model (optional)</label>
+                            <input type="text" id="desktop-swarmui-model" placeholder="e.g., OfficialStableDiffusion/sd_xl_base_1.0">
+                        </div>
+                        <div class="desktop-setting-item">
+                            <label for="desktop-swarmui-sampler">Sampler</label>
+                            <select id="desktop-swarmui-sampler">
+                                <option value="Euler a" selected>Euler a</option>
+                                <option value="DPM++ 2M">DPM++ 2M</option>
+                                <option value="LCM">LCM</option>
+                                <option value="DDIM">DDIM</option>
+                                <option value="K_EULER_ANCESTRAL">K_EULER_ANCESTRAL</option>
+                                <option value="K_EULER">K_EULER</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- OpenAI GPT-image-1 Settings -->
+                    <div id="desktop-openai-settings" style="display: none;">
+                        <div class="desktop-setting-item">
+                            <label for="desktop-image-size">Image Size</label>
+                            <select id="desktop-image-size">
+                                <option value="auto" selected>Auto</option>
+                                <option value="1024x1024">Square (1024x1024)</option>
+                                <option value="1536x1024">Landscape (1536x1024)</option>
+                                <option value="1024x1536">Portrait (1024x1536)</option>
+                            </select>
+                        </div>
+                        <div class="desktop-setting-item">
+                            <label for="desktop-openai-quality">Quality</label>
+                            <select id="desktop-openai-quality">
+                                <option value="auto" selected>Auto</option>
+                                <option value="high">High</option>
+                                <option value="medium">Medium</option>
+                                <option value="low">Low</option>
+                            </select>
+                        </div>
+                        <div class="desktop-setting-item">
+                            <label for="desktop-openai-output-format">Output Format</label>
+                            <select id="desktop-openai-output-format">
+                                <option value="png" selected>PNG</option>
+                                <option value="jpeg">JPEG</option>
+                                <option value="webp">WebP</option>
+                            </select>
+                        </div>
+                        <div class="desktop-setting-item">
+                            <label for="desktop-openai-background">Background</label>
+                            <select id="desktop-openai-background">
+                                <option value="auto" selected>Auto</option>
+                                <option value="opaque">Opaque</option>
+                                <option value="transparent">Transparent</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="desktop-button-group">
+                    <button class="desktop-button secondary" id="desktop-save-conversation">Save Conversation</button>
+                    <button class="desktop-button secondary" id="desktop-load-conversation">Load Conversation</button>
+                </div>
+            </div>
+
+            <!-- Desktop Persona Area (hidden initially) -->
+            <div class="desktop-persona" style="display: none;">
+                <div class="desktop-persona-header">
+                    <h1>Persona Management</h1>
+                    <p>Create and manage AI personas to customize your chat experience</p>
+                </div>
+                
+                <div class="desktop-persona-section">
+                    <h3><span class="section-icon">🎭</span>Create Custom Persona</h3>
+                    <div class="desktop-setting-item">
+                        <label for="desktop-persona-name">Persona Name</label>
+                        <input type="text" id="desktop-persona-name" placeholder="Enter persona name">
+                    </div>
+                    <div class="desktop-setting-item">
+                        <label for="desktop-persona-prompt">Persona Description</label>
+                        <textarea id="desktop-persona-prompt" placeholder="Describe the persona's personality, expertise, and communication style..."></textarea>
+                    </div>
+                    
+                    <div class="desktop-button-group">
+                        <button class="desktop-button persona" id="desktop-create-persona">Create Persona</button>
+                        <button class="desktop-button secondary" id="desktop-use-random-persona">Use Random Persona</button>
+                        <button class="desktop-button secondary" id="desktop-clear-persona">Clear Persona</button>
+                    </div>
+                </div>
+
+                <div class="desktop-persona-section">
+                    <h3><span class="section-icon">📋</span>Persona Templates</h3>
+                    <p style="color: #b0b0b0; margin-bottom: 20px;">Quick-start personas for common use cases:</p>
+                    
+                    <div class="desktop-button-group">
+                        <button class="desktop-button" data-persona="teacher">👩‍🏫 Teacher</button>
+                        <button class="desktop-button" data-persona="assistant">💼 Assistant</button>
+                        <button class="desktop-button" data-persona="friend">👫 Friend</button>
+                    </div>
+                    <div class="desktop-button-group">
+                        <button class="desktop-button" data-persona="expert">🎓 Expert</button>
+                        <button class="desktop-button" data-persona="creative">🎨 Creative</button>
+                        <button class="desktop-button" data-persona="analyst">📊 Analyst</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mobile Layout (Original) -->
     <div class="chat-container">
         <div class="chat-window" id="chat-window">
             <!-- Messages will appear here -->
@@ -87,6 +644,7 @@
     <script src="js/azureSTTService.js"></script>
     <script src="js/voiceService.js"></script> 
     <script src="js/mcpClient.js"></script>
+    <script src="js/desktopInterface.js"></script>
     <script src="js/main.js"></script>
     
     <!-- Service Worker Registration -->

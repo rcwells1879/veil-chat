@@ -437,47 +437,12 @@ Make sure the character you create embodies and follows the persona instructions
         console.log("Generating character profile...");
 
         try {
-            let payload, data, characterProfile;
-            
-            if (isDirectProvider) {
-                payload = this.createDirectProviderPayload(characterGenMessages, this.characterGenTemperature, this.characterGenMaxTokens);
-                console.log('Sending direct provider character generation request:', JSON.stringify(this.sanitizePayloadForLogging(payload), null, 2));
-                data = await this.sendDirectProviderRequest(payload);
-                characterProfile = this.extractDirectProviderResponse(data);
-            } else {
-                payload = this.createCompatiblePayload(characterGenMessages, this.characterGenTemperature, this.characterGenMaxTokens, false);
-
-                const headers = {
-                    'Content-Type': 'application/json',
-                };
-
-                if (this.apiKey) {
-                    headers['Authorization'] = `Bearer ${this.apiKey}`;
-                }
-
-                console.log('Sending traditional character generation request:', JSON.stringify(this.sanitizePayloadForLogging(payload), null, 2));
-
-                const response = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: headers,
-                    body: JSON.stringify(payload)
-                });
-
-                if (!response.ok) {
-                    const errorData = await response.json().catch(() => response.text());
-                    console.error('Character Generation API Error:', errorData);
-                    console.error('Request payload that failed:', JSON.stringify(payload, null, 2));
-                    throw new Error("Character generation failed with status " + response.status + ": " + JSON.stringify(errorData));
-                }
-
-                data = await response.json();
-                console.log('Raw API response data:', data);
-                
-                // Since reasoning is disabled, content should be in the standard location
-                characterProfile = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content
-                    ? data.choices[0].message.content.trim()
-                    : "";
-            }
+            const characterProfile = await this.sendUniversalLLMRequest(
+                characterGenMessages, 
+                this.characterGenTemperature, 
+                this.characterGenMaxTokens, 
+                false
+            );
 
             console.log('Extracted character profile:', characterProfile); // Add this debug line
 
@@ -576,56 +541,14 @@ Make sure the character you create embodies and follows the persona instructions
 
             console.log("Sending request for dedicated image prompt:", JSON.stringify(imageGenMessagesForApiCall, null, 2));
             
-            let payload, data, rawReply;
-            
-            if (isDirectProvider) {
-                payload = this.createDirectProviderPayload(imageGenMessagesForApiCall, this.imagePromptTemperature, this.imagePromptMaxTokens);
-                console.log('Sending direct provider image prompt request:', JSON.stringify(this.sanitizePayloadForLogging(payload), null, 2));
-                try {
-                    data = await this.sendDirectProviderRequest(payload);
-                    rawReply = this.extractDirectProviderResponse(data);
-                } catch (error) {
-                    console.error('Direct provider image prompt generation failed:', error);
-                    console.log('Falling back to traditional LLM approach for image prompt generation...');
-                    rawReply = null; // Set to null to trigger fallback
-                }
-            }
-            
-            // If direct provider failed or we're not using a direct provider, try traditional approach
-            if (!rawReply) {
-                payload = this.createCompatiblePayload(imageGenMessagesForApiCall, this.imagePromptTemperature, this.imagePromptMaxTokens, false);
+            const rawReply = await this.sendUniversalLLMRequest(
+                imageGenMessagesForApiCall, 
+                this.imagePromptTemperature, 
+                this.imagePromptMaxTokens, 
+                true
+            );
 
-                const headers = {
-                    'Content-Type': 'application/json',
-                };
-
-                if (this.apiKey) {
-                    headers['Authorization'] = `Bearer ${this.apiKey}`;
-                }
-
-                console.log('Sending traditional image prompt request:', JSON.stringify(this.sanitizePayloadForLogging(payload), null, 2));
-
-                const response = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: headers,
-                    body: JSON.stringify(payload)
-                });
-
-                if (!response.ok) {
-                    const errorData = await response.json().catch(() => response.text());
-                    console.error('LLM API Error (Image Prompt Request):', errorData);
-                    console.error('Request payload that failed:', JSON.stringify(payload, null, 2));
-                    throw new Error("LLM API request for image prompt failed with status " + response.status + ": " + JSON.stringify(errorData));
-                }
-
-                data = await response.json();
-                
-                rawReply = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content
-                    ? data.choices[0].message.content.trim()
-                    : "";
-            }
-
-                            console.log("Received from LLM (Image Prompt Request - raw): " + rawReply);
+            console.log("Received from LLM (Image Prompt Request - raw): " + rawReply);
 
             if (rawReply) {
                 return { type: 'image_request', prompt: rawReply };
@@ -660,49 +583,12 @@ Make sure the character you create embodies and follows the persona instructions
             console.log("Current conversation history being sent to LLM:", JSON.stringify(messagesForAPI, null, 2));
 
             try {
-                let payload, data, rawReply;
-                
-                if (isDirectProvider) {
-                    payload = this.createDirectProviderPayload(messagesForAPI, this.chatTemperature, this.chatMaxTokens);
-                    console.log('Sending direct provider normal chat request:', JSON.stringify(this.sanitizePayloadForLogging(payload), null, 2));
-                    data = await this.sendDirectProviderRequest(payload);
-                    rawReply = this.extractDirectProviderResponse(data);
-                    if (!rawReply) {
-                        rawReply = "Sorry, I couldn't understand that.";
-                    }
-                } else {
-                    payload = this.createCompatiblePayload(messagesForAPI, this.chatTemperature, this.chatMaxTokens, true);
-
-                    const headers = {
-                        'Content-Type': 'application/json',
-                    };
-
-                    if (this.apiKey) {
-                        headers['Authorization'] = `Bearer ${this.apiKey}`;
-                    }
-
-                    console.log('Sending traditional normal chat request:', JSON.stringify(this.sanitizePayloadForLogging(payload), null, 2));
-
-                    const response = await fetch(endpoint, {
-                        method: 'POST',
-                        headers: headers,
-                        body: JSON.stringify(payload),
-                        });
-
-                    if (!response.ok) {
-                        const errorData = await response.json().catch(() => response.text());
-                        console.error('LLM API Error (Normal Chat):', errorData);
-                        console.error('Request payload that failed:', JSON.stringify(payload, null, 2));
-                        this.conversationHistory.pop(); 
-                        throw new Error("LLM API request failed with status " + response.status + ": " + JSON.stringify(errorData));
-                    }
-
-                    data = await response.json();
-                    
-                    rawReply = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content
-                        ? data.choices[0].message.content.trim()
-                        : "Sorry, I couldn't understand that.";
-                }
+                const rawReply = await this.sendUniversalLLMRequest(
+                    messagesForAPI, 
+                    this.chatTemperature, 
+                    this.chatMaxTokens, 
+                    false
+                );
 
                 this.conversationHistory.push({ role: "assistant", content: rawReply });
                 console.log("Received from LLM (Normal Chat - raw): " + rawReply);
@@ -732,6 +618,53 @@ Make sure the character you create embodies and follows the persona instructions
         );
         
         console.log("Character profile reset. Will regenerate on next message.");
+    }
+
+    // --- CONSOLIDATED API REQUEST HANDLER ---
+    async sendUniversalLLMRequest(messages, temperature, maxTokens, isImagePrompt = false) {
+        const isDirectProvider = ['openai-direct', 'anthropic-direct', 'google-direct'].includes(this.providerType);
+        
+        let payload, data, response;
+        
+        if (isDirectProvider) {
+            payload = this.createDirectProviderPayload(messages, temperature, maxTokens);
+            console.log(`Sending direct provider request (${isImagePrompt ? 'image' : 'chat'}):`, JSON.stringify(this.sanitizePayloadForLogging(payload), null, 2));
+            data = await this.sendDirectProviderRequest(payload);
+            response = this.extractDirectProviderResponse(data);
+        } else {
+            const endpoint = `${this.apiBaseUrl}/v1/chat/completions`;
+            payload = this.createCompatiblePayload(messages, temperature, maxTokens, !isImagePrompt);
+
+            const headers = {
+                'Content-Type': 'application/json',
+            };
+
+            if (this.apiKey) {
+                headers['Authorization'] = `Bearer ${this.apiKey}`;
+            }
+
+            console.log(`Sending traditional request (${isImagePrompt ? 'image' : 'chat'}):`, JSON.stringify(this.sanitizePayloadForLogging(payload), null, 2));
+
+            const fetchResponse = await fetch(endpoint, {
+                method: 'POST',
+                headers: headers,
+                body: JSON.stringify(payload)
+            });
+
+            if (!fetchResponse.ok) {
+                const errorData = await fetchResponse.json().catch(() => fetchResponse.text());
+                console.error(`LLM API Error (${isImagePrompt ? 'Image' : 'Chat'}):`, errorData);
+                console.error('Request payload that failed:', JSON.stringify(payload, null, 2));
+                throw new Error(`LLM API request failed with status ${fetchResponse.status}: ${JSON.stringify(errorData)}`);
+            }
+
+            data = await fetchResponse.json();
+            response = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content
+                ? data.choices[0].message.content.trim()
+                : "";
+        }
+        
+        return response || (isImagePrompt ? "" : "Sorry, I couldn't understand that.");
     }
 
     // Helper function to sanitize payload for logging (removes safety settings)
@@ -836,73 +769,17 @@ Make sure the character you create embodies and follows the persona instructions
                 content: `Generate image keywords for: "show me what you look like"\n\nRecent conversation context: ${conversationContext}\n\nOutput format: 1woman, hair-color, hair-style, eye-color, build, clothing-style, setting, mood, lighting, pose, expression, background-details, weather, time-of-day, activity, art-style, quality-tags\n\nProvide at least 20 comma-separated keywords. Respond with ONLY the keywords.`
             });
             
-            const isDirectProvider = ['openai-direct', 'anthropic-direct', 'google-direct'].includes(this.providerType);
-            let imagePrompt = null;
+            const imagePrompt = await this.sendUniversalLLMRequest(
+                imageGenMessages, 
+                this.imagePromptTemperature, 
+                this.imagePromptMaxTokens, 
+                true
+            );
             
-            if (isDirectProvider) {
-                const imagePayload = this.createDirectProviderPayload(imageGenMessages, this.imagePromptTemperature, this.imagePromptMaxTokens);
-                console.log('Sending direct provider initial image prompt generation request:', JSON.stringify(imagePayload, null, 2));
-                
-                try {
-                    const imageData = await this.sendDirectProviderRequest(imagePayload);
-                    console.log('Raw image prompt generation response:', imageData);
-                    
-                    const rawImageReply = this.extractDirectProviderResponse(imageData);
-                    console.log('Extracted image prompt:', rawImageReply);
-                    
-                    if (rawImageReply) {
-                        imagePrompt = rawImageReply;
-                        console.log("Generated image prompt:", imagePrompt);
-                    } else {
-                        console.log('No image prompt generated - full response:', JSON.stringify(imageData, null, 2));
-                    }
-                } catch (error) {
-                    console.error('Direct provider image prompt generation failed:', error);
-                    // Continue to try traditional LLM approach as fallback
-                }
-            }
-            
-            // If direct provider failed or we're not using a direct provider, try traditional approach
-            if (!imagePrompt) {
-                const imagePayload = this.createCompatiblePayload(imageGenMessages, this.imagePromptTemperature, this.imagePromptMaxTokens, false);
-
-                const imageHeaders = {
-                    'Content-Type': 'application/json',
-                };
-
-                if (this.apiKey) {
-                    imageHeaders['Authorization'] = `Bearer ${this.apiKey}`;
-                }
-
-                console.log('Sending traditional initial image generation request:', JSON.stringify(imagePayload, null, 2));
-
-                const response = await fetch(`${this.apiBaseUrl}/v1/chat/completions`, {
-                    method: 'POST',
-                    headers: imageHeaders,
-                    body: JSON.stringify(imagePayload),
-                });
-
-                if (response.ok) {
-                    const imageData = await response.json();
-                    console.log('Raw image generation response:', imageData);
-                    
-                    const rawImageReply = imageData.choices && imageData.choices[0] && imageData.choices[0].message && imageData.choices[0].message.content
-                        ? imageData.choices[0].message.content.trim()
-                        : null;
-                    
-                    console.log('Extracted image reply:', rawImageReply);
-                    
-                    if (rawImageReply) {
-                        imagePrompt = rawImageReply;
-                        console.log("Generated image prompt:", imagePrompt);
-                    } else {
-                        console.log('No image prompt generated - full response:', JSON.stringify(imageData, null, 2));
-                    }
-                } else {
-                    console.error('Image generation request failed:', response.status, response.statusText);
-                    const errorText = await response.text();
-                    console.error('Error response:', errorText);
-                }
+            if (imagePrompt) {
+                console.log("Generated image prompt:", imagePrompt);
+            } else {
+                console.log('No image prompt generated');
             }
             
             // Then, get a greeting using temporary messages
@@ -914,56 +791,12 @@ Make sure the character you create embodies and follows the persona instructions
                 }
             ];
             
-            let greeting = "Hello there! What's your name?";
-            
-            if (isDirectProvider) {
-                const greetingPayload = this.createDirectProviderPayload(greetingMessages, this.chatTemperature, this.chatMaxTokens);
-                console.log('Sending direct provider initial greeting request:', JSON.stringify(greetingPayload, null, 2));
-                
-                try {
-                    const greetingData = await this.sendDirectProviderRequest(greetingPayload);
-                    const rawGreetingReply = this.extractDirectProviderResponse(greetingData);
-                    
-                    if (rawGreetingReply) {
-                        greeting = rawGreetingReply;
-                    } else {
-                        console.log('No greeting generated - full response:', JSON.stringify(greetingData, null, 2));
-                    }
-                } catch (error) {
-                    console.error('Direct provider greeting generation failed:', error);
-                }
-            } else {
-                const greetingPayload = this.createCompatiblePayload(greetingMessages, this.chatTemperature, this.chatMaxTokens, true);
-
-                const greetingHeaders = {
-                    'Content-Type': 'application/json',
-                };
-
-                if (this.apiKey) {
-                    greetingHeaders['Authorization'] = `Bearer ${this.apiKey}`;
-                }
-
-                console.log('Sending traditional initial greeting request:', JSON.stringify(greetingPayload, null, 2));
-
-                const greetingResponse = await fetch(`${this.apiBaseUrl}/v1/chat/completions`, {
-                    method: 'POST',
-                    headers: greetingHeaders,
-                    body: JSON.stringify(greetingPayload),
-                });
-
-                if (greetingResponse.ok) {
-                    const greetingData = await greetingResponse.json();
-                    const rawGreetingReply = greetingData.choices && greetingData.choices[0] && greetingData.choices[0].message && greetingData.choices[0].message.content
-                        ? greetingData.choices[0].message.content.trim()
-                        : null;
-                    
-                    if (rawGreetingReply) {
-                        greeting = rawGreetingReply;
-                    } else {
-                        console.log('No greeting generated - full response:', JSON.stringify(greetingData, null, 2));
-                    }
-                }
-            }
+            const greeting = await this.sendUniversalLLMRequest(
+                greetingMessages, 
+                this.chatTemperature, 
+                this.chatMaxTokens, 
+                false
+            ) || "Hello there! What's your name?";
             
             // Add the initial interaction to conversation history
             console.log('Adding initial greeting exchange to conversation history');
