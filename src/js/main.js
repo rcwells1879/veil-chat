@@ -230,7 +230,12 @@ async function initializeApp() {
         ttsVoice: localStorage.getItem('ttsVoice') || 'Sonia',
         voiceSpeed: parseFloat(localStorage.getItem('voiceSpeed')) || 1.0,
         voicePitch: parseFloat(localStorage.getItem('voicePitch')) || 1.0,
-        azureApiKey: localStorage.getItem('azureApiKey') || '',
+        azureApiKey: (() => {
+            const camelCase = localStorage.getItem('azureApiKey');
+            const kebabCase = localStorage.getItem('azure-api-key'); 
+            console.log('🔍 Azure key initialization:', {camelCase, kebabCase});
+            return camelCase || kebabCase || '';
+        })(),
         azureRegion: localStorage.getItem('azureRegion') || 'eastus',
         // UI
         fontSize: parseInt(localStorage.getItem('fontSize') || '16'),
@@ -1319,7 +1324,7 @@ Type **"/list"** anytime to see this help again.`;
         console.trace("Call stack for closeSettingsPanel:"); // This will show what called the function.
         
         // Apply all settings before closing panel to ensure everything is saved
-        saveAllSettings();
+        // Settings now save automatically - no manual save needed
         
         const panel = document.querySelector('#settings-panel-container .settings-panel');
         if (!panel) {
@@ -1432,19 +1437,67 @@ Type **"/list"** anytime to see this help again.`;
     
     // Desktop element mapping for dual sync
     const desktopSettingsIdMap = {
+        // Font Settings
+        fontSize: 'desktop-font-size',
+        
+        // LLM Provider Settings  
         customLlmProvider: 'desktop-llm-provider',
         customLlmApiUrl: 'desktop-llm-api-url',
         customLlmModelIdentifier: 'desktop-llm-model',
         customLlmApiKey: 'desktop-llm-api-key',
-        customImageProvider: 'desktop-image-provider',
-        customImageApiUrl: 'desktop-image-api-url',
-        swarmuiModel: 'desktop-swarmui-model',
+        
+        // Direct API Provider Settings
+        openaiModelIdentifier: 'desktop-openai-model-identifier',
+        openaiApiKey: 'desktop-openai-api-key',
+        anthropicModelIdentifier: 'desktop-anthropic-model-identifier',
+        anthropicApiKey: 'desktop-anthropic-api-key',
+        googleModelIdentifier: 'desktop-google-model-identifier',
+        googleApiKey: 'desktop-google-api-key',
+        
+        // Voice Settings
         ttsVoice: 'desktop-tts-voice',
         voiceSpeed: 'desktop-voice-speed',
-        azureApiKey: 'desktop-azure-api-key',
+        voicePitch: 'desktop-voice-pitch',
+        azureApiKey: 'azure-api-key-desktop',
+        azureRegion: 'desktop-azure-region',
+        
+        // MCP Settings
         mcpEnabled: 'desktop-mcp-enabled',
         mcpServerUrl: 'desktop-mcp-url',
-        fontSize: 'desktop-font-size'
+        
+        // Web Search Settings
+        searchEnabled: 'desktop-search-enabled',
+        searchProvider: 'desktop-search-provider',
+        searchApiKey: 'desktop-search-api-key',
+        searchResultsLimit: 'desktop-search-results-limit',
+        searchAutoSummarize: 'desktop-search-auto-summarize',
+        searchTimeFilter: 'desktop-search-time-filter',
+        
+        // Image Generation Settings
+        customImageProvider: 'desktop-image-provider',
+        
+        // A1111 Settings
+        customImageApiUrl: 'desktop-image-api-url',
+        imageWidth: 'desktop-image-width',
+        imageHeight: 'desktop-image-height',
+        imageSteps: 'desktop-image-steps',
+        imageCfgScale: 'desktop-image-cfg-scale',
+        imageSampler: 'desktop-image-sampler',
+        
+        // SwarmUI Settings
+        swarmuiApiUrl: 'desktop-swarmui-api-url',
+        swarmuiWidth: 'desktop-swarmui-width',
+        swarmuiHeight: 'desktop-swarmui-height',
+        swarmuiSteps: 'desktop-swarmui-steps',
+        swarmuiCfgScale: 'desktop-swarmui-cfg-scale',
+        swarmuiModel: 'desktop-swarmui-model',
+        swarmuiSampler: 'desktop-swarmui-sampler',
+        
+        // OpenAI Image Settings
+        imageSize: 'desktop-image-size',
+        openaiQuality: 'desktop-openai-quality',
+        openaiOutputFormat: 'desktop-openai-output-format',
+        openaiBackground: 'desktop-openai-background'
     };
 
     // --- Load Settings Panel Now That Mappings Are Defined ---
@@ -1629,6 +1682,49 @@ Type **"/list"** anytime to see this help again.`;
     }
 
     // --- Universal Settings Loading (Mobile + Desktop) ---
+    function setupMobileSettingsHandlers() {
+        if (!settingsPanelContainer) return;
+        
+        console.log('📱 Setting up mobile settings handlers...');
+        
+        // Load settings from localStorage into mobile interface
+        Object.keys(settingsIdMap).forEach(settingsKey => {
+            const mobileId = settingsIdMap[settingsKey];
+            const element = settingsPanelContainer.querySelector(`#${mobileId}`);
+            
+            if (element) {
+                let value = localStorage.getItem(settingsKey);
+                
+                // Special handling for Azure API key fallback
+                if (settingsKey === 'azureApiKey' && (!value || value === '')) {
+                    value = localStorage.getItem('azure-api-key') || '';
+                }
+                
+                // Load value into element
+                if (element.type === 'checkbox') {
+                    element.checked = value === 'true' || value === true;
+                } else if (element.type === 'range') {
+                    element.value = value || element.defaultValue || '1';
+                } else {
+                    element.value = value || '';
+                }
+                
+                // Setup save handlers
+                const saveHandler = () => {
+                    const currentValue = element.type === 'checkbox' ? element.checked : element.value;
+                    localStorage.setItem(settingsKey, currentValue);
+                    if (window.SETTINGS) {
+                        window.SETTINGS[settingsKey] = currentValue;
+                    }
+                    console.log(`💾 Mobile saved: ${settingsKey} = ${currentValue ? (settingsKey.includes('ApiKey') ? 'PRESENT' : currentValue) : 'EMPTY'}`);
+                };
+                
+                element.addEventListener('change', saveHandler);
+                element.addEventListener('input', saveHandler);
+            }
+        });
+    }
+
     function loadAllSettings() {
         console.log('🔧 loadAllSettings: Loading settings to all interfaces...');
         
@@ -1807,8 +1903,8 @@ Type **"/list"** anytime to see this help again.`;
                 setupImageControls();
                 toggleModelIdentifierVisibility();
 
-                // Note: Settings are now saved only when panel closes via closeSettingsPanel()
-                // Individual change events removed to prevent redundant service updates
+                // Setup simple localStorage-based mobile settings
+                setupMobileSettingsHandlers();
 
                 // Add specific event listeners for voice sliders to update display values
                 const voiceSpeedSlider = settingsPanelContainer.querySelector('#slider-voice-speed');
@@ -1872,6 +1968,86 @@ Type **"/list"** anytime to see this help again.`;
                 </div>`;
         }
     }
+
+    // Function to sync settings from localStorage to desktop elements
+    function syncSettingsToDesktop() {
+        if (!window.desktopInterface) {
+            console.log('Desktop interface not available, skipping sync');
+            return;
+        }
+        
+        console.log('=== Starting Desktop Settings Sync ===');
+        console.log('Current SETTINGS object:', SETTINGS);
+        
+        // Debug localStorage keys for Azure
+        console.log('Azure debugging:');
+        console.log('  localStorage.azureApiKey:', localStorage.getItem('azureApiKey'));
+        console.log('  localStorage.azureAPIKey:', localStorage.getItem('azureAPIKey'));
+        console.log('  localStorage["azure-api-key"]:', localStorage.getItem('azure-api-key'));
+        console.log('  SETTINGS.azureApiKey:', SETTINGS.azureApiKey);
+        
+        let syncCount = 0;
+        let missingElements = 0;
+        
+        // Sync each setting from localStorage to its corresponding desktop element
+        Object.keys(desktopSettingsIdMap).forEach(settingKey => {
+            const desktopElementId = desktopSettingsIdMap[settingKey];
+            const desktopElement = document.getElementById(desktopElementId);
+            const value = SETTINGS[settingKey];
+            
+            console.log(`Checking ${settingKey}: value="${value}", element=${!!desktopElement}`);
+            
+            if (desktopElement && value !== undefined && value !== null && value !== '') {
+                if (desktopElement.type === 'checkbox') {
+                    desktopElement.checked = (value === true || value === 'true');
+                    console.log(`✅ Synced checkbox ${settingKey} = ${desktopElement.checked}`);
+                } else if (desktopElement.type === 'range') {
+                    desktopElement.value = value;
+                    // Trigger display update for range sliders
+                    const displayElement = document.getElementById(desktopElementId + '-value');
+                    if (displayElement) {
+                        if (settingKey === 'fontSize') {
+                            displayElement.textContent = value + 'px';
+                        } else if (settingKey === 'voiceSpeed') {
+                            displayElement.textContent = value + 'x';
+                        } else if (settingKey === 'voicePitch') {
+                            displayElement.textContent = value;
+                        }
+                    }
+                    console.log(`✅ Synced range ${settingKey} = ${value}`);
+                } else {
+                    desktopElement.value = value;
+                    console.log(`✅ Synced input ${settingKey} = "${value}"`);
+                }
+                syncCount++;
+            } else if (!desktopElement) {
+                console.warn(`❌ Desktop element not found: ${desktopElementId}`);
+                missingElements++;
+            } else if (value === undefined || value === null || value === '') {
+                console.log(`⚠️  Empty value for ${settingKey}: "${value}"`);
+            }
+        });
+
+        console.log(`Synced ${syncCount} settings, ${missingElements} elements missing`);
+
+        // Trigger provider-specific section visibility updates
+        const providerElement = document.getElementById('desktop-llm-provider');
+        if (providerElement && window.desktopInterface) {
+            console.log(`Updating provider sections for: ${providerElement.value}`);
+            window.desktopInterface.toggleProviderSections(providerElement.value);
+        }
+
+        const imageProviderElement = document.getElementById('desktop-image-provider');
+        if (imageProviderElement && window.desktopInterface) {
+            console.log(`Updating image provider sections for: ${imageProviderElement.value}`);
+            window.desktopInterface.toggleImageProviderSections(imageProviderElement.value);
+        }
+        
+        console.log('=== Desktop Settings Sync Completed ===');
+    }
+
+    // Make the sync function available globally for desktop interface
+    window.syncSettingsToDesktop = syncSettingsToDesktop;
 
     // --- Voice Service Handlers ---
     function handleSttResult(text) { 
@@ -2034,7 +2210,11 @@ Type **"/list"** anytime to see this help again.`;
             console.log('%c[DEBUG] Panel does NOT exist. Loading now...', 'color: orange;');
             await loadSettingsPanel();
         } else {
-            console.log('%c[DEBUG] Panel already exists. Not reloading.', 'color: green;');
+            console.log('%c[DEBUG] Panel already exists. Reloading settings from localStorage.', 'color: green;');
+            // Reload mobile settings from localStorage when reopening panel
+            if (typeof setupMobileSettingsHandlers === 'function') {
+                setupMobileSettingsHandlers();
+            }
         }
         showSettingsPanel();
     });

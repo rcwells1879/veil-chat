@@ -8,6 +8,69 @@ class DesktopInterface {
         this.settingsSync = new Map();
         this.initialized = false;
         
+        // Desktop settings ID mapping
+        this.desktopSettingsIdMap = {
+            // Font Settings
+            fontSize: 'desktop-font-size',
+            
+            // LLM Provider Settings  
+            customLlmProvider: 'desktop-llm-provider',
+            customLlmApiUrl: 'desktop-llm-api-url',
+            customLlmModelIdentifier: 'desktop-llm-model',
+            customLlmApiKey: 'desktop-llm-api-key',
+            
+            // Direct API Provider Settings
+            openaiModelIdentifier: 'desktop-openai-model-identifier',
+            openaiApiKey: 'desktop-openai-api-key',
+            anthropicModelIdentifier: 'desktop-anthropic-model-identifier',
+            anthropicApiKey: 'desktop-anthropic-api-key',
+            googleModelIdentifier: 'desktop-google-model-identifier',
+            googleApiKey: 'desktop-google-api-key',
+            
+            // Voice Settings
+            ttsVoice: 'desktop-tts-voice',
+            voiceSpeed: 'desktop-voice-speed',
+            voicePitch: 'desktop-voice-pitch',
+            azureApiKey: 'azure-api-key-desktop',
+            azureRegion: 'desktop-azure-region',
+            
+            // MCP Settings
+            mcpEnabled: 'desktop-mcp-enabled',
+            mcpServerUrl: 'desktop-mcp-url',
+            
+            // Web Search Settings
+            searchEnabled: 'desktop-search-enabled',
+            searchProvider: 'desktop-search-provider',
+            searchApiKey: 'desktop-search-api-key',
+            searchResultsLimit: 'desktop-search-results-limit',
+            searchAutoSummarize: 'desktop-search-auto-summarize',
+            searchTimeFilter: 'desktop-search-time-filter',
+            
+            // Image Generation Settings
+            customImageProvider: 'desktop-image-provider',
+            customImageApiUrl: 'desktop-image-api-url',
+            imageWidth: 'desktop-image-width',
+            imageHeight: 'desktop-image-height',
+            imageSteps: 'desktop-image-steps',
+            imageCfgScale: 'desktop-image-cfg-scale',
+            imageSampler: 'desktop-image-sampler',
+            
+            // SwarmUI Settings
+            swarmuiApiUrl: 'desktop-swarmui-api-url',
+            swarmuiWidth: 'desktop-swarmui-width',
+            swarmuiHeight: 'desktop-swarmui-height',
+            swarmuiSteps: 'desktop-swarmui-steps',
+            swarmuiCfgScale: 'desktop-swarmui-cfg-scale',
+            swarmuiModel: 'desktop-swarmui-model',
+            swarmuiSampler: 'desktop-swarmui-sampler',
+            
+            // OpenAI Image Settings
+            imageSize: 'desktop-image-size',
+            openaiQuality: 'desktop-openai-quality',
+            openaiOutputFormat: 'desktop-openai-output-format',
+            openaiBackground: 'desktop-openai-background'
+        };
+        
         this.init();
     }
 
@@ -73,7 +136,7 @@ class DesktopInterface {
         // Auto-save settings if leaving the settings view
         if (this.currentView === 'settings' && view !== 'settings') {
             if (window.saveAllSettings && typeof window.saveAllSettings === 'function') {
-                window.saveAllSettings();
+                // Settings save automatically - no manual save needed
                 this.showNotification('Settings saved automatically');
             }
         }
@@ -107,7 +170,8 @@ class DesktopInterface {
                 document.querySelector('.desktop-settings').style.display = 'block';
                 document.getElementById('desktop-settings-nav').classList.add('active');
                 this.currentView = 'settings';
-                this.syncSettingsToDesktop();
+                // Setup handlers when settings panel is opened
+                this.setupDesktopSettingsHandlers();
                 break;
             case 'persona':
                 document.querySelector('.desktop-persona').style.display = 'block';
@@ -239,34 +303,8 @@ class DesktopInterface {
             'desktop-openai-background': 'openai-background'
         };
 
-        // Setup two-way sync for all settings
-        Object.entries(this.settingsMap).forEach(([desktopId, mobileId]) => {
-            const desktopElement = document.getElementById(desktopId);
-            const mobileElement = document.getElementById(mobileId);
-            
-            if (desktopElement && mobileElement) {
-                // Sync from mobile to desktop initially
-                this.syncElementValue(mobileElement, desktopElement);
-                
-                // Setup change listeners for real-time sync to mobile (saving handled by saveAllSettings)
-                desktopElement.addEventListener('change', () => {
-                    this.syncElementValue(desktopElement, mobileElement);
-                    this.updateSettingsDisplay(desktopId);
-                    
-                    // Handle provider-specific section visibility
-                    if (desktopId === 'desktop-llm-provider') {
-                        this.toggleProviderSections(desktopElement.value);
-                    } else if (desktopId === 'desktop-image-provider') {
-                        this.toggleImageProviderSections(desktopElement.value);
-                    }
-                });
-                
-                desktopElement.addEventListener('input', () => {
-                    this.syncElementValue(desktopElement, mobileElement);
-                    this.updateSettingsDisplay(desktopId);
-                });
-            }
-        });
+        // Setup simple localStorage-based settings for desktop interface
+        this.setupDesktopSettingsHandlers();
 
         // Auto-save functionality (no manual save button needed)
         // Settings will be auto-saved when leaving the settings view
@@ -303,22 +341,115 @@ class DesktopInterface {
         }
     }
 
+    setupDesktopSettingsHandlers() {
+        console.log('🖥️ Setting up desktop settings handlers...');
+        console.log('🖥️ this.desktopSettingsIdMap exists:', !!this.desktopSettingsIdMap);
+        console.log('🖥️ desktopSettingsIdMap keys:', Object.keys(this.desktopSettingsIdMap || {}));
+        
+        // Load all settings from localStorage when settings panel is opened
+        this.loadSettingsFromLocalStorage();
+        
+        // Setup save handlers for all desktop settings elements
+        Object.keys(this.desktopSettingsIdMap).forEach(settingsKey => {
+            const desktopId = this.desktopSettingsIdMap[settingsKey];
+            const element = document.getElementById(desktopId);
+            
+            console.log(`🖥️ Setting up handler for ${settingsKey} → ${desktopId}: ${element ? 'FOUND' : 'NOT FOUND'}`);
+            
+            if (element) {
+                // Save on change
+                element.addEventListener('change', () => {
+                    this.saveSettingToLocalStorage(settingsKey, element);
+                    this.updateSettingsDisplay(desktopId);
+                    
+                    // Handle provider-specific section visibility
+                    if (desktopId === 'desktop-llm-provider') {
+                        this.toggleProviderSections(element.value);
+                    } else if (desktopId === 'desktop-image-provider') {
+                        this.toggleImageProviderSections(element.value);
+                    }
+                });
+                
+                // Save on input (for real-time saving)
+                element.addEventListener('input', () => {
+                    this.saveSettingToLocalStorage(settingsKey, element);
+                    this.updateSettingsDisplay(desktopId);
+                });
+            }
+        });
+    }
+
+    loadSettingsFromLocalStorage() {
+        console.log('📥 Desktop: Loading all settings from localStorage...');
+        
+        Object.keys(this.desktopSettingsIdMap).forEach(settingsKey => {
+            const desktopId = this.desktopSettingsIdMap[settingsKey];
+            const element = document.getElementById(desktopId);
+            
+            if (element) {
+                let value = localStorage.getItem(settingsKey);
+                
+                // Special handling for Azure API key fallback
+                if (settingsKey === 'azureApiKey' && (!value || value === '')) {
+                    value = localStorage.getItem('azure-api-key') || '';
+                }
+                
+                if (element.type === 'checkbox') {
+                    element.checked = value === 'true' || value === true;
+                } else if (element.type === 'range') {
+                    element.value = value || element.defaultValue || '1';
+                    // Trigger display update for ranges
+                    element.dispatchEvent(new Event('input'));
+                } else {
+                    element.value = value || '';
+                }
+                
+                console.log(`📥 Loaded ${settingsKey}: ${value ? (settingsKey.includes('ApiKey') ? 'PRESENT' : value) : 'EMPTY'}`);
+            }
+        });
+        
+        // Update provider sections after loading
+        const providerElement = document.getElementById('desktop-llm-provider');
+        if (providerElement && providerElement.value) {
+            this.toggleProviderSections(providerElement.value);
+        }
+    }
+
+    saveSettingToLocalStorage(settingsKey, element) {
+        const value = element.type === 'checkbox' ? element.checked : element.value;
+        localStorage.setItem(settingsKey, value);
+        
+        // Update global SETTINGS object if available
+        if (window.SETTINGS) {
+            window.SETTINGS[settingsKey] = value;
+        }
+        
+        console.log(`💾 Desktop saved: ${settingsKey} = ${value ? (settingsKey.includes('ApiKey') ? 'PRESENT' : value) : 'EMPTY'}`);
+    }
+
     async syncSettingsToDesktop() {
         // Wait for mobile settings panel to be loaded
         await this.waitForMobileSettings();
         
-        // Sync all mobile settings to desktop when opening settings panel
-        Object.entries(this.settingsMap).forEach(([desktopId, mobileId]) => {
-            const desktopElement = document.getElementById(desktopId);
-            const mobileElement = document.getElementById(mobileId);
-            
-            if (desktopElement && mobileElement) {
-                this.syncElementValue(mobileElement, desktopElement);
-                this.updateSettingsDisplay(desktopId);
-            } else if (!mobileElement) {
-                console.warn(`Mobile settings element not found: ${mobileId}`);
-            }
-        });
+        // Use the comprehensive sync function from main.js if available
+        if (window.syncSettingsToDesktop && typeof window.syncSettingsToDesktop === 'function') {
+            console.log('Desktop: Using comprehensive settings sync from main.js');
+            window.syncSettingsToDesktop();
+        } else {
+            console.log('Desktop: Fallback to basic element sync');
+            // Fallback: Sync all mobile settings to desktop when opening settings panel
+            Object.entries(this.settingsMap).forEach(([desktopId, mobileId]) => {
+                const desktopElement = document.getElementById(desktopId);
+                const mobileElement = document.getElementById(mobileId);
+                
+                if (desktopElement && mobileElement) {
+                    this.syncElementValue(mobileElement, desktopElement);
+                    this.updateSettingsDisplay(desktopId);
+                } else if (!mobileElement) {
+                    console.warn(`Mobile settings element not found: ${mobileId}`);
+                }
+            });
+        }
     }
 
     async waitForMobileSettings() {
@@ -371,27 +502,96 @@ class DesktopInterface {
     }
 
     toggleProviderSections(provider) {
-        // Hide all direct API sections
+        console.log(`=== Desktop toggleProviderSections called for: ${provider} ===`);
+        
+        // Get standard desktop setting elements
+        const apiUrlItem = document.getElementById('desktop-llm-api-url')?.parentElement;
+        const modelItem = document.getElementById('desktop-llm-model')?.parentElement;
+        const apiKeyItem = document.getElementById('desktop-llm-api-key')?.parentElement;
+        
+        console.log('Standard elements found:', {
+            apiUrlItem: !!apiUrlItem,
+            modelItem: !!modelItem,
+            apiKeyItem: !!apiKeyItem
+        });
+        
+        // Hide all direct API sections first
         const sections = ['desktop-openai-direct-settings', 'desktop-anthropic-direct-settings', 'desktop-google-direct-settings'];
         sections.forEach(sectionId => {
             const section = document.getElementById(sectionId);
-            if (section) section.style.display = 'none';
+            console.log(`Section ${sectionId}: found=${!!section}`);
+            if (section) {
+                section.style.display = 'none';
+                console.log(`Hidden section: ${sectionId}`);
+            }
         });
 
-        // Show relevant section based on provider
-        let targetSection = null;
         if (provider === 'openai-direct') {
-            targetSection = 'desktop-openai-direct-settings';
+            console.log('Setting up OpenAI direct provider...');
+            // Hide standard settings, show OpenAI direct settings
+            if (modelItem) {
+                modelItem.style.display = 'none';
+                console.log('Hidden standard model item');
+            }
+            if (apiKeyItem) {
+                apiKeyItem.style.display = 'none';
+                console.log('Hidden standard API key item');
+            }
+            if (apiUrlItem) {
+                apiUrlItem.style.display = 'none';
+                console.log('Hidden standard API URL item');
+            }
+            const section = document.getElementById('desktop-openai-direct-settings');
+            if (section) {
+                section.style.display = 'block';
+                console.log('✅ Shown OpenAI direct settings section');
+            } else {
+                console.error('❌ OpenAI direct settings section not found!');
+            }
         } else if (provider === 'anthropic-direct') {
-            targetSection = 'desktop-anthropic-direct-settings';
+            console.log('Setting up Anthropic direct provider...');
+            // Hide standard settings, show Anthropic direct settings
+            if (modelItem) modelItem.style.display = 'none';
+            if (apiKeyItem) apiKeyItem.style.display = 'none';
+            if (apiUrlItem) apiUrlItem.style.display = 'none';
+            const section = document.getElementById('desktop-anthropic-direct-settings');
+            if (section) {
+                section.style.display = 'block';
+                console.log('✅ Shown Anthropic direct settings section');
+            } else {
+                console.error('❌ Anthropic direct settings section not found!');
+            }
         } else if (provider === 'google-direct') {
-            targetSection = 'desktop-google-direct-settings';
+            console.log('Setting up Google direct provider...');
+            // Hide standard settings, show Google direct settings
+            if (modelItem) modelItem.style.display = 'none';
+            if (apiKeyItem) apiKeyItem.style.display = 'none';
+            if (apiUrlItem) apiUrlItem.style.display = 'none';
+            const section = document.getElementById('desktop-google-direct-settings');
+            if (section) {
+                section.style.display = 'block';
+                console.log('✅ Shown Google direct settings section');
+            } else {
+                console.error('❌ Google direct settings section not found!');
+            }
+        } else {
+            console.log(`Setting up traditional provider: ${provider}`);
+            // Traditional providers (litellm, lmstudio, ollama) - show standard settings
+            if (apiUrlItem) {
+                apiUrlItem.style.display = 'flex';
+                console.log('Shown standard API URL item');
+            }
+            if (apiKeyItem) {
+                apiKeyItem.style.display = 'flex';
+                console.log('Shown standard API key item');
+            }
+            if (modelItem) {
+                modelItem.style.display = 'flex';
+                console.log('Shown standard model item');
+            }
         }
-
-        if (targetSection) {
-            const section = document.getElementById(targetSection);
-            if (section) section.style.display = 'block';
-        }
+        
+        console.log(`=== Desktop provider sections update completed for: ${provider} ===`);
     }
 
     toggleImageProviderSections(provider) {
@@ -809,7 +1009,7 @@ class DesktopInterface {
             'desktop-swarmui-height': 'swarmuiHeight',
             'desktop-swarmui-steps': 'swarmuiSteps',
             'desktop-swarmui-cfg-scale': 'swarmuiCfgScale',
-            'desktop-swarmui-model': 'swarmUIModel',
+            'desktop-swarmui-model': 'swarmuiModel',
             'desktop-swarmui-sampler': 'swarmuiSampler',
             
             // OpenAI Image Settings
