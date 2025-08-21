@@ -1,7 +1,8 @@
 // VeilChat PWA Service Worker
-const CACHE_NAME = 'veilchat-v3';
-const STATIC_CACHE = 'veilchat-static-v3';
-const API_CACHE = 'veilchat-api-v3';
+const CACHE_VERSION = Date.now(); // Automatic versioning
+const CACHE_NAME = `veilchat-v${CACHE_VERSION}`;
+const STATIC_CACHE = `veilchat-static-v${CACHE_VERSION}`;
+const API_CACHE = `veilchat-api-v${CACHE_VERSION}`;
 
 // Static assets to cache immediately
 const STATIC_ASSETS = [
