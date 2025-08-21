@@ -32,19 +32,15 @@ jobs:
           # Create deployment directory
           mkdir -p deploy
           
-          # Copy only the web application files (no server files)
-          cp -r src/ deploy/
-          cp index.html deploy/ 2>/dev/null || echo "No root index.html found"
-          cp manifest.json deploy/ 2>/dev/null || echo "No manifest.json found"
-          cp *.md deploy/ 2>/dev/null || echo "No markdown files found"
-          
-          # Copy specific files if they exist at root level
-          if [ -f "src/index.html" ]; then
-            cp src/index.html deploy/index.html
-          fi
+          # Copy contents of src/ directly to deploy/ (not the src folder itself)
+          cp -r src/* deploy/
           
           # Remove server-side files from deployment
-          rm -rf deploy/src/server/ 2>/dev/null || echo "No server directory to remove"
+          rm -rf deploy/server/ 2>/dev/null || echo "No server directory to remove"
+          
+          # Copy root level files if they exist
+          cp index.html deploy/ 2>/dev/null || echo "No root index.html found"
+          cp manifest.json deploy/ 2>/dev/null || echo "No manifest.json found"
           
           # List what will be deployed
           echo "📁 Files prepared for deployment:"
