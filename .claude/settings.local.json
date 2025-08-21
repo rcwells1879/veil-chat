@@ -36,5 +36,18 @@
       "WebSearch"
     ],
     "deny": []
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./claude-startup.sh"
+          }
+        ]
+      }
+    ]
   }
 }

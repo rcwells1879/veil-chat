@@ -62,6 +62,19 @@ A sophisticated AI research and interaction platform featuring intelligent web s
 - **Keyboard Optimization**: Smart keyboard handling, viewport management
 - **Performance Optimized**: Efficient rendering, smart caching, resource management
 
+## 🏗️ Architecture
+
+### Settings Synchronization
+
+VeilChat uses a **simple localStorage-based synchronization system** for seamless settings management across mobile and desktop interfaces:
+
+- **Single Source of Truth**: localStorage serves as the authoritative source for all settings
+- **Independent Interfaces**: Mobile and desktop settings load/save independently - no complex bidirectional syncing
+- **Automatic Updates**: Settings reload each time an interface is opened
+- **Immediate Persistence**: All changes save to localStorage instantly on input/change events
+
+This architecture provides reliable, fast, and maintainable settings management without the complexity of traditional sync systems.
+
 ## 🚀 Quick Start
 
 ### Prerequisites

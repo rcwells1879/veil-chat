@@ -402,11 +402,43 @@ if (typeof MCPClient === 'undefined') {
         }
 
         getLLMSettings() {
-            return {
-                apiBaseUrl: localStorage.getItem('customLlmApiUrl') || '',
-                apiKey: localStorage.getItem('customLlmApiKey') || '',
-                model: localStorage.getItem('customLlmModelIdentifier') || 'gemini2.5-flash'
-            };
+            // Get provider type from localStorage - support both traditional and direct providers
+            const provider = localStorage.getItem('customLlmProvider') || 'litellm';
+            
+            let llmSettings;
+            if (provider === 'openai-direct') {
+                llmSettings = {
+                    provider: 'openai-direct',
+                    apiBaseUrl: 'https://api.openai.com/v1/chat/completions',
+                    apiKey: localStorage.getItem('openaiApiKey'),
+                    model: localStorage.getItem('openaiModelIdentifier') || 'gpt-4.1-mini'
+                };
+            } else if (provider === 'anthropic-direct') {
+                llmSettings = {
+                    provider: 'anthropic-direct',
+                    apiBaseUrl: 'https://api.anthropic.com/v1/messages',
+                    apiKey: localStorage.getItem('anthropicApiKey'),
+                    model: localStorage.getItem('anthropicModelIdentifier') || 'claude-sonnet-4'
+                };
+            } else if (provider === 'google-direct') {
+                const googleModel = localStorage.getItem('googleModelIdentifier') || 'gemini-2.5-flash';
+                llmSettings = {
+                    provider: 'google-direct',
+                    apiBaseUrl: `https://generativelanguage.googleapis.com/v1beta/models/${googleModel}:generateContent`,
+                    apiKey: localStorage.getItem('googleApiKey'),
+                    model: googleModel
+                };
+            } else {
+                // Traditional providers (litellm, lmstudio, ollama)
+                llmSettings = {
+                    provider: provider,
+                    apiBaseUrl: localStorage.getItem('customLlmApiUrl') || '',
+                    apiKey: localStorage.getItem('customLlmApiKey') || '',
+                    model: localStorage.getItem('customLlmModelIdentifier') || 'gemini2.5-flash'
+                };
+            }
+            
+            return llmSettings;
         }
 
         // Execute a complete research workflow

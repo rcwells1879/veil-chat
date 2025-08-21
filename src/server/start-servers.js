@@ -3,6 +3,7 @@
 import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { exec } from 'child_process';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -35,7 +36,8 @@ mcpServer.on('error', (error) => {
 });
 
 // Start Live Server (port 8080) - use the one from parent directory
-const liveServer = spawn('node', [join(parentDir, 'node_modules', 'live-server', 'live-server.js'), '.'], {
+// Use --no-browser flag to prevent auto-opening localhost
+const liveServer = spawn('node', [join(parentDir, 'node_modules', 'live-server', 'live-server.js'), '.', '--no-browser'], {
     cwd: join(parentDir, 'src'),
     stdio: 'pipe'
 });
@@ -87,7 +89,29 @@ liveServer.on('close', (code) => {
     }
 });
 
+// Function to open browser to Cloudflare tunnel URL
+function openBrowser() {
+    const url = 'https://mcp-veil.veilstudio.io';
+    const command = process.platform === 'win32' ? `start ${url}` : 
+                   process.platform === 'darwin' ? `open ${url}` : 
+                   `xdg-open ${url}`;
+    
+    exec(command, (error) => {
+        if (error) {
+            console.log(`⚠️  Could not auto-open browser: ${error.message}`);
+            console.log(`🌐 Please manually open: ${url}`);
+        } else {
+            console.log(`🌐 Opened browser to: ${url}`);
+        }
+    });
+}
+
 console.log('✅ Both servers are starting...');
-console.log('📱 Web interface will be available at: http://localhost:8080');
+console.log('📱 Web interface will be available at: https://mcp-veil.veilstudio.io');
 console.log('🔧 MCP API will be available at: http://localhost:3001');
-console.log('⏹️  Press Ctrl+C to stop both servers\n'); 
+console.log('⏹️  Press Ctrl+C to stop both servers\n');
+
+// Give servers a moment to start up, then open browser
+setTimeout(() => {
+    openBrowser();
+}, 2000); 

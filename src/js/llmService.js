@@ -118,12 +118,10 @@ if (typeof LLMService === 'undefined') {
                 model: this.directModel,
                 temperature: temperature,
                 system: systemPrompts || undefined,
-                messages: anthropicMessages
+                messages: anthropicMessages,
+                // Anthropic requires max_tokens - use default if not provided
+                max_tokens: maxTokens !== null ? maxTokens : 4096
             };
-            // Only include max_tokens if it's not null
-            if (maxTokens !== null) {
-                payload.max_tokens = maxTokens;
-            }
             return payload;
         } else if (this.providerType === 'google-direct') {
             // Google AI Studio API format

@@ -47,6 +47,39 @@ npm run build
 
 VeilChat is a modern web-based chat interface with AI capabilities, built with vanilla JavaScript and Node.js. The application uses a **HTTP REST API architecture** for browser compatibility and mobile/PWA support.
 
+### Settings Synchronization Architecture
+
+**IMPORTANT: VeilChat uses a simple localStorage-based settings synchronization system.**
+
+#### Design Principle
+- **Single Source of Truth**: localStorage is the authoritative source for all settings
+- **No Complex Syncing**: Each interface (mobile/desktop) independently loads from and saves to localStorage
+- **Automatic Updates**: Settings are reloaded each time an interface is opened
+- **Immediate Persistence**: All changes save to localStorage instantly on input/change events
+
+#### Implementation
+```javascript
+// Mobile settings: src/js/main.js setupMobileSettingsHandlers()
+// Desktop settings: src/js/desktopInterface.js setupDesktopSettingsHandlers()
+
+// Pattern for each interface:
+1. Load from localStorage on panel open
+2. Save to localStorage on every input/change event
+3. Update global SETTINGS object for service reconfiguration
+```
+
+#### Key Files
+- **Mobile Settings**: `src/js/main.js` - `setupMobileSettingsHandlers()`
+- **Desktop Settings**: `src/js/desktopInterface.js` - `setupDesktopSettingsHandlers()` 
+- **Settings UI**: `src/pages/user-settings.html` (mobile), `src/index.html` (desktop)
+- **ID Mappings**: `settingsIdMap` (mobile), `desktopSettingsIdMap` (desktop)
+
+#### Benefits
+- **Reliable**: No complex bidirectional sync to break
+- **Fast**: Direct localStorage access with no intermediary logic
+- **Maintainable**: Simple load/save pattern is easy to debug
+- **Scalable**: Adding new settings requires minimal code changes
+
 ### Text-to-Speech (TTS) Architecture
 
 **IMPORTANT: TTS is entirely client-side - no server-side audio processing exists.**

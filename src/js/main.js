@@ -434,6 +434,73 @@ async function initializeApp() {
         console.log('🔧 All services reinitialized with current settings');
     }
     
+    // Expose globally for desktop interface
+    window.reinitializeServicesWithCurrentSettings = reinitializeServicesWithCurrentSettings;
+    
+    // Smart service reinitialization utilities
+    const SERVICE_AFFECTING_SETTINGS = {
+        // Image Service settings
+        image: ['customImageProvider', 'customImageApiUrl', 'swarmuiApiUrl', 'imageWidth', 'imageHeight', 'imageSteps', 'imageCfgScale', 'imageSampler', 'swarmuiWidth', 'swarmuiHeight', 'swarmuiSteps', 'swarmuiCfgScale', 'swarmuiModel', 'swarmuiSampler', 'imageSize', 'openaiQuality', 'openaiOutputFormat', 'openaiBackground'],
+        
+        // LLM Service settings
+        llm: ['customLlmProvider', 'customLlmApiUrl', 'customLlmModelIdentifier', 'customLlmApiKey', 'openaiModelIdentifier', 'openaiApiKey', 'anthropicModelIdentifier', 'anthropicApiKey', 'googleModelIdentifier', 'googleApiKey'],
+        
+        // Voice Service settings (Azure TTS)
+        voice: ['azureApiKey', 'azureRegion'],
+        
+        // MCP Service settings
+        mcp: ['mcpEnabled', 'mcpServerUrl'],
+        
+        // Search service settings
+        search: ['searchEnabled', 'searchProvider', 'searchApiKey', 'searchResultsLimit', 'searchAutoSummarize', 'searchTimeFilter']
+    };
+    
+    // Flatten all service-affecting settings into one array
+    const ALL_SERVICE_AFFECTING_SETTINGS = [
+        ...SERVICE_AFFECTING_SETTINGS.image,
+        ...SERVICE_AFFECTING_SETTINGS.llm,
+        ...SERVICE_AFFECTING_SETTINGS.voice,
+        ...SERVICE_AFFECTING_SETTINGS.mcp,
+        ...SERVICE_AFFECTING_SETTINGS.search
+    ];
+    
+    // Debounced service reinitialization
+    let serviceReinitTimeout = null;
+    const debouncedServiceReinit = () => {
+        clearTimeout(serviceReinitTimeout);
+        serviceReinitTimeout = setTimeout(() => {
+            if (window.reinitializeServicesWithCurrentSettings) {
+                window.reinitializeServicesWithCurrentSettings();
+                console.log('🔄 Services reinitialized after 750ms delay');
+            }
+        }, 750);
+    };
+    
+    // Smart service reinitialization function
+    const smartServiceReinit = (settingsKey, elementType) => {
+        // Only reinitialize for service-affecting settings
+        if (!ALL_SERVICE_AFFECTING_SETTINGS.includes(settingsKey)) {
+            console.log(`⏭️ Skipping service reinit for UI-only setting: ${settingsKey}`);
+            return;
+        }
+        
+        // Immediate reinit for dropdowns and checkboxes (single changes)
+        if (elementType === 'select-one' || elementType === 'checkbox') {
+            if (window.reinitializeServicesWithCurrentSettings) {
+                window.reinitializeServicesWithCurrentSettings();
+                console.log(`🔄 Immediate service reinit for ${elementType}: ${settingsKey}`);
+            }
+        } 
+        // Debounced reinit for text inputs and ranges (continuous changes)
+        else if (elementType === 'text' || elementType === 'password' || elementType === 'range' || elementType === 'number') {
+            debouncedServiceReinit();
+            console.log(`⏳ Debounced service reinit for ${elementType}: ${settingsKey}`);
+        }
+    };
+    
+    // Expose utilities globally
+    window.smartServiceReinit = smartServiceReinit;
+    
     // Run service reinitialization to ensure everything is properly configured
     await reinitializeServicesWithCurrentSettings();
     
@@ -618,8 +685,18 @@ async function initializeApp() {
             }
         }
 
+        // Add message to mobile chat window
         chatWindow.appendChild(messageElement);
         chatWindow.scrollTop = chatWindow.scrollHeight;
+        
+        // Also add message to desktop chat window if it exists
+        const desktopChatWindow = document.getElementById('desktop-chat-window');
+        if (desktopChatWindow) {
+            // Clone the message element for desktop
+            const desktopMessageElement = messageElement.cloneNode(true);
+            desktopChatWindow.appendChild(desktopMessageElement);
+            desktopChatWindow.scrollTop = desktopChatWindow.scrollHeight;
+        }
 
         // Only enable TTS for LLM messages, never for user messages
         if (enableTTS && sender === 'llm' && textToSpeak && voiceService && voiceService.isSynthesisSupported()) {
@@ -1068,7 +1145,15 @@ Type **"/list"** anytime to see this help again.`;
 
 
     function clearConversation() {
+        // Clear mobile chat window
         chatWindow.innerHTML = '';
+        
+        // Also clear desktop chat window if it exists
+        const desktopChatWindow = document.getElementById('desktop-chat-window');
+        if (desktopChatWindow) {
+            desktopChatWindow.innerHTML = '';
+        }
+        
         if (llmService) {
             llmService.clearConversationHistory();
         }
@@ -1101,7 +1186,14 @@ Type **"/list"** anytime to see this help again.`;
 
     // --- Persona Management ---
     async function createPersona(customPrompt) {
+        // Clear mobile chat window
         chatWindow.innerHTML = '';
+        
+        // Also clear desktop chat window if it exists
+        const desktopChatWindow = document.getElementById('desktop-chat-window');
+        if (desktopChatWindow) {
+            desktopChatWindow.innerHTML = '';
+        }
         currentPersonaPrompt = customPrompt;
         personaCreated = true;
 
@@ -1139,6 +1231,7 @@ Type **"/list"** anytime to see this help again.`;
         addWelcomeMessage();
 
         const successMessage = customPrompt ? 'Creating custom persona...' : 'Generating random persona...';
+        console.log(`🔍 About to add status message: "${successMessage}"`);
         addMessage(successMessage, 'llm');
 
         try {
@@ -1716,6 +1809,12 @@ Type **"/list"** anytime to see this help again.`;
                     if (window.SETTINGS) {
                         window.SETTINGS[settingsKey] = currentValue;
                     }
+                    
+                    // Smart service reinitialization based on element type and setting importance
+                    if (window.smartServiceReinit && typeof window.smartServiceReinit === 'function') {
+                        window.smartServiceReinit(settingsKey, element.type);
+                    }
+                    
                     console.log(`💾 Mobile saved: ${settingsKey} = ${currentValue ? (settingsKey.includes('ApiKey') ? 'PRESENT' : currentValue) : 'EMPTY'}`);
                 };
                 

@@ -424,6 +424,11 @@ class DesktopInterface {
             window.SETTINGS[settingsKey] = value;
         }
         
+        // Smart service reinitialization based on element type and setting importance
+        if (window.smartServiceReinit && typeof window.smartServiceReinit === 'function') {
+            window.smartServiceReinit(settingsKey, element.type);
+        }
+        
         console.log(`💾 Desktop saved: ${settingsKey} = ${value ? (settingsKey.includes('ApiKey') ? 'PRESENT' : value) : 'EMPTY'}`);
     }
 
@@ -544,6 +549,9 @@ class DesktopInterface {
             const section = document.getElementById('desktop-openai-direct-settings');
             if (section) {
                 section.style.display = 'block';
+                // Remove any debug styling
+                section.style.background = '';
+                section.style.backgroundColor = '';
                 console.log('✅ Shown OpenAI direct settings section');
             } else {
                 console.error('❌ OpenAI direct settings section not found!');
@@ -623,7 +631,9 @@ class DesktopInterface {
         const randomButton = document.getElementById('desktop-use-random-persona');
         const clearButton = document.getElementById('desktop-clear-persona');
         
-        if (createButton) {
+        // Remove any existing event listeners to prevent duplicates
+        if (createButton && !createButton.hasDesktopListener) {
+            createButton.hasDesktopListener = true;
             createButton.addEventListener('click', async () => {
                 const name = document.getElementById('desktop-persona-name').value;
                 const prompt = document.getElementById('desktop-persona-prompt').value;
@@ -631,6 +641,38 @@ class DesktopInterface {
                 if (!prompt) {
                     this.showNotification('Please enter a persona description');
                     return;
+                }
+                
+                // 🔒 SECURITY: Validate persona prompt before processing (same as mobile interface)
+                if (window.securityValidator) {
+                    const validation = window.securityValidator.validateUserInput(prompt, 'characterPrompt');
+                    if (!validation.isValid) {
+                        console.warn('🔒 Security: Desktop persona prompt blocked due to validation failure:', validation.violations);
+                        window.securityValidator.logSecurityEvent('DESKTOP_PERSONA_BLOCKED', {
+                            prompt: prompt,
+                            violations: validation.violations,
+                            riskLevel: validation.riskLevel,
+                            source: 'desktop-persona-creation'
+                        });
+                        
+                        this.showNotification('⚠️ Your persona description contains potentially unsafe content and was blocked for security reasons. Please rephrase your persona.');
+                        return; // Block the persona creation
+                    }
+                    
+                    console.log('🔒 Security: Desktop persona prompt validated and sanitized');
+                    // Use sanitized prompt for persona creation
+                    const sanitizedPrompt = validation.sanitizedInput;
+                    
+                    if (sanitizedPrompt !== prompt) {
+                        this.showNotification('Persona description was sanitized for security');
+                        // Update the UI to show sanitized version
+                        document.getElementById('desktop-persona-prompt').value = sanitizedPrompt;
+                    }
+                    
+                    // Continue with sanitized prompt
+                    prompt = sanitizedPrompt;
+                } else {
+                    console.warn('🔒 Security: SecurityValidator not available for persona validation');
                 }
                 
                 // Wait for main.js to be loaded and initialize
@@ -664,7 +706,8 @@ class DesktopInterface {
             });
         }
         
-        if (randomButton) {
+        if (randomButton && !randomButton.hasDesktopListener) {
+            randomButton.hasDesktopListener = true;
             randomButton.addEventListener('click', async () => {
                 // Wait for main.js persona system
                 let attempts = 0;
@@ -697,7 +740,8 @@ class DesktopInterface {
             });
         }
         
-        if (clearButton) {
+        if (clearButton && !clearButton.hasDesktopListener) {
+            clearButton.hasDesktopListener = true;
             clearButton.addEventListener('click', () => {
                 // Clear the UI fields
                 document.getElementById('desktop-persona-name').value = '';
@@ -822,8 +866,7 @@ class DesktopInterface {
                 });
             }
 
-            // Sync desktop chat to mobile chat
-            this.setupChatSync();
+            // Note: Chat sync handled by addMessage() in main.js - no separate sync needed
             
             // Setup STT button state sync
             this.setupSTTStateSync();
@@ -837,10 +880,42 @@ class DesktopInterface {
         if (desktopInput && mobileInput) {
             const message = desktopInput.value.trim();
             if (message) {
-                // Copy to mobile input and trigger send
-                mobileInput.value = message;
-                desktopInput.value = '';
-                desktopInput.style.height = 'auto';
+                // 🔒 SECURITY: Validate user input before processing (same as mobile interface)
+                if (window.securityValidator) {
+                    const validation = window.securityValidator.validateUserInput(message, 'userMessage');
+                    if (!validation.isValid) {
+                        console.warn('🔒 Security: Desktop user input blocked due to validation failure:', validation.violations);
+                        window.securityValidator.logSecurityEvent('DESKTOP_INPUT_BLOCKED', {
+                            message: message,
+                            violations: validation.violations,
+                            riskLevel: validation.riskLevel,
+                            source: 'desktop-interface'
+                        });
+                        
+                        this.showNotification('⚠️ Your message contains potentially unsafe content and was blocked for security reasons. Please rephrase your request.');
+                        return; // Block the message from being sent
+                    }
+                    
+                    // Use sanitized input for processing
+                    const sanitizedMessage = validation.sanitizedInput;
+                    console.log('🔒 Security: Desktop input validated and sanitized');
+                    
+                    // Copy sanitized message to mobile input and trigger send
+                    mobileInput.value = sanitizedMessage;
+                    desktopInput.value = '';
+                    desktopInput.style.height = 'auto';
+                    
+                    // Update desktop input to show sanitized version temporarily
+                    if (sanitizedMessage !== message) {
+                        this.showNotification('Input was sanitized for security');
+                    }
+                } else {
+                    console.warn('🔒 Security: SecurityValidator not available - sending without validation');
+                    // Fallback: copy original message if validator not available
+                    mobileInput.value = message;
+                    desktopInput.value = '';
+                    desktopInput.style.height = 'auto';
+                }
                 
                 // Trigger mobile send button
                 const mobileSendButton = document.getElementById('send-button');
@@ -851,61 +926,6 @@ class DesktopInterface {
         }
     }
 
-    setupChatSync() {
-        const desktopChat = document.getElementById('desktop-chat-window');
-        const mobileChat = document.getElementById('chat-window');
-        
-        if (mobileChat && desktopChat) {
-            // Clear existing content
-            desktopChat.innerHTML = '';
-            
-            // Simple direct sync - copy existing messages immediately
-            const syncMessages = () => {
-                const mobileMessages = mobileChat.querySelectorAll('.message');
-                const desktopMessages = desktopChat.querySelectorAll('.message');
-                
-                // If mobile has more messages than desktop, add the new ones
-                if (mobileMessages.length > desktopMessages.length) {
-                    for (let i = desktopMessages.length; i < mobileMessages.length; i++) {
-                        const originalMessage = mobileMessages[i];
-                        const clonedMessage = originalMessage.cloneNode(true);
-                        
-                        // Apply desktop-specific styling
-                        if (clonedMessage.classList.contains('user-message')) {
-                            clonedMessage.style.marginLeft = '30%';
-                            clonedMessage.style.maxWidth = '70%';
-                        } else if (clonedMessage.classList.contains('llm-message')) {
-                            clonedMessage.style.maxWidth = '70%';
-                        }
-                        
-                        desktopChat.appendChild(clonedMessage);
-                    }
-                    
-                    // Scroll to bottom
-                    desktopChat.scrollTop = desktopChat.scrollHeight;
-                }
-            };
-            
-            // Initial sync
-            syncMessages();
-            
-            // Watch for new messages with a more aggressive observer
-            const observer = new MutationObserver(() => {
-                syncMessages();
-            });
-            
-            // Observe all changes to mobile chat
-            observer.observe(mobileChat, { 
-                childList: true, 
-                subtree: true, 
-                attributes: true, 
-                characterData: true 
-            });
-            
-            // Also poll every 500ms to catch any missed updates
-            setInterval(syncMessages, 500);
-        }
-    }
 
     handleResize() {
         window.addEventListener('resize', () => {
