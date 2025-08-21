@@ -82,8 +82,6 @@ jobs:
             **/lmstudio-proxy.js
             **/.env*
             **/.*
-          dry-run: false
-          log-level: verbose
 
       - name: ✅ Deployment complete
         run: |
