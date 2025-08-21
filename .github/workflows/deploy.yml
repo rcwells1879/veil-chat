@@ -50,6 +50,12 @@ jobs:
           # List what will be deployed
           echo "📁 Files prepared for deployment:"
           find deploy -type f | head -20
+          
+          # Debug: Show specific files we expect
+          echo "🔍 Checking for key files:"
+          ls -la deploy/index.html 2>/dev/null && echo "✅ index.html found" || echo "❌ index.html missing"
+          ls -la deploy/css/desktop-styles.css 2>/dev/null && echo "✅ desktop-styles.css found" || echo "❌ desktop-styles.css missing"  
+          ls -la deploy/js/desktopInterface.js 2>/dev/null && echo "✅ desktopInterface.js found" || echo "❌ desktopInterface.js missing"
 
       - name: 📂 Deploy to FTP server
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
@@ -58,7 +64,9 @@ jobs:
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
           local-dir: ./deploy/
-          server-dir: ./veilchat/
+          server-dir: ./public_html/veilchat/
+          dry-run: false
+          log-level: verbose
           exclude: |
             **/node_modules/**
             **/server/**
