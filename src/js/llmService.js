@@ -101,9 +101,19 @@ if (typeof LLMService === 'undefined') {
             const payload = {
                 model: this.directModel,
                 messages: messages,
-                temperature: temperature,
                 stream: false
             };
+            
+            // Some OpenAI models only support default temperature (1.0)
+            // o1, o3, and gpt-4.1 models don't support custom temperature
+            const restrictedModels = ['o1', 'o3', '4.1'];
+            const modelSupportsCustomTemp = !restrictedModels.some(restricted => 
+                this.directModel.toLowerCase().includes(restricted));
+            
+            if (modelSupportsCustomTemp && temperature !== undefined) {
+                payload.temperature = temperature;
+            }
+            
             // Only include max_tokens if it's not null
             if (maxTokens !== null) {
                 payload.max_tokens = maxTokens;

@@ -636,7 +636,7 @@ class DesktopInterface {
             createButton.hasDesktopListener = true;
             createButton.addEventListener('click', async () => {
                 const name = document.getElementById('desktop-persona-name').value;
-                const prompt = document.getElementById('desktop-persona-prompt').value;
+                let prompt = document.getElementById('desktop-persona-prompt').value;
                 
                 if (!prompt) {
                     this.showNotification('Please enter a persona description');

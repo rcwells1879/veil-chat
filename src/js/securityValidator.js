@@ -325,7 +325,8 @@ if (typeof SecurityValidator === 'undefined') {
                 result.riskLevel = 'medium';
             }
             
-            result.sanitizedContent = contentValidation.sanitizedInput;
+            // Sanitize the file content for security
+            result.sanitizedContent = this.sanitizeInput(content, 'attachedFile');
             
             return result;
         }

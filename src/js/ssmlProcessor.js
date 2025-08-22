@@ -82,7 +82,7 @@ if (typeof SSMLProcessor === 'undefined') {
                 return ssmlText || '';
             }
 
-            // Remove all SSML tags but preserve the content
+            // Remove all SSML tags but preserve the content and line structure
             let cleanText = ssmlText
                 // Remove speak tags
                 .replace(/<\/?speak[^>]*>/gi, '')
@@ -98,8 +98,10 @@ if (typeof SSMLProcessor === 'undefined') {
                 .replace(/<break[^>]*\/?>[\s\S]*?<\/break>|<break[^>]*\/?>/gi, ' ')
                 // Remove any other remaining SSML tags
                 .replace(/<\/?[^>]+>/gi, '')
-                // Clean up extra whitespace
-                .replace(/\s+/g, ' ')
+                // Clean up multiple spaces but preserve line breaks
+                .replace(/[^\S\r\n]+/g, ' ')
+                // Clean up multiple consecutive line breaks (max 2)
+                .replace(/\n{3,}/g, '\n\n')
                 .trim();
 
             return cleanText;

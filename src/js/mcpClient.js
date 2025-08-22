@@ -252,23 +252,31 @@ if (typeof MCPClient === 'undefined') {
         }
 
         // Agent Workflow Methods
-        async startAgentTask(goal, options = {}) {
+        async startAgentTask(goal, options = {}, context = '') {
             console.log('🤖 MCP Client: Starting agent task with goal:', goal);
             
             try {
+                const requestBody = {
+                    goal: goal,
+                    options: {
+                        ...options,
+                        searchSettings: this.getSearchSettings(),
+                        llmSettings: this.getLLMSettings()
+                    }
+                };
+                
+                // Include context if provided
+                if (context && context.trim().length > 0) {
+                    requestBody.context = context;
+                    console.log('📄 Adding context to agent task:', context.length, 'characters');
+                }
+                
                 const response = await fetch(`${this.serverUrl}/api/agent/start-task`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({
-                        goal: goal,
-                        options: {
-                            ...options,
-                            searchSettings: this.getSearchSettings(),
-                            llmSettings: this.getLLMSettings()
-                        }
-                    })
+                    body: JSON.stringify(requestBody)
                 });
 
                 if (!response.ok) {
@@ -442,12 +450,15 @@ if (typeof MCPClient === 'undefined') {
         }
 
         // Execute a complete research workflow
-        async executeResearchWorkflow(goal, options = {}) {
+        async executeResearchWorkflow(goal, options = {}, context = '') {
             console.log('🔬 Starting complete research workflow for goal:', goal);
+            if (context && context.trim().length > 0) {
+                console.log('📄 Including document context in workflow:', context.length, 'characters');
+            }
             
             try {
-                // Step 1: Start the agent task
-                const taskResult = await this.startAgentTask(goal, options);
+                // Step 1: Start the agent task with context
+                const taskResult = await this.startAgentTask(goal, options, context);
                 const taskId = taskResult.taskId;
                 
                 console.log('📋 Task created with ID:', taskId);
@@ -703,7 +714,7 @@ if (typeof MCPClient === 'undefined') {
                             ...this.getSearchSettings(),
                             autoSummarize: false // Always extract full content for research
                         }
-                    });
+                    }, context);
                     
                     if (result.success) {
                         console.log('✅ Agent workflow completed successfully');

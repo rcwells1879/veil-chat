@@ -641,6 +641,30 @@
     
     <!-- Add Marked.js for Markdown rendering -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script>
+        // Configure and verify marked library
+        window.addEventListener('load', function() {
+            console.log('📚 Marked library check:', typeof window.marked);
+            if (window.marked && window.marked.parse) {
+                // Configure marked with standard options
+                marked.use({
+                    gfm: true,         // GitHub Flavored Markdown
+                    breaks: false,     // Don't convert single line breaks to <br>
+                    pedantic: false,   // Don't be overly strict
+                    silent: false      // Show parsing errors
+                });
+                
+                console.log('✅ Marked library loaded and configured successfully');
+                
+                // Test basic markdown parsing
+                const testMd = '# Test Heading\n\n**Bold text** and *italic text*\n\n- List item 1\n- List item 2';
+                const testHtml = marked.parse(testMd);
+                console.log('📝 Test markdown conversion:', testHtml);
+            } else {
+                console.error('❌ Marked library not loaded properly');
+            }
+        });
+    </script>
     
     <!-- Azure Speech SDK for STT -->
     <script src="https://aka.ms/csspeech/jsbrowserpackageraw"></script>

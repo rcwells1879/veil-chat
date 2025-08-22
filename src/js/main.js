@@ -640,11 +640,33 @@ async function initializeApp() {
                 displayText = message;
             }
 
-            if (sender === 'llm' && window.marked) {
+            console.log('📝 Processing message - sender:', sender, 'marked available:', !!window.marked);
+            
+            if (sender === 'llm' && window.marked && window.marked.parse) {
+                console.log('📝 Converting markdown to HTML for LLM message');
+                console.log('📝 Original message length:', displayText.length);
+                console.log('📝 Original message has newlines:', displayText.includes('\n'));
+                
                 const cleanMessage = stripMarkdownCodeBlock(displayText);
-                const htmlContent = marked.parse(cleanMessage);
-                messageElement.innerHTML = htmlContent;
+                console.log('📝 Clean markdown length:', cleanMessage.length);
+                console.log('📝 Clean markdown has newlines:', cleanMessage.includes('\n'));
+                console.log('📝 Clean markdown first 300 chars with line breaks shown:');
+                console.log(cleanMessage.substring(0, 300).replace(/\n/g, '\\n'));
+                
+                try {
+                    const htmlContent = marked.parse(cleanMessage);
+                    console.log('📝 Generated HTML:', htmlContent.substring(0, 200) + '...');
+                    messageElement.innerHTML = htmlContent;
+                    console.log('📝 ✅ Markdown conversion successful');
+                } catch (error) {
+                    console.error('📝 ❌ Markdown parsing error:', error);
+                    messageElement.textContent = displayText;
+                }
             } else {
+                console.log('📝 Using plain text - Reason:', 
+                    sender !== 'llm' ? 'Not LLM message' : 
+                    !window.marked ? 'Marked not available' : 
+                    !window.marked.parse ? 'Marked.parse not available' : 'Unknown');
                 messageElement.textContent = displayText;
             }
         } else if (message.type === 'image' && message.url) {
@@ -676,11 +698,33 @@ async function initializeApp() {
                 displayText = message.text;
             }
 
-            if (sender === 'llm' && window.marked) {
+            console.log('📝 Processing message - sender:', sender, 'marked available:', !!window.marked);
+            
+            if (sender === 'llm' && window.marked && window.marked.parse) {
+                console.log('📝 Converting markdown to HTML for LLM message');
+                console.log('📝 Original message length:', displayText.length);
+                console.log('📝 Original message has newlines:', displayText.includes('\n'));
+                
                 const cleanMessage = stripMarkdownCodeBlock(displayText);
-                const htmlContent = marked.parse(cleanMessage);
-                messageElement.innerHTML = htmlContent;
+                console.log('📝 Clean markdown length:', cleanMessage.length);
+                console.log('📝 Clean markdown has newlines:', cleanMessage.includes('\n'));
+                console.log('📝 Clean markdown first 300 chars with line breaks shown:');
+                console.log(cleanMessage.substring(0, 300).replace(/\n/g, '\\n'));
+                
+                try {
+                    const htmlContent = marked.parse(cleanMessage);
+                    console.log('📝 Generated HTML:', htmlContent.substring(0, 200) + '...');
+                    messageElement.innerHTML = htmlContent;
+                    console.log('📝 ✅ Markdown conversion successful');
+                } catch (error) {
+                    console.error('📝 ❌ Markdown parsing error:', error);
+                    messageElement.textContent = displayText;
+                }
             } else {
+                console.log('📝 Using plain text - Reason:', 
+                    sender !== 'llm' ? 'Not LLM message' : 
+                    !window.marked ? 'Marked not available' : 
+                    !window.marked.parse ? 'Marked.parse not available' : 'Unknown');
                 messageElement.textContent = displayText;
             }
         }
@@ -989,6 +1033,14 @@ Type **"/list"** anytime to see this help again.`;
             console.log('📸 Image request detected - excluding from conversation history:', sanitizedMessage);
         }
 
+        // Get document context from attached files (always available regardless of MCP)
+        const documentContext = contextService.getDocumentContext();
+        if (documentContext && documentContext.trim().length > 0) {
+            console.log('📄 Document context available:', documentContext.length, 'characters');
+        } else {
+            console.log('📄 No document context available');
+        }
+        
         // Prepare conversation context for MCP
         const conversationContext = llmService.conversationHistory
             .map(msg => {
@@ -996,6 +1048,9 @@ Type **"/list"** anytime to see this help again.`;
                 return `${msg.role}: ${content}`;
             })
             .join('\n');
+        
+        // Combine conversation and document context for MCP (only if MCP is connected)
+        const fullContextForMCP = documentContext + '\n\n' + conversationContext;
 
         // Check for search keywords FIRST (basic search has priority)
         if (SETTINGS.searchEnabled && detectSearchKeywords(sanitizedMessage)) {
@@ -1052,7 +1107,7 @@ Type **"/list"** anytime to see this help again.`;
         if (mcpClient && mcpClient.isConnected) {
             console.log('🔍 MCP Client is connected, checking if message should be handled...');
             try {
-                const mcpResult = await mcpClient.integrateWithChat(sanitizedMessage, conversationContext, llmService);
+                const mcpResult = await mcpClient.integrateWithChat(sanitizedMessage, fullContextForMCP, llmService);
                 if (mcpResult && mcpResult.content && mcpResult.content[0]) {
                     console.log('✅ MCP handled the message');
                     
@@ -1117,7 +1172,7 @@ Type **"/list"** anytime to see this help again.`;
         console.log('🤖 Processing with normal LLM flow');
         // Processing with normal LLM flow
         
-        const documentContext = contextService.getDocumentContext();
+        // Document context already retrieved above for MCP, reuse it
         // Skip adding user message for image requests, allow for normal messages
         const skipAddingUserMessage = isImageRequest;
         const response = await llmService.sendMessage(sanitizedMessage, documentContext, skipAddingUserMessage);
@@ -2811,11 +2866,18 @@ Type **"/list"** anytime to see this help again.`;
 // Add this helper function near the top or above addMessage
 function stripMarkdownCodeBlock(text) {
     text = text.trim();
-    const codeBlockRegex = /^```(?:markdown)?\n([\s\S]*?)\n```$/i;
+    
+    // Remove SSML content first (everything between <speak> tags)
+    text = text.replace(/<speak[^>]*>[\s\S]*?<\/speak>/gi, '').trim();
+    
+    // Now extract markdown from code blocks
+    const codeBlockRegex = /```(?:markdown)?\n?([\s\S]*?)\n?```/i;
     const match = text.match(codeBlockRegex);
     if (match) {
-        return match[1];
+        return match[1].trim();
     }
+    
+    // If no code block, return the cleaned text
     return text;
 }
 

@@ -89,6 +89,86 @@ body {
 .message h6 {
     font-size: calc(var(--chat-font-size, 16px) + 2px) !important;
     font-weight: bold;
+    margin: 0.5em 0;
+}
+
+/* Cleaner markdown formatting styles */
+.message strong,
+.message b {
+    font-weight: bold;
+}
+
+.message em,
+.message i {
+    font-style: italic;
+}
+
+.message code {
+    background-color: rgba(255, 255, 255, 0.1);
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-family: 'Courier New', 'Menlo', 'Monaco', monospace;
+    font-size: 0.9em;
+}
+
+.message pre {
+    background-color: rgba(255, 255, 255, 0.05);
+    padding: 10px;
+    border-radius: 5px;
+    overflow-x: auto;
+    margin: 10px 0;
+    white-space: pre;
+}
+
+.message pre code {
+    background-color: transparent;
+    padding: 0;
+    border-radius: 0;
+}
+
+.message ul,
+.message ol {
+    margin: 10px 0;
+    padding-left: 20px;
+}
+
+.message li {
+    margin: 3px 0;
+}
+
+.message hr {
+    border: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+    margin: 15px 0;
+}
+
+.message blockquote {
+    border-left: 4px solid rgba(255, 255, 255, 0.3);
+    padding-left: 10px;
+    margin: 10px 0;
+    font-style: italic;
+}
+
+.message p {
+    margin: 10px 0;
+}
+
+.message table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 10px 0;
+}
+
+.message th,
+.message td {
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 8px;
+    text-align: left;
+}
+
+.message th {
+    background-color: rgba(255, 255, 255, 0.1);
+    font-weight: bold;
 }
 
 .user-message {
