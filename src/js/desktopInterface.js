@@ -101,10 +101,8 @@ class DesktopInterface {
         // Just wait for it to be available
         const panelExists = document.querySelector('#settings-panel-container .settings-panel');
         if (!panelExists) {
-            console.log('Desktop: Waiting for mobile settings panel to be loaded by main.js...');
             await this.waitForMobileSettings();
         } else {
-            console.log('Desktop: Mobile settings panel already available');
         }
     }
 
@@ -342,9 +340,6 @@ class DesktopInterface {
     }
 
     setupDesktopSettingsHandlers() {
-        console.log('🖥️ Setting up desktop settings handlers...');
-        console.log('🖥️ this.desktopSettingsIdMap exists:', !!this.desktopSettingsIdMap);
-        console.log('🖥️ desktopSettingsIdMap keys:', Object.keys(this.desktopSettingsIdMap || {}));
         
         // Load all settings from localStorage when settings panel is opened
         this.loadSettingsFromLocalStorage();
@@ -354,7 +349,6 @@ class DesktopInterface {
             const desktopId = this.desktopSettingsIdMap[settingsKey];
             const element = document.getElementById(desktopId);
             
-            console.log(`🖥️ Setting up handler for ${settingsKey} → ${desktopId}: ${element ? 'FOUND' : 'NOT FOUND'}`);
             
             if (element) {
                 // Save on change
@@ -380,7 +374,6 @@ class DesktopInterface {
     }
 
     loadSettingsFromLocalStorage() {
-        console.log('📥 Desktop: Loading all settings from localStorage...');
         
         Object.keys(this.desktopSettingsIdMap).forEach(settingsKey => {
             const desktopId = this.desktopSettingsIdMap[settingsKey];
@@ -404,7 +397,6 @@ class DesktopInterface {
                     element.value = value || '';
                 }
                 
-                console.log(`📥 Loaded ${settingsKey}: ${value ? (settingsKey.includes('ApiKey') ? 'PRESENT' : value) : 'EMPTY'}`);
             }
         });
         
@@ -429,7 +421,6 @@ class DesktopInterface {
             window.smartServiceReinit(settingsKey, element.type);
         }
         
-        console.log(`💾 Desktop saved: ${settingsKey} = ${value ? (settingsKey.includes('ApiKey') ? 'PRESENT' : value) : 'EMPTY'}`);
     }
 
     async syncSettingsToDesktop() {
@@ -438,7 +429,6 @@ class DesktopInterface {
         
         // Use the comprehensive sync function from main.js if available
         if (window.syncSettingsToDesktop && typeof window.syncSettingsToDesktop === 'function') {
-            console.log('Desktop: Using comprehensive settings sync from main.js');
             window.syncSettingsToDesktop();
         } else {
             console.log('Desktop: Fallback to basic element sync');
@@ -970,7 +960,6 @@ class DesktopInterface {
             });
         }
         
-        console.log('Desktop settings loaded');
     }
 
     getStorageKeyMapping() {

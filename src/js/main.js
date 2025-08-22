@@ -308,7 +308,6 @@ async function initializeApp() {
     // --- Service Reinitialization ---
     // Ensure all services are properly configured with current settings
     async function reinitializeServicesWithCurrentSettings() {
-        console.log('🔧 Reinitializing services with current settings...');
         
         // Check if ImageService needs reinitialization based on provider
         const currentImageApiUrl = imageService.apiBaseUrl;
@@ -325,7 +324,6 @@ async function initializeApp() {
         if (currentImageApiUrl !== expectedImageApiUrl || 
             imageService.provider !== SETTINGS.customImageProvider) {
             
-            console.log('🔧 Image settings need reinitialization - recreating ImageService...');
             imageService = new ImageService(
                 expectedImageApiUrl,
                 SETTINGS.customImageProvider, 
@@ -366,22 +364,12 @@ async function initializeApp() {
             apiBaseUrl: expectedImageApiUrl
         });
         
-        console.log('🔧 ImageService settings updated with current values:', {
-            provider: SETTINGS.customImageProvider,
-            swarmWidth: SETTINGS.swarmuiWidth,
-            swarmHeight: SETTINGS.swarmuiHeight,
-            swarmSteps: SETTINGS.swarmuiSteps,
-            swarmCfgScale: SETTINGS.swarmuiCfgScale,
-            swarmModel: SETTINGS.swarmuiModel,
-            swarmSampler: SETTINGS.swarmuiSampler
-        });
         
         // Check if LLMService needs reinitialization
         if (llmService.apiBaseUrl !== SETTINGS.customLlmApiUrl || 
             llmService.providerType !== SETTINGS.customLlmProvider ||
             llmService.modelIdentifier !== SETTINGS.customLlmModelIdentifier) {
             
-            console.log('🔧 LLM settings need reinitialization - recreating LLMService...');
             llmService = new LLMService(
                 SETTINGS.customLlmApiUrl, 
                 SETTINGS.customLlmProvider, 
@@ -415,11 +403,6 @@ async function initializeApp() {
                               (SETTINGS.mcpEnabled && !mcpClient);
         
         if (needsMCPReinit && SETTINGS.mcpEnabled && SETTINGS.mcpServerUrl) {
-            console.log('🔧 MCP settings need reinitialization:', {
-                enabled: SETTINGS.mcpEnabled,
-                serverUrl: SETTINGS.mcpServerUrl,
-                currentUrl: mcpClient ? mcpClient.serverUrl : 'none'
-            });
             
             // Update the global mcpEnabled variable
             mcpEnabled = SETTINGS.mcpEnabled;
@@ -427,11 +410,9 @@ async function initializeApp() {
             // Reinitialize MCP client with current settings
             await initializeMCPClient();
         } else if (!SETTINGS.mcpEnabled) {
-            console.log('🔧 MCP disabled in settings');
             mcpClient = null;
         }
         
-        console.log('🔧 All services reinitialized with current settings');
     }
     
     // Expose globally for desktop interface
@@ -480,7 +461,6 @@ async function initializeApp() {
     const smartServiceReinit = (settingsKey, elementType) => {
         // Only reinitialize for service-affecting settings
         if (!ALL_SERVICE_AFFECTING_SETTINGS.includes(settingsKey)) {
-            console.log(`⏭️ Skipping service reinit for UI-only setting: ${settingsKey}`);
             return;
         }
         
@@ -488,13 +468,11 @@ async function initializeApp() {
         if (elementType === 'select-one' || elementType === 'checkbox') {
             if (window.reinitializeServicesWithCurrentSettings) {
                 window.reinitializeServicesWithCurrentSettings();
-                console.log(`🔄 Immediate service reinit for ${elementType}: ${settingsKey}`);
             }
         } 
         // Debounced reinit for text inputs and ranges (continuous changes)
         else if (elementType === 'text' || elementType === 'password' || elementType === 'range' || elementType === 'number') {
             debouncedServiceReinit();
-            console.log(`⏳ Debounced service reinit for ${elementType}: ${settingsKey}`);
         }
     };
     
@@ -509,7 +487,6 @@ async function initializeApp() {
     function loadInitialSettingsToUI() {
         // This ensures that when the settings panel is opened later, 
         // it will have the correct values from localStorage
-        console.log('🔧 Preparing initial settings for UI loading...');
         
         // Settings will be loaded into UI elements when the settings panel is opened
         // by loadAllSettings() function, but we ensure the SETTINGS object is current
@@ -528,10 +505,8 @@ async function initializeApp() {
     async function ensureSettingsPanelLoaded() {
         const panelExists = settingsPanelContainer.querySelector('.settings-panel');
         if (!panelExists) {
-            console.log('🔧 Proactively loading mobile settings panel for desktop sync...');
             try {
                 await loadSettingsPanel();
-                console.log('🔧 Mobile settings panel loaded successfully');
                 
                 // Verify panel was actually loaded
                 const verifyPanel = settingsPanelContainer.querySelector('.settings-panel');
@@ -545,7 +520,6 @@ async function initializeApp() {
                 // Don't rethrow to avoid breaking app initialization
             }
         } else {
-            console.log('🔧 Mobile settings panel already exists');
         }
     }
     
@@ -640,33 +614,17 @@ async function initializeApp() {
                 displayText = message;
             }
 
-            console.log('📝 Processing message - sender:', sender, 'marked available:', !!window.marked);
-            
             if (sender === 'llm' && window.marked && window.marked.parse) {
-                console.log('📝 Converting markdown to HTML for LLM message');
-                console.log('📝 Original message length:', displayText.length);
-                console.log('📝 Original message has newlines:', displayText.includes('\n'));
-                
                 const cleanMessage = stripMarkdownCodeBlock(displayText);
-                console.log('📝 Clean markdown length:', cleanMessage.length);
-                console.log('📝 Clean markdown has newlines:', cleanMessage.includes('\n'));
-                console.log('📝 Clean markdown first 300 chars with line breaks shown:');
-                console.log(cleanMessage.substring(0, 300).replace(/\n/g, '\\n'));
                 
                 try {
                     const htmlContent = marked.parse(cleanMessage);
-                    console.log('📝 Generated HTML:', htmlContent.substring(0, 200) + '...');
                     messageElement.innerHTML = htmlContent;
-                    console.log('📝 ✅ Markdown conversion successful');
                 } catch (error) {
-                    console.error('📝 ❌ Markdown parsing error:', error);
+                    console.error('❌ Markdown parsing error:', error);
                     messageElement.textContent = displayText;
                 }
             } else {
-                console.log('📝 Using plain text - Reason:', 
-                    sender !== 'llm' ? 'Not LLM message' : 
-                    !window.marked ? 'Marked not available' : 
-                    !window.marked.parse ? 'Marked.parse not available' : 'Unknown');
                 messageElement.textContent = displayText;
             }
         } else if (message.type === 'image' && message.url) {
@@ -698,33 +656,17 @@ async function initializeApp() {
                 displayText = message.text;
             }
 
-            console.log('📝 Processing message - sender:', sender, 'marked available:', !!window.marked);
-            
             if (sender === 'llm' && window.marked && window.marked.parse) {
-                console.log('📝 Converting markdown to HTML for LLM message');
-                console.log('📝 Original message length:', displayText.length);
-                console.log('📝 Original message has newlines:', displayText.includes('\n'));
-                
                 const cleanMessage = stripMarkdownCodeBlock(displayText);
-                console.log('📝 Clean markdown length:', cleanMessage.length);
-                console.log('📝 Clean markdown has newlines:', cleanMessage.includes('\n'));
-                console.log('📝 Clean markdown first 300 chars with line breaks shown:');
-                console.log(cleanMessage.substring(0, 300).replace(/\n/g, '\\n'));
                 
                 try {
                     const htmlContent = marked.parse(cleanMessage);
-                    console.log('📝 Generated HTML:', htmlContent.substring(0, 200) + '...');
                     messageElement.innerHTML = htmlContent;
-                    console.log('📝 ✅ Markdown conversion successful');
                 } catch (error) {
-                    console.error('📝 ❌ Markdown parsing error:', error);
+                    console.error('❌ Markdown parsing error:', error);
                     messageElement.textContent = displayText;
                 }
             } else {
-                console.log('📝 Using plain text - Reason:', 
-                    sender !== 'llm' ? 'Not LLM message' : 
-                    !window.marked ? 'Marked not available' : 
-                    !window.marked.parse ? 'Marked.parse not available' : 'Unknown');
                 messageElement.textContent = displayText;
             }
         }
@@ -1445,7 +1387,6 @@ Type **"/list"** anytime to see this help again.`;
     }
     // --- Settings Panel Slide Up ---
     function showSettingsPanel() {
-        console.log(`%c[${new Date().toLocaleTimeString()}] SHOW settings panel triggered.`, 'color: lightblue; font-weight: bold;');
         const panel = document.querySelector('#settings-panel-container .settings-panel');
         if (!panel) {
             console.warn('showSettingsPanel called, but no panel element found.');
@@ -1468,7 +1409,6 @@ Type **"/list"** anytime to see this help again.`;
         }, 0);
     }
     function closeSettingsPanel() {
-        console.log(`%c[${new Date().toLocaleTimeString()}] CLOSE settings panel triggered.`, 'color: red; font-weight: bold;');
         console.trace("Call stack for closeSettingsPanel:"); // This will show what called the function.
         
         // Apply all settings before closing panel to ensure everything is saved
@@ -1660,7 +1600,6 @@ Type **"/list"** anytime to see this help again.`;
     });
 
     function saveAllSettings() {
-        console.log('🔧 saveAllSettings: Starting to save settings...');
         Object.keys(SETTINGS).forEach(key => {
             const mobileElementId = settingsIdMap[key];
             const desktopElementId = desktopSettingsIdMap[key];
@@ -1733,7 +1672,6 @@ Type **"/list"** anytime to see this help again.`;
                                    (mcpClient && mcpClient.serverUrl !== SETTINGS.mcpServerUrl);
 
         if (llmSettingsChanged) {
-            console.log('🔧 saveAllSettings: LLM settings changed, recreating LLMService...');
             console.log('🔧 Provider:', SETTINGS.customLlmProvider);
             console.log('🔧 Direct providers config:', {
                 openaiModel: SETTINGS.openaiModelIdentifier,
@@ -1833,7 +1771,6 @@ Type **"/list"** anytime to see this help again.`;
     function setupMobileSettingsHandlers() {
         if (!settingsPanelContainer) return;
         
-        console.log('📱 Setting up mobile settings handlers...');
         
         // Load settings from localStorage into mobile interface
         Object.keys(settingsIdMap).forEach(settingsKey => {
@@ -1870,7 +1807,6 @@ Type **"/list"** anytime to see this help again.`;
                         window.smartServiceReinit(settingsKey, element.type);
                     }
                     
-                    console.log(`💾 Mobile saved: ${settingsKey} = ${currentValue ? (settingsKey.includes('ApiKey') ? 'PRESENT' : currentValue) : 'EMPTY'}`);
                 };
                 
                 element.addEventListener('change', saveHandler);
@@ -1880,7 +1816,6 @@ Type **"/list"** anytime to see this help again.`;
     }
 
     function loadAllSettings() {
-        console.log('🔧 loadAllSettings: Loading settings to all interfaces...');
         
         Object.keys(SETTINGS).forEach(key => {
             const mobileElementId = settingsIdMap[key];
@@ -2182,7 +2117,6 @@ Type **"/list"** anytime to see this help again.`;
             }
         });
 
-        console.log(`Synced ${syncCount} settings, ${missingElements} elements missing`);
 
         // Trigger provider-specific section visibility updates
         const providerElement = document.getElementById('desktop-llm-provider');
