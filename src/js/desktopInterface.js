@@ -695,6 +695,25 @@ class DesktopInterface {
                 mobileInput.value = desktopInput.value;
             });
 
+            // Stop TTS on desktop input interaction (same as mobile)
+            desktopInput.addEventListener('touchstart', (e) => {
+                if (window.voiceService && window.voiceService.stopSpeaking) {
+                    window.voiceService.stopSpeaking();
+                }
+            }, { passive: true });
+            
+            desktopInput.addEventListener('mousedown', (e) => {
+                if (window.voiceService && window.voiceService.stopSpeaking) {
+                    window.voiceService.stopSpeaking();
+                }
+            });
+            
+            desktopInput.addEventListener('focus', (e) => {
+                if (window.voiceService && window.voiceService.stopSpeaking) {
+                    window.voiceService.stopSpeaking();
+                }
+            });
+
             // Handle desktop send button
             desktopSendButton.addEventListener('click', () => {
                 this.sendMessage();
