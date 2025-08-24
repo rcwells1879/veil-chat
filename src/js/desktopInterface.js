@@ -3,7 +3,7 @@
 
 class DesktopInterface {
     constructor() {
-        this.currentView = 'dashboard';
+        this.currentView = 'chat';
         this.isDesktop = window.innerWidth >= 1024;
         this.settingsSync = new Map();
         this.initialized = false;
@@ -31,7 +31,7 @@ class DesktopInterface {
             ttsVoice: 'desktop-tts-voice',
             voiceSpeed: 'desktop-voice-speed',
             voicePitch: 'desktop-voice-pitch',
-            azureApiKey: 'azure-api-key-desktop',
+            azureApiKey: 'desktop-azure-api-key',
             azureRegion: 'desktop-azure-region',
             
             // MCP Settings
@@ -78,7 +78,6 @@ class DesktopInterface {
         if (!this.isDesktop || this.initialized) return;
         
         this.setupNavigation();
-        this.setupFeatureCards();
         this.setupDesktopChat();
         this.handleResize();
         
@@ -98,11 +97,12 @@ class DesktopInterface {
 
     async initializeMobileSettings() {
         // The mobile settings panel should already be loaded by main.js proactively
-        // Just wait for it to be available
+        // Just verify it exists - no complex waiting needed
         const panelExists = document.querySelector('#settings-panel-container .settings-panel');
-        if (!panelExists) {
-            await this.waitForMobileSettings();
+        if (panelExists) {
+            console.log('✅ Mobile settings panel already available for desktop sync');
         } else {
+            console.log('⚠️ Mobile settings panel not yet loaded - desktop will use localStorage directly');
         }
     }
 
@@ -111,7 +111,6 @@ class DesktopInterface {
         const personaNav = document.getElementById('desktop-persona-nav');
         const settingsNav = document.getElementById('desktop-settings-nav');
 
-        const dashboard = document.querySelector('.desktop-dashboard');
         const chat = document.querySelector('.desktop-chat');
         const settings = document.querySelector('.desktop-settings');
         const persona = document.querySelector('.desktop-persona');
@@ -121,13 +120,6 @@ class DesktopInterface {
         personaNav?.addEventListener('click', () => this.switchView('persona'));
         settingsNav?.addEventListener('click', () => this.switchView('settings'));
 
-        // Feature card click handlers to start chat
-        document.querySelectorAll('.feature-card').forEach(card => {
-            card.addEventListener('click', () => {
-                const feature = card.dataset.feature;
-                this.startFeatureChat(feature);
-            });
-        });
     }
 
     switchView(view) {
@@ -146,7 +138,6 @@ class DesktopInterface {
 
         // Hide all content areas
         const contentAreas = [
-            '.desktop-dashboard',
             '.desktop-chat', 
             '.desktop-settings',
             '.desktop-persona'
@@ -159,11 +150,6 @@ class DesktopInterface {
 
         // Show selected view and activate nav
         switch(view) {
-            case 'chat':
-                document.querySelector('.desktop-chat').style.display = 'flex';
-                document.getElementById('desktop-chat-nav').classList.add('active');
-                this.currentView = 'chat';
-                break;
             case 'settings':
                 document.querySelector('.desktop-settings').style.display = 'block';
                 document.getElementById('desktop-settings-nav').classList.add('active');
@@ -177,14 +163,14 @@ class DesktopInterface {
                 this.currentView = 'persona';
                 break;
             default:
-                document.querySelector('.desktop-dashboard').style.display = 'block';
+                // Default to chat view
+                document.querySelector('.desktop-chat').style.display = 'flex';
                 document.getElementById('desktop-chat-nav').classList.add('active');
-                this.currentView = 'dashboard';
+                this.currentView = 'chat';
         }
 
         // Add fade-in animation
         const activeContent = document.querySelector(
-            this.currentView === 'dashboard' ? '.desktop-dashboard' :
             this.currentView === 'chat' ? '.desktop-chat' :
             this.currentView === 'settings' ? '.desktop-settings' :
             '.desktop-persona'
@@ -195,117 +181,11 @@ class DesktopInterface {
         }
     }
 
-    startFeatureChat(feature) {
-        // Switch to chat view
-        this.switchView('chat');
-        
-        // Add a welcome message for the feature
-        const welcomeMessages = {
-            'guided-learning': 'Welcome to Guided Learning! I\'ll help you create structured learning plans and break down complex topics into manageable steps.',
-            'course-links': 'Course Links activated! I can help you find relevant courses and learning resources for any topic you\'re interested in.',
-            'voice-interaction': 'Voice interaction is ready! You can now speak to me and I\'ll respond with natural speech.',
-            'image-generation': 'Image generation is active! Describe any image you\'d like me to create and I\'ll generate it for you.',
-            'reasoning': 'Enhanced reasoning mode enabled! I\'ll use advanced logical thinking and step-by-step analysis for complex problems.',
-            'web-search': 'Web search capabilities activated! I can now search the internet for current information and real-time data.'
-        };
-
-        const message = welcomeMessages[feature] || 'Feature activated! How can I help you today?';
-        
-        // Add system message to chat
-        this.addSystemMessage(message);
-        
-        // Focus the desktop input
-        const desktopInput = document.getElementById('desktop-user-input');
-        if (desktopInput) {
-            setTimeout(() => desktopInput.focus(), 100);
-        }
-    }
-
-    addSystemMessage(text) {
-        const chatWindow = document.getElementById('desktop-chat-window');
-        if (!chatWindow) return;
-
-        const messageDiv = document.createElement('div');
-        messageDiv.className = 'message llm-message';
-        messageDiv.style.background = 'linear-gradient(135deg, rgba(138, 43, 226, 0.2) 0%, rgba(0, 191, 255, 0.2) 100%)';
-        messageDiv.style.border = '1px solid rgba(138, 43, 226, 0.3)';
-        messageDiv.textContent = text;
-        
-        chatWindow.appendChild(messageDiv);
-        chatWindow.scrollTop = chatWindow.scrollHeight;
-    }
 
     setupSettingsSync() {
-        // Map desktop settings to mobile settings
-        this.settingsMap = {
-            // Font Settings
-            'desktop-font-size': 'slider-font-size',
-            
-            // LLM Provider Settings
-            'desktop-llm-provider': 'llm-provider',
-            'desktop-llm-api-url': 'llm-api-url',
-            'desktop-llm-model': 'llm-model-identifier',
-            'desktop-llm-api-key': 'llm-api-key',
-            
-            // Direct API Provider Settings
-            'desktop-openai-model-identifier': 'openai-model-identifier',
-            'desktop-openai-api-key': 'openai-api-key',
-            'desktop-anthropic-model-identifier': 'anthropic-model-identifier',
-            'desktop-anthropic-api-key': 'anthropic-api-key',
-            'desktop-google-model-identifier': 'google-model-identifier',
-            'desktop-google-api-key': 'google-api-key',
-            
-            // Voice Settings
-            'desktop-tts-voice': 'select-tts-voice',
-            'desktop-voice-speed': 'slider-voice-speed',
-            'desktop-voice-pitch': 'slider-voice-pitch',
-            'desktop-azure-api-key': 'azure-api-key',
-            'desktop-azure-region': 'azure-region',
-            
-            // MCP Settings
-            'desktop-mcp-enabled': 'mcp-enabled',
-            'desktop-mcp-url': 'mcp-server-url',
-            
-            // Web Search Settings
-            'desktop-search-enabled': 'search-enabled',
-            'desktop-search-provider': 'search-provider',
-            'desktop-search-api-key': 'search-api-key',
-            'desktop-search-results-limit': 'search-results-limit',
-            'desktop-search-auto-summarize': 'search-auto-summarize',
-            'desktop-search-time-filter': 'search-time-filter',
-            
-            // Image Generation Settings
-            'desktop-image-provider': 'image-provider',
-            
-            // A1111 Settings
-            'desktop-image-api-url': 'image-api-url',
-            'desktop-image-width': 'image-width',
-            'desktop-image-height': 'image-height',
-            'desktop-image-steps': 'image-steps',
-            'desktop-image-cfg-scale': 'image-cfg-scale',
-            'desktop-image-sampler': 'image-sampler',
-            
-            // SwarmUI Settings
-            'desktop-swarmui-api-url': 'swarmui-api-url',
-            'desktop-swarmui-width': 'swarmui-width',
-            'desktop-swarmui-height': 'swarmui-height',
-            'desktop-swarmui-steps': 'swarmui-steps',
-            'desktop-swarmui-cfg-scale': 'swarmui-cfg-scale',
-            'desktop-swarmui-model': 'swarmui-model',
-            'desktop-swarmui-sampler': 'swarmui-sampler',
-            
-            // OpenAI Image Settings
-            'desktop-image-size': 'image-size',
-            'desktop-openai-quality': 'openai-quality',
-            'desktop-openai-output-format': 'openai-output-format',
-            'desktop-openai-background': 'openai-background'
-        };
-
-        // Setup simple localStorage-based settings for desktop interface
+        // Desktop interface uses purely localStorage-based settings
+        // No complex mobile-to-desktop syncing needed - both use same localStorage keys
         this.setupDesktopSettingsHandlers();
-
-        // Auto-save functionality (no manual save button needed)
-        // Settings will be auto-saved when leaving the settings view
 
         // Setup conversation buttons
         const saveConvButton = document.getElementById('desktop-save-conversation');
@@ -327,17 +207,6 @@ class DesktopInterface {
     }
 
 
-    syncElementValue(source, target) {
-        if (source.type === 'checkbox') {
-            target.checked = source.checked;
-        } else if (source.type === 'range') {
-            target.value = source.value;
-            // Trigger input event to update displays
-            target.dispatchEvent(new Event('input'));
-        } else {
-            target.value = source.value;
-        }
-    }
 
     setupDesktopSettingsHandlers() {
         
@@ -351,6 +220,7 @@ class DesktopInterface {
             
             
             if (element) {
+                
                 // Save on change
                 element.addEventListener('change', () => {
                     this.saveSettingToLocalStorage(settingsKey, element);
@@ -401,9 +271,15 @@ class DesktopInterface {
         });
         
         // Update provider sections after loading
-        const providerElement = document.getElementById('desktop-llm-provider');
-        if (providerElement && providerElement.value) {
-            this.toggleProviderSections(providerElement.value);
+        const llmProviderElement = document.getElementById('desktop-llm-provider');
+        if (llmProviderElement && llmProviderElement.value) {
+            this.toggleProviderSections(llmProviderElement.value);
+        }
+        
+        // Update image provider sections after loading
+        const imageProviderElement = document.getElementById('desktop-image-provider');
+        if (imageProviderElement && imageProviderElement.value) {
+            this.toggleImageProviderSections(imageProviderElement.value);
         }
     }
 
@@ -420,58 +296,13 @@ class DesktopInterface {
         if (window.smartServiceReinit && typeof window.smartServiceReinit === 'function') {
             window.smartServiceReinit(settingsKey, element.type);
         }
-        
     }
 
-    async syncSettingsToDesktop() {
-        // Wait for mobile settings panel to be loaded
-        await this.waitForMobileSettings();
-        
-        // Use the comprehensive sync function from main.js if available
-        if (window.syncSettingsToDesktop && typeof window.syncSettingsToDesktop === 'function') {
-            window.syncSettingsToDesktop();
-        } else {
-            console.log('Desktop: Fallback to basic element sync');
-            // Fallback: Sync all mobile settings to desktop when opening settings panel
-            Object.entries(this.settingsMap).forEach(([desktopId, mobileId]) => {
-                const desktopElement = document.getElementById(desktopId);
-                const mobileElement = document.getElementById(mobileId);
-                
-                if (desktopElement && mobileElement) {
-                    this.syncElementValue(mobileElement, desktopElement);
-                    this.updateSettingsDisplay(desktopId);
-                } else if (!mobileElement) {
-                    console.warn(`Mobile settings element not found: ${mobileId}`);
-                }
-            });
-        }
+    syncSettingsToDesktop() {
+        // Simply reload from localStorage - no complex mobile-to-desktop sync needed
+        this.loadSettingsFromLocalStorage();
     }
 
-    async waitForMobileSettings() {
-        return new Promise((resolve) => {
-            let attempts = 0;
-            const maxAttempts = 100;
-            
-            const checkForSettings = () => {
-                const settingsPanel = document.querySelector('#settings-panel-container .settings-panel');
-                const hasBasicSettings = document.getElementById('slider-font-size') && 
-                                       document.getElementById('llm-provider') &&
-                                       document.getElementById('select-tts-voice');
-                
-                if (settingsPanel && hasBasicSettings) {
-                    resolve(true);
-                } else if (attempts < maxAttempts) {
-                    attempts++;
-                    setTimeout(checkForSettings, 100);
-                } else {
-                    console.warn('Mobile settings panel not loaded after timeout');
-                    resolve(false);
-                }
-            };
-            
-            checkForSettings();
-        });
-    }
 
     updateSettingsDisplay(elementId) {
         // Update range slider displays
@@ -597,7 +428,9 @@ class DesktopInterface {
         const sections = ['desktop-a1111-settings', 'desktop-swarmui-settings', 'desktop-openai-settings'];
         sections.forEach(sectionId => {
             const section = document.getElementById(sectionId);
-            if (section) section.style.display = 'none';
+            if (section) {
+                section.style.display = 'none';
+            }
         });
 
         // Show relevant section based on provider
@@ -612,8 +445,60 @@ class DesktopInterface {
 
         if (targetSection) {
             const section = document.getElementById(targetSection);
-            if (section) section.style.display = 'block';
+            if (section) {
+                section.style.display = 'block';
+                // Re-setup event handlers for newly visible elements
+                this.setupEventHandlersForSection(targetSection);
+            }
         }
+    }
+
+    setupEventHandlersForSection(sectionId) {
+        // Setup event handlers for elements within a specific section
+        const section = document.getElementById(sectionId);
+        if (!section) return;
+
+        // Find all input elements within this section
+        const inputs = section.querySelectorAll('input, select, textarea');
+        
+        inputs.forEach(element => {
+            const elementId = element.id;
+            
+            // Find the corresponding settings key
+            let settingsKey = null;
+            Object.entries(this.desktopSettingsIdMap).forEach(([key, id]) => {
+                if (id === elementId) {
+                    settingsKey = key;
+                }
+            });
+            
+            if (settingsKey) {
+                // Remove any existing listeners to prevent duplicates
+                const newElement = element.cloneNode(true);
+                element.parentNode.replaceChild(newElement, element);
+                
+                // Add fresh event listeners
+                newElement.addEventListener('change', () => {
+                    this.saveSettingToLocalStorage(settingsKey, newElement);
+                    this.updateSettingsDisplay(elementId);
+                });
+                
+                newElement.addEventListener('input', () => {
+                    this.saveSettingToLocalStorage(settingsKey, newElement);
+                    this.updateSettingsDisplay(elementId);
+                });
+                
+                // Load current value from localStorage
+                const currentValue = localStorage.getItem(settingsKey);
+                if (currentValue && newElement.value !== currentValue) {
+                    if (newElement.type === 'checkbox') {
+                        newElement.checked = currentValue === 'true';
+                    } else {
+                        newElement.value = currentValue;
+                    }
+                }
+            }
+        });
     }
 
     setupPersonaSync() {
@@ -792,25 +677,6 @@ class DesktopInterface {
         }
     }
 
-    setupFeatureCards() {
-        // Add click animations to feature cards
-        document.querySelectorAll('.feature-card').forEach(card => {
-            card.addEventListener('mouseenter', () => {
-                card.style.transform = 'translateY(-8px) scale(1.02)';
-            });
-            
-            card.addEventListener('mouseleave', () => {
-                card.style.transform = 'translateY(0) scale(1)';
-            });
-            
-            card.addEventListener('click', () => {
-                card.style.transform = 'translateY(-4px) scale(0.98)';
-                setTimeout(() => {
-                    card.style.transform = 'translateY(-8px) scale(1.02)';
-                }, 150);
-            });
-        });
-    }
 
     setupDesktopChat() {
         const desktopInput = document.getElementById('desktop-user-input');
@@ -937,97 +803,10 @@ class DesktopInterface {
             console.log('Desktop: Using universal loadAllSettings function');
             window.loadAllSettings();
         } else {
-            console.warn('Desktop: Universal loadAllSettings not available, using fallback');
-            // Fallback to original implementation if main.js not loaded yet
-            const settingsKeys = this.getStorageKeyMapping();
-
-            Object.entries(settingsKeys).forEach(([elementId, storageKey]) => {
-                const element = document.getElementById(elementId);
-                const storedValue = localStorage.getItem(storageKey);
-                
-                if (element && storedValue !== null) {
-                    if (element.type === 'checkbox') {
-                        element.checked = storedValue === 'true';
-                    } else if (element.type === 'range') {
-                        element.value = storedValue;
-                        this.updateSettingsDisplay(elementId);
-                    } else {
-                        element.value = storedValue;
-                    }
-                    
-                    console.log(`Loaded ${storageKey}: ${storedValue} into ${elementId}`);
-                }
-            });
+            console.warn('Desktop: Universal loadAllSettings not available, settings will load when main.js initializes');
         }
-        
     }
 
-    getStorageKeyMapping() {
-        // Use the same localStorage keys as main.js to prevent conflicts
-        return {
-            // Font Settings
-            'desktop-font-size': 'fontSize',
-            
-            // LLM Provider Settings
-            'desktop-llm-provider': 'customLlmProvider',
-            'desktop-llm-api-url': 'customLlmApiUrl',
-            'desktop-llm-model': 'customLlmModelIdentifier',
-            'desktop-llm-api-key': 'customLlmApiKey',
-            
-            // Direct API Provider Settings
-            'desktop-openai-model-identifier': 'openaiModelIdentifier',
-            'desktop-openai-api-key': 'openaiApiKey',
-            'desktop-anthropic-model-identifier': 'anthropicModelIdentifier',
-            'desktop-anthropic-api-key': 'anthropicApiKey',
-            'desktop-google-model-identifier': 'googleModelIdentifier',
-            'desktop-google-api-key': 'googleApiKey',
-            
-            // Voice Settings
-            'desktop-tts-voice': 'selectedTTSVoice',
-            'desktop-voice-speed': 'voiceSpeed',
-            'desktop-voice-pitch': 'voicePitch',
-            'desktop-azure-api-key': 'azureAPIKey',
-            'desktop-azure-region': 'azureRegion',
-            
-            // MCP Settings
-            'desktop-mcp-enabled': 'mcpEnabled',
-            'desktop-mcp-url': 'mcpServerUrl',
-            
-            // Web Search Settings
-            'desktop-search-enabled': 'searchEnabled',
-            'desktop-search-provider': 'searchProvider',
-            'desktop-search-api-key': 'searchApiKey',
-            'desktop-search-results-limit': 'searchResultsLimit',
-            'desktop-search-auto-summarize': 'searchAutoSummarize',
-            'desktop-search-time-filter': 'searchTimeFilter',
-            
-            // Image Generation Settings
-            'desktop-image-provider': 'customImageProvider',
-            
-            // A1111 Settings
-            'desktop-image-api-url': 'customImageApiUrl',
-            'desktop-image-width': 'imageWidth',
-            'desktop-image-height': 'imageHeight',
-            'desktop-image-steps': 'imageSteps',
-            'desktop-image-cfg-scale': 'imageCfgScale',
-            'desktop-image-sampler': 'imageSampler',
-            
-            // SwarmUI Settings
-            'desktop-swarmui-api-url': 'swarmuiApiUrl',
-            'desktop-swarmui-width': 'swarmuiWidth',
-            'desktop-swarmui-height': 'swarmuiHeight',
-            'desktop-swarmui-steps': 'swarmuiSteps',
-            'desktop-swarmui-cfg-scale': 'swarmuiCfgScale',
-            'desktop-swarmui-model': 'swarmuiModel',
-            'desktop-swarmui-sampler': 'swarmuiSampler',
-            
-            // OpenAI Image Settings
-            'desktop-image-size': 'imageSize',
-            'desktop-openai-quality': 'openaiQuality',
-            'desktop-openai-output-format': 'openaiOutputFormat',
-            'desktop-openai-background': 'openaiBackground'
-        };
-    }
 
 
     toggleDesktopSTT() {

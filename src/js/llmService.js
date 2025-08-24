@@ -118,6 +118,16 @@ if (typeof LLMService === 'undefined') {
             if (maxTokens !== null) {
                 payload.max_tokens = maxTokens;
             }
+            
+            // Handle GPT-OSS models in direct provider - disable reasoning tokens
+            if (this.directModel && this.directModel.toLowerCase().includes('gpt-oss')) {
+                console.log("Applying GPT-OSS-specific settings for direct model: " + this.directModel);
+                payload.reasoning = {
+                    exclude: true
+                };
+                payload.raw_cot = false;
+            }
+            
             return payload;
         } else if (this.providerType === 'anthropic-direct') {
             // Anthropic API format
@@ -835,6 +845,7 @@ Make sure the character you create embodies and follows the persona instructions
 
     createCompatiblePayload(messages, temperature, maxTokens, includeStop = true) {
         const isGemini = this.modelIdentifier && this.modelIdentifier.toLowerCase().includes('gemini');
+        const isGptOss = this.modelIdentifier && this.modelIdentifier.toLowerCase().includes('gpt-oss');
         const isOllama = this.providerType === 'ollama' || (this.providerType === 'litellm' && this.modelIdentifier && this.modelIdentifier.startsWith('ollama/'));
         
         const payload = {
@@ -850,6 +861,19 @@ Make sure the character you create embodies and follows the persona instructions
 
         if (this.modelIdentifier) {
             payload.model = this.modelIdentifier;
+        }
+
+        // Handle GPT-OSS parameters - disable reasoning tokens for GPT-OSS models
+        if (isGptOss) {
+            console.log("Applying GPT-OSS-specific settings for model: " + this.modelIdentifier);
+            
+            // API-level reasoning suppression - exclude reasoning content entirely
+            payload.reasoning = {
+                exclude: true
+            };
+            
+            // Additional parameter to suppress raw CoT
+            payload.raw_cot = false;
         }
 
         // Handle Gemini parameters - disable thinking and set safety settings for ALL Gemini models

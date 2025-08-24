@@ -87,97 +87,8 @@
 
         <!-- Main Content Area -->
         <div class="desktop-main">
-            <!-- Dashboard Welcome -->
-            <div class="desktop-dashboard">
-                <div class="dashboard-header">
-                    <h1>Hi, I'm Chat Bot</h1>
-                    <p>Tell me your goal, and get complete Learning Plans.</p>
-                </div>
-                
-                <!-- Feature Grid -->
-                <div class="feature-grid">
-                    <div class="feature-card" data-feature="guided-learning">
-                        <div class="card-header">
-                            <span class="card-icon">🎯</span>
-                            <h3>Guided Learning</h3>
-                        </div>
-                        <div class="card-progress">
-                            <div class="progress-bar">
-                                <div class="progress-fill" style="width: 75%"></div>
-                            </div>
-                            <span class="progress-value">75%</span>
-                        </div>
-                    </div>
-                    
-                    <div class="feature-card" data-feature="course-links">
-                        <div class="card-header">
-                            <span class="card-icon">🔗</span>
-                            <h3>Links To Course</h3>
-                        </div>
-                        <div class="card-progress">
-                            <div class="progress-bar">
-                                <div class="progress-fill" style="width: 60%"></div>
-                            </div>
-                            <span class="progress-value">60%</span>
-                        </div>
-                    </div>
-                    
-                    <div class="feature-card" data-feature="voice-interaction">
-                        <div class="card-header">
-                            <span class="card-icon">🎤</span>
-                            <h3>Voice Interaction</h3>
-                        </div>
-                        <div class="card-progress">
-                            <div class="progress-bar">
-                                <div class="progress-fill" style="width: 90%"></div>
-                            </div>
-                            <span class="progress-value">90%</span>
-                        </div>
-                    </div>
-                    
-                    <div class="feature-card" data-feature="image-generation">
-                        <div class="card-header">
-                            <span class="card-icon">🎨</span>
-                            <h3>Image Generation</h3>
-                        </div>
-                        <div class="card-progress">
-                            <div class="progress-bar">
-                                <div class="progress-fill" style="width: 45%"></div>
-                            </div>
-                            <span class="progress-value">45%</span>
-                        </div>
-                    </div>
-                    
-                    <div class="feature-card" data-feature="reasoning">
-                        <div class="card-header">
-                            <span class="card-icon">🧠</span>
-                            <h3>Enhanced Reasoning</h3>
-                        </div>
-                        <div class="card-progress">
-                            <div class="progress-bar">
-                                <div class="progress-fill" style="width: 85%"></div>
-                            </div>
-                            <span class="progress-value">85%</span>
-                        </div>
-                    </div>
-                    
-                    <div class="feature-card" data-feature="web-search">
-                        <div class="card-header">
-                            <span class="card-icon">🌐</span>
-                            <h3>Web Search</h3>
-                        </div>
-                        <div class="card-progress">
-                            <div class="progress-bar">
-                                <div class="progress-fill" style="width: 55%"></div>
-                            </div>
-                            <span class="progress-value">55%</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Desktop Chat Area (hidden initially) -->
-            <div class="desktop-chat" style="display: none;">
+            <!-- Desktop Chat Area -->
+            <div class="desktop-chat">
                 <div class="desktop-chat-window" id="desktop-chat-window">
                     <!-- Messages will appear here -->
                 </div>
@@ -247,6 +158,7 @@
                             <option value="claude4">claude4</option>
                             <option value="gemini2.5-flash">gemini2.5-flash</option>
                             <option value="dark-champion">dark-champion</option>
+                            <option value="gpt-oss-20b">gpt-oss-20b</option>
                         </select>
                     </div>
                     <div class="desktop-setting-item">
@@ -367,8 +279,8 @@
                         <span id="desktop-voice-pitch-value">1.0</span>
                     </div>
                     <div class="desktop-setting-item">
-                        <label for="azure-api-key-desktop">Azure Speech API Key</label>
-                        <input type="password" id="azure-api-key-desktop" placeholder="Enter Azure Speech Services API key">
+                        <label for="desktop-azure-api-key">Azure Speech API Key</label>
+                        <input type="password" id="desktop-azure-api-key" placeholder="Enter Azure Speech Services API key">
                     </div>
                     <div class="desktop-setting-item">
                         <label for="desktop-azure-region">Azure Region</label>
