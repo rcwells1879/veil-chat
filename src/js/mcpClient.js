@@ -723,13 +723,13 @@ if (typeof MCPClient === 'undefined') {
                         return {
                             content: [{
                                 type: 'text',
-                                text: result.synthesis
+                                text: result.results?.final_synthesis || result.synthesis || 'Research completed but no synthesis available'
                             }],
                             isAgentResult: true,
                             metadata: {
-                                searchQuery: result.searchQuery,
-                                urlsFound: result.urlsFound,
-                                extractedContent: result.extractedContent,
+                                searchQuery: result.results?.search_query,
+                                urlsFound: result.results?.urls_found,
+                                extractedContent: result.results?.extracted_content,
                                 taskId: result.taskId
                             }
                         };
