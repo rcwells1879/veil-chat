@@ -47,6 +47,15 @@ npm run build
 
 VeilChat is a modern web-based chat interface with AI capabilities, built with vanilla JavaScript and Node.js. The application uses a **HTTP REST API architecture** for browser compatibility and mobile/PWA support.
 
+### Key Technologies & Frameworks
+- **Frontend**: Vanilla JavaScript (ES6+ modules)
+- **Backend**: Express.js server with CORS support
+- **PWA**: Full Progressive Web App implementation with service worker
+- **MCP Integration**: Model Context Protocol for enhanced reasoning
+- **Web Scraping**: Puppeteer + Cheerio with intelligent extraction
+- **Security**: Input validation and sanitization layer
+- **Offline Support**: LocalStorage-based persistence with queue sync
+
 ### Settings Synchronization Architecture
 
 **IMPORTANT: VeilChat uses a simple localStorage-based settings synchronization system.**
@@ -107,11 +116,145 @@ VeilChat is a modern web-based chat interface with AI capabilities, built with v
 3. **Mobile autoplay**: Requires user interaction before first TTS playback
 4. **Voice not found**: Check Azure voice mapping in `mapVoiceKeywordToAzure()`
 
+### Progressive Web App (PWA) Architecture
+
+**IMPORTANT: VeilChat is a full-featured PWA with offline capabilities.**
+
+#### Service Worker Implementation (`src/service-worker.js`)
+- **Automatic cache versioning**: Uses `Date.now()` for cache names to force updates
+- **Multi-tier caching**: Separate caches for static assets, API responses, and external CDN resources
+- **Offline-first strategy**: Static assets served from cache, APIs fall back to network
+- **Background sync**: Queued requests processed when connectivity returns
+
+#### PWA Features
+- **App Installation**: Custom install prompts with user-friendly experience
+- **Offline Manager**: Full offline conversation history and settings persistence
+- **Network Detection**: Real-time online/offline status with UI indicators
+- **App Shortcuts**: Quick access to new chat and voice mode
+- **Share Target**: Receive shared content from other apps
+
+#### Troubleshooting PWA Issues
+- Cache updates require version changes in service worker
+- Install prompts only show on HTTPS or localhost
+- Offline data stored in localStorage with Map-based structure
+- Service worker updates may require hard refresh (Ctrl+Shift+R)
+
+### Model Context Protocol (MCP) Integration
+
+**IMPORTANT: MCP enables enhanced reasoning and tool usage through external servers.**
+
+#### MCP Architecture (`src/js/mcpClient.js`, `src/server/mcp-server.js`)
+- **Dual connection modes**: HTTP API for browsers, direct process spawning for Node.js
+- **Sequential Thinking**: Advanced reasoning through step-by-step thought processes
+- **Tool integration**: External tools and APIs accessible through MCP protocol
+- **Server management**: Automatic server startup with `npm run start:both`
+
+#### MCP Components
+- **HTTP Server** (`src/server/mcp-http-server.js`): RESTful API bridge for browser clients
+- **MCP Server** (`src/server/mcp-server.js`): Full MCP protocol implementation
+- **Client Interface** (`src/js/mcpClient.js`): Browser-compatible MCP client
+
+### Web Content Extraction System
+
+**IMPORTANT: Intelligent web scraping with multi-method fallback strategies.**
+
+#### Extractor Architecture (`src/server/extractors/`)
+- **Base Extractor** (`base-extractor.js`): Core extraction logic and method selection
+- **Puppeteer Extractor** (`puppeteer-extractor.js`): Dynamic content and JavaScript-heavy sites
+- **Web Extractor** (`web-extractor.js`): Static content with Cheerio and Readability
+
+#### Smart Content Detection
+- **Domain-based routing**: Automatic selection of extraction method by domain
+- **Fallback strategy**: Puppeteer → Cheerio → Basic fetch
+- **Content optimization**: Mozilla Readability for article extraction
+- **Performance**: Timeout controls and resource management
+
+#### Supported Content Types
+- **Dynamic sites**: Google Maps, Yelp, Reddit (new interface), Quora
+- **Static content**: News articles, documentation, blogs
+- **Social media**: Limited support with JavaScript execution
+- **PDF/Documents**: Through appropriate extractor selection
+
+### Security Architecture
+
+**IMPORTANT: Multi-layer security with input validation and sanitization.**
+
+#### Security Validator (`src/js/securityValidator.js`)
+- **Prompt injection detection**: Comprehensive pattern matching for injection attempts
+- **XSS prevention**: Script tag and JavaScript protocol filtering
+- **Template injection**: Protection against template literal and expression attacks
+- **Jailbreak detection**: Common AI jailbreak pattern recognition
+
+#### Security Patterns Detected
+- System instruction overrides and prompt manipulation
+- SSML/XML injection attempts for TTS exploitation
+- URL encoding and Unicode escape sequence abuse
+- Developer mode and unrestricted access requests
+
+#### Server Security (`src/server/security-manager.js`)
+- **File access restrictions**: Blocked access to server files and node_modules
+- **CORS configuration**: Managed through Cloudflare Zero Trust policies
+- **Static file serving**: Limited to safe directories only
+
 ## Deployment Configuration
 
 - CORS settings are handled in my Cloudflare tunnel dashboard 
 
 ## Best Practices
 
+### Code Reusability and Function Management
+
+**IMPORTANT: Always check existing services before creating new functions.**
+
+#### Before Creating New Functions
+1. **Survey existing services**: Check all files in `src/js/` for suitable existing methods
+2. **Review service interfaces**: Look for compatible functions in these core services:
+   - `llmService.js` - LLM API interactions and response processing
+   - `voiceService.js` - Speech-to-text and text-to-speech functionality  
+   - `imageService.js` - Image generation and processing
+   - `contextservice.js` - Context management and conversation handling
+   - `mcpClient.js` - Model Context Protocol integration
+   - `securityValidator.js` - Input validation and sanitization
+   - `azureTTSService.js` / `azureSTTService.js` - Azure speech services
+   - `offlineManager.js` - Offline data persistence and sync
+   - `ssmlProcessor.js` - Speech Synthesis Markup Language processing
+   - `desktopInterface.js` - Desktop-specific UI and settings management
+
+#### Function Reuse Guidelines
+- **Extend existing services** rather than duplicating functionality
+- **Use service methods** by importing or referencing existing instances
+- **Maintain consistency** with established patterns and interfaces
+- **Document dependencies** when calling methods from other services
+
+#### Common Reusable Functions
+- **API calls**: Use `llmService` methods for consistent request handling
+- **Voice operations**: Use `voiceService` or Azure services for speech functionality
+- **Security validation**: Always use `securityValidator` for input sanitization
+- **Context management**: Use `contextservice` for conversation state
+- **Offline operations**: Use `offlineManager` for data persistence
+
 ### External Tool Usage
 - Always reference online documentation for external tools like Puppeteer or Cheerio before making changes to their services
+
+### Development Workflow Considerations
+
+#### Server Restart Requirements
+After making changes to server-side components, restart is required:
+- **MCP Server changes**: Restart with `npm run start:both` or `npm run dev:mcp`
+- **HTTP Server changes**: Restart with `npm run start:http` or `npm run dev:http` 
+- **Extractor changes**: Affects web content extraction functionality
+- **Security changes**: Critical for input validation updates
+
+#### Client Refresh Requirements  
+For client-side changes, hard refresh may be needed:
+- **Service Worker updates**: Require `Ctrl+Shift+R` (hard refresh)
+- **PWA manifest changes**: May need app reinstallation
+- **New static assets**: Service worker cache versioning handles automatically
+- **Settings changes**: localStorage updates applied immediately
+
+#### Key Dependencies
+- **@modelcontextprotocol/sdk**: Core MCP integration (v0.4.0)
+- **puppeteer-extra**: Enhanced web scraping with stealth plugin  
+- **@mozilla/readability**: Content extraction from web articles
+- **cheerio**: Server-side HTML manipulation and parsing
+- **express**: HTTP server framework with CORS support

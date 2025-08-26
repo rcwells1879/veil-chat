@@ -697,20 +697,42 @@ class DesktopInterface {
 
             // Stop TTS on desktop input interaction (same as mobile)
             desktopInput.addEventListener('touchstart', (e) => {
+                console.log('Desktop TouchStart: Event fired! voiceService available:', !!window.voiceService);
                 if (window.voiceService && window.voiceService.stopSpeaking) {
+                    console.log('Desktop TouchStart: Calling stopSpeaking()');
                     window.voiceService.stopSpeaking();
+                } else {
+                    console.log('Desktop TouchStart: voiceService.stopSpeaking not available');
                 }
             }, { passive: true });
             
             desktopInput.addEventListener('mousedown', (e) => {
+                console.log('Desktop MouseDown: Event fired! voiceService available:', !!window.voiceService);
                 if (window.voiceService && window.voiceService.stopSpeaking) {
+                    console.log('Desktop MouseDown: Calling stopSpeaking()');
                     window.voiceService.stopSpeaking();
+                } else {
+                    console.log('Desktop MouseDown: voiceService.stopSpeaking not available');
+                }
+            });
+            
+            desktopInput.addEventListener('click', (e) => {
+                console.log('Desktop Click: Event fired! voiceService available:', !!window.voiceService);
+                if (window.voiceService && window.voiceService.stopSpeaking) {
+                    console.log('Desktop Click: Calling stopSpeaking()');
+                    window.voiceService.stopSpeaking();
+                } else {
+                    console.log('Desktop Click: voiceService.stopSpeaking not available');
                 }
             });
             
             desktopInput.addEventListener('focus', (e) => {
+                console.log('Desktop Focus: Event fired! voiceService available:', !!window.voiceService);
                 if (window.voiceService && window.voiceService.stopSpeaking) {
+                    console.log('Desktop Focus: Calling stopSpeaking()');
                     window.voiceService.stopSpeaking();
+                } else {
+                    console.log('Desktop Focus: voiceService.stopSpeaking not available');
                 }
             });
 
