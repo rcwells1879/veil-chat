@@ -81,10 +81,10 @@ if (typeof ImageService === 'undefined') {
         }
         if (settings.openaiApiKey !== undefined) {
             this.openaiApiKey = settings.openaiApiKey;
-        }
-        if (settings.apiBaseUrl !== undefined) {
-            this.apiBaseUrl = settings.apiBaseUrl;
-        }
+    }
+    if (settings.apiBaseUrl !== undefined) {
+        this.apiBaseUrl = settings.apiBaseUrl;
+    }
         
         console.log('ImageService: Settings updated:', settings);
     }
