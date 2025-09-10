@@ -4,7 +4,7 @@ const CACHE_NAME = `veilchat-v${CACHE_VERSION}`;
 const STATIC_CACHE = `veilchat-static-v${CACHE_VERSION}`;
 const API_CACHE = `veilchat-api-v${CACHE_VERSION}`;
 
-// Static assets to cache immediately
+// Static assets to cache immediately (excluding CDN resources that may cause installation to hang)
 const STATIC_ASSETS = [
   './',
   'index.html',
@@ -25,8 +25,11 @@ const STATIC_ASSETS = [
   'js/offlineManager.js',
   'pages/user-settings.html',
   'pages/persona.html',
-  'manifest.json',
-  // External CDN resources (cache for offline use)
+  'manifest.json'
+];
+
+// CDN resources to cache separately (won't block installation)
+const CDN_ASSETS = [
   'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js',
   'https://cdn.jsdelivr.net/npm/marked/marked.min.js'
@@ -37,24 +40,74 @@ const API_CACHE_PATTERNS = [
   '/api/mcp/call'
 ];
 
-// Install event - cache static assets
+// Install event - cache static assets with detailed debugging
 self.addEventListener('install', event => {
   console.log('Service Worker: Installing...');
   event.waitUntil(
     caches.open(STATIC_CACHE)
       .then(cache => {
-        console.log('Service Worker: Caching static assets');
-        return cache.addAll(STATIC_ASSETS);
+        console.log('Service Worker: Cache opened successfully');
+        console.log('Service Worker: Attempting to cache', STATIC_ASSETS.length, 'static assets');
+        
+        // Cache assets individually with debugging
+        return Promise.all(
+          STATIC_ASSETS.map(async (asset, index) => {
+            try {
+              console.log(`Service Worker: Caching asset ${index + 1}/${STATIC_ASSETS.length}: ${asset}`);
+              const response = await fetch(asset);
+              if (!response.ok) {
+                throw new Error(`Failed to fetch ${asset}: ${response.status} ${response.statusText}`);
+              }
+              await cache.put(asset, response);
+              console.log(`Service Worker: Successfully cached: ${asset}`);
+            } catch (error) {
+              console.error(`Service Worker: Failed to cache ${asset}:`, error);
+              throw error; // Re-throw to fail the installation
+            }
+          })
+        );
       })
       .then(() => {
-        console.log('Service Worker: Static assets cached');
+        console.log('Service Worker: All static assets cached successfully');
+        // Cache CDN assets separately (don't block installation if these fail)
+        return cacheCDNAssets();
+      })
+      .then(() => {
+        console.log('Service Worker: Installation complete, calling skipWaiting()');
         return self.skipWaiting();
       })
       .catch(error => {
-        console.error('Service Worker: Error caching static assets:', error);
+        console.error('Service Worker: Installation failed:', error);
+        throw error;
       })
   );
 });
+
+// Cache CDN assets separately to avoid blocking installation
+async function cacheCDNAssets() {
+  try {
+    const cache = await caches.open(STATIC_CACHE);
+    console.log('Service Worker: Attempting to cache CDN assets');
+    
+    for (const [index, asset] of CDN_ASSETS.entries()) {
+      try {
+        console.log(`Service Worker: Caching CDN asset ${index + 1}/${CDN_ASSETS.length}: ${asset}`);
+        const response = await fetch(asset);
+        if (response.ok) {
+          await cache.put(asset, response);
+          console.log(`Service Worker: Successfully cached CDN asset: ${asset}`);
+        } else {
+          console.warn(`Service Worker: CDN asset returned ${response.status}: ${asset}`);
+        }
+      } catch (error) {
+        console.warn(`Service Worker: Failed to cache CDN asset (non-critical): ${asset}`, error);
+      }
+    }
+    console.log('Service Worker: CDN asset caching complete');
+  } catch (error) {
+    console.warn('Service Worker: CDN caching failed (non-critical):', error);
+  }
+}
 
 // Activate event - clean up old caches
 self.addEventListener('activate', event => {
