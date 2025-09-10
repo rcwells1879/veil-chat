@@ -4,14 +4,19 @@ const CACHE_NAME = `veilchat-v${CACHE_VERSION}`;
 const STATIC_CACHE = `veilchat-static-v${CACHE_VERSION}`;
 const API_CACHE = `veilchat-api-v${CACHE_VERSION}`;
 
-// Static assets to cache immediately (excluding CDN resources that may cause installation to hang)
-const STATIC_ASSETS = [
+// Critical assets to cache immediately (fast installation)
+const CRITICAL_ASSETS = [
   './',
   'index.html',
   'css/style.css',
+  'js/main.js',
+  'manifest.json'
+];
+
+// Secondary assets to cache after installation (non-blocking)
+const SECONDARY_ASSETS = [
   'css/desktop-styles.css',
   'css/pwa-styles.css',
-  'js/main.js',
   'js/llmService.js',
   'js/voiceService.js',
   'js/imageService.js',
@@ -24,8 +29,7 @@ const STATIC_ASSETS = [
   'js/ssmlProcessor.js',
   'js/offlineManager.js',
   'pages/user-settings.html',
-  'pages/persona.html',
-  'manifest.json'
+  'pages/persona.html'
 ];
 
 // CDN resources to cache separately (won't block installation)
@@ -40,41 +44,43 @@ const API_CACHE_PATTERNS = [
   '/api/mcp/call'
 ];
 
-// Install event - cache static assets with detailed debugging
+// Install event - cache only critical assets for fast installation
 self.addEventListener('install', event => {
   console.log('Service Worker: Installing...');
   event.waitUntil(
     caches.open(STATIC_CACHE)
       .then(cache => {
         console.log('Service Worker: Cache opened successfully');
-        console.log('Service Worker: Attempting to cache', STATIC_ASSETS.length, 'static assets');
+        console.log('Service Worker: Attempting to cache', CRITICAL_ASSETS.length, 'critical assets');
         
-        // Cache assets individually with debugging
+        // Cache only critical assets to speed up installation
         return Promise.all(
-          STATIC_ASSETS.map(async (asset, index) => {
+          CRITICAL_ASSETS.map(async (asset, index) => {
             try {
-              console.log(`Service Worker: Caching asset ${index + 1}/${STATIC_ASSETS.length}: ${asset}`);
+              console.log(`Service Worker: Caching critical asset ${index + 1}/${CRITICAL_ASSETS.length}: ${asset}`);
               const response = await fetch(asset);
               if (!response.ok) {
                 throw new Error(`Failed to fetch ${asset}: ${response.status} ${response.statusText}`);
               }
               await cache.put(asset, response);
-              console.log(`Service Worker: Successfully cached: ${asset}`);
+              console.log(`Service Worker: Successfully cached critical asset: ${asset}`);
             } catch (error) {
-              console.error(`Service Worker: Failed to cache ${asset}:`, error);
+              console.error(`Service Worker: Failed to cache critical asset ${asset}:`, error);
               throw error; // Re-throw to fail the installation
             }
           })
         );
       })
       .then(() => {
-        console.log('Service Worker: All static assets cached successfully');
-        // Cache CDN assets separately (don't block installation if these fail)
-        return cacheCDNAssets();
-      })
-      .then(() => {
+        console.log('Service Worker: Critical assets cached successfully');
         console.log('Service Worker: Installation complete, calling skipWaiting()');
         return self.skipWaiting();
+      })
+      .then(() => {
+        // Cache secondary assets in background (non-blocking)
+        cacheSecondaryAssets();
+        // Cache CDN assets in background (non-blocking)
+        cacheCDNAssets();
       })
       .catch(error => {
         console.error('Service Worker: Installation failed:', error);
@@ -83,11 +89,37 @@ self.addEventListener('install', event => {
   );
 });
 
+// Cache secondary assets in background (non-blocking)
+async function cacheSecondaryAssets() {
+  try {
+    const cache = await caches.open(STATIC_CACHE);
+    console.log('Service Worker: Starting background caching of secondary assets');
+    
+    for (const [index, asset] of SECONDARY_ASSETS.entries()) {
+      try {
+        console.log(`Service Worker: Caching secondary asset ${index + 1}/${SECONDARY_ASSETS.length}: ${asset}`);
+        const response = await fetch(asset);
+        if (response.ok) {
+          await cache.put(asset, response);
+          console.log(`Service Worker: Successfully cached secondary asset: ${asset}`);
+        } else {
+          console.warn(`Service Worker: Secondary asset returned ${response.status}: ${asset}`);
+        }
+      } catch (error) {
+        console.warn(`Service Worker: Failed to cache secondary asset (non-critical): ${asset}`, error);
+      }
+    }
+    console.log('Service Worker: Secondary asset caching complete');
+  } catch (error) {
+    console.warn('Service Worker: Secondary asset caching failed (non-critical):', error);
+  }
+}
+
 // Cache CDN assets separately to avoid blocking installation
 async function cacheCDNAssets() {
   try {
     const cache = await caches.open(STATIC_CACHE);
-    console.log('Service Worker: Attempting to cache CDN assets');
+    console.log('Service Worker: Starting background caching of CDN assets');
     
     for (const [index, asset] of CDN_ASSETS.entries()) {
       try {
