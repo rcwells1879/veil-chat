@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Tools for Coding - Presentation</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            color: #333;
+        }
+        
+        .presentation-container {
+            width: 90%;
+            max-width: 1200px;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        .slide {
+            padding: 60px;
+            min-height: 600px;
+            display: none;
+            animation: fadeIn 0.5s;
+        }
+        
+        .slide.active {
+            display: block;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        h1 {
+            font-size: 3em;
+            color: #667eea;
+            margin-bottom: 20px;
+            font-weight: 300;
+        }
+        
+        h2 {
+            font-size: 2.5em;
+            color: #444;
+            margin-bottom: 30px;
+            font-weight: 300;
+        }
+        
+        h3 {
+            font-size: 1.8em;
+            color: #667eea;
+            margin: 30px 0 15px;
+            font-weight: 400;
+        }
+        
+        .subtitle {
+            font-size: 1.3em;
+            color: #666;
+            margin-bottom: 40px;
+            font-style: italic;
+        }
+        
+        ul {
+            list-style: none;
+            padding-left: 0;
+        }
+        
+        li {
+            font-size: 1.3em;
+            margin: 20px 0;
+            padding-left: 30px;
+            position: relative;
+            line-height: 1.6;
+        }
+        
+        li:before {
+            content: "▸";
+            position: absolute;
+            left: 0;
+            color: #667eea;
+            font-size: 1.2em;
+        }
+        
+        .highlight {
+            background: linear-gradient(120deg, #f093fb 0%, #f5576c 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: 600;
+        }
+        
+        .tool-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 30px;
+            margin: 40px 0;
+        }
+        
+        .tool-box {
+            padding: 25px;
+            background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
+            border-radius: 15px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .tool-box h4 {
+            font-size: 1.4em;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+        
+        .tool-box p {
+            font-size: 1.1em;
+            color: #555;
+        }
+        
+        .timeline {
+            position: relative;
+            padding: 20px 0;
+        }
+        
+        .timeline-item {
+            display: flex;
+            align-items: center;
+            margin: 25px 0;
+        }
+        
+        .timeline-dot {
+            width: 15px;
+            height: 15px;
+            background: #667eea;
+            border-radius: 50%;
+            margin-right: 20px;
+        }
+        
+        .timeline-content {
+            font-size: 1.2em;
+            color: #555;
+        }
+        
+        .impact-box {
+            background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+            padding: 30px;
+            border-radius: 15px;
+            margin: 30px 0;
+        }
+        
+        .impact-box ul li {
+            color: #444;
+            font-weight: 500;
+        }
+        
+        .warning-box {
+            background: #fff3cd;
+            border-left: 5px solid #ffc107;
+            padding: 20px;
+            margin: 30px 0;
+            border-radius: 10px;
+        }
+        
+        .warning-box p {
+            font-size: 1.2em;
+            color: #856404;
+        }
+        
+        .navigation {
+            display: flex;
+            justify-content: space-between;
+            padding: 20px 60px;
+            background: #f8f9fa;
+        }
+        
+        button {
+            padding: 10px 30px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        button:hover {
+            background: #764ba2;
+            transform: translateY(-2px);
+        }
+        
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .slide-number {
+            font-size: 0.9em;
+            color: #999;
+            margin-top: 40px;
+            text-align: center;
+        }
+        
+        .emoji {
+            font-size: 1.5em;
+            vertical-align: middle;
+            margin: 0 5px;
+        }
+
+        .author {
+            margin-top: 30px;
+            font-size: 1.2em;
+            color: #666;
+        }
+
+        .date {
+            font-size: 1em;
+            color: #999;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="presentation-container">
+        <!-- Slide 1: Title -->
+        <div class="slide active">
+            <h1>From Soldering Iron to AI Agent</h1>
+            <p class="subtitle">How a Hardware Engineer Accidentally Became a Full-Stack Developer</p>
+            
+            <div style="margin-top: 60px;">
+                <h3>Today's Journey:</h3>
+                <ul>
+                    <li>My unlikely coding evolution (2022 → now)</li>
+                    <li>The AI tools that changed everything</li>
+                    <li>Live demo: Building real things, fast</li>
+                    <li>Lessons from the trenches</li>
+                </ul>
+            </div>
+            
+            <p class="author">Autonomous Systems Engineer, APL-UW</p>
+            <p class="date">Previously: Research Scientist Engineer, NOAA PMEL</p>
+            
+            <p class="slide-number">1 / 5</p>
+        </div>
+
+        <!-- Slide 2: The Tools -->
+        <div class="slide">
+            <h2>My AI Coding Arsenal</h2>
+            <p class="subtitle">From "What's a callback?" to "Let me spin up a backend real quick"</p>
+            
+            <div class="tool-grid">
+                <div class="tool-box">
+                    <h4>Claude Code <span class="emoji">👑</span></h4>
+                    <p>The agent that builds while I watch<br>
+                    <em style="font-size: 0.9em; color: #888;">WSL + Cursor IDE</em></p>
+                </div>
+                
+                <div class="tool-box">
+                    <h4>GitHub Copilot</h4>
+                    <p>My gateway drug (2022)<br>
+                    <em style="font-size: 0.9em; color: #888;">Still great for autocomplete</em></p>
+                </div>
+                
+                <div class="tool-box">
+                    <h4>Gemini 2.0 Flash</h4>
+                    <p>Architecture brainstorming champion<br>
+                    <em style="font-size: 0.9em; color: #888;">Google AI Studio</em></p>
+                </div>
+                
+                <div class="tool-box">
+                    <h4>The Supporting Cast</h4>
+                    <p>Cursor Chat, LiteLLM, Ollama<br>
+                    <em style="font-size: 0.9em; color: #888;">Plus the occasional ChatGPT</em></p>
+                </div>
+            </div>
+            
+            <div style="margin-top: 40px; font-size: 1.1em; color: #666; text-align: center;">
+                <em>"Different models for different moods" - Every tool has its superpower</em>
+            </div>
+            
+            <p class="slide-number">2 / 5</p>
+        </div>
+
+        <!-- Slide 3: Evolution Timeline -->
+        <div class="slide">
+            <h2>The Evolution Timeline</h2>
+            <p class="subtitle">From Python scripts to "accidentally" building MCP servers</p>
+            
+            <div class="timeline">
+                <div class="timeline-item">
+                    <div class="timeline-dot"></div>
+                    <div class="timeline-content">
+                        <strong>Before 2022:</strong> Python scripts, LabJacks, Arduino sketches<br>
+                        <em style="color: #888;">Mostly copy-paste from StackOverflow</em>
+                    </div>
+                </div>
+                
+                <div class="timeline-item">
+                    <div class="timeline-dot"></div>
+                    <div class="timeline-content">
+                        <strong>2022 - WAM-V Route Planner:</strong> PyQt → JavaScript revelation<br>
+                        <em style="color: #888;">"Wait, it works in any browser?"</em>
+                    </div>
+                </div>
+                
+                <div class="timeline-item">
+                    <div class="timeline-dot"></div>
+                    <div class="timeline-content">
+                        <strong>2023 - MATLAB Liberation:</strong> Converted viz tools to Python<br>
+                        <em style="color: #888;">No more license nightmares!</em>
+                    </div>
+                </div>
+                
+                <div class="timeline-item">
+                    <div class="timeline-dot"></div>
+                    <div class="timeline-content">
+                        <strong>2024 - The Accident:</strong> "How do I use MCP?"<br>
+                        <em style="color: #888;">Claude: "Say no more" *builds entire server*</em>
+                    </div>
+                </div>
+                
+                <div class="timeline-item">
+                    <div class="timeline-dot"></div>
+                    <div class="timeline-content">
+                        <strong>Now:</strong> React, Vite, Tailwind, Supabase, n8n...<br>
+                        <em style="color: #888;">Full-stack by accident, backend by surprise</em>
+                    </div>
+                </div>
+            </div>
+            
+            <p class="slide-number">3 / 5</p>
+        </div>
+
+        <!-- Slide 4: Real Impact -->
+        <div class="slide">
+            <h2>The Reality Check</h2>
+            <p class="subtitle">What actually happened when hardware met AI</p>
+            
+            <div class="impact-box">
+                <h3>The Good <span class="emoji">🚀</span></h3>
+                <ul>
+                    <li>Built a complete route planner in days (not months)</li>
+                    <li>Ported complex MATLAB tools without knowing MATLAB</li>
+                    <li>Created web apps with zero web dev background</li>
+                    <li>Accidentally learned backend architecture in one afternoon</li>
+                </ul>
+            </div>
+            
+            <h3>The Surprising <span class="emoji">🤔</span></h3>
+            <ul>
+                <li><strong>Plot twist:</strong> JavaScript everywhere (goodbye Python-only world)</li>
+                <li><strong>Discovery:</strong> AI explains concepts better than most tutorials</li>
+                <li><strong>Revelation:</strong> Building > Planning (when AI handles the syntax)</li>
+            </ul>
+            
+            <div class="warning-box">
+                <p><strong>The "Oops" Moment:</strong> When Claude Code goes rogue and refactors your entire project because you asked about "best practices" 😅</p>
+            </div>
+            
+            <p class="slide-number">4 / 5</p>
+        </div>
+
+        <!-- Slide 5: Lessons & Tips -->
+        <div class="slide">
+            <h2>Survival Guide</h2>
+            <p class="subtitle">What I wish someone told me two years ago</p>
+            
+            <h3>The Golden Rules <span class="emoji">⚡</span></h3>
+            <ul>
+                <li><span class="highlight">Read the code</span> - Even if AI wrote it, you own it</li>
+                <li><span class="highlight">Start specific</span> - "Build a button" beats "make it better"</li>
+                <li><span class="highlight">Use the right model</span> - Claude for coding, Gemini for planning</li>
+                <li><span class="highlight">Version control everything</span> - AI makes bold choices</li>
+            </ul>
+            
+            <h3>The Reality Checks <span class="emoji">⚠️</span></h3>
+            <ul>
+                <li>AI doesn't know your business logic (yet)</li>
+                <li>It will confidently rebuild what isn't broken</li>
+                <li>Sometimes it invents npm packages that should exist</li>
+            </ul>
+            
+            <div style="margin-top: 50px; padding: 30px; background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%); border-radius: 15px;">
+                <p style="font-size: 1.3em; text-align: center; color: #667eea;">
+                    <strong>"You don't need to be a software engineer.<br>
+                    You just need to be curious and willing to debug."</strong>
+                </p>
+            </div>
+            
+            <p style="margin-top: 40px; font-size: 1.2em; text-align: center;">
+                <em>Now let's build something live... <span class="emoji">💻</span></em>
+            </p>
+            
+            <p class="slide-number">5 / 5</p>
+        </div>
+
+        <!-- Navigation -->
+        <div class="navigation">
+            <button onclick="previousSlide()" id="prevBtn">Previous</button>
+            <button onclick="nextSlide()" id="nextBtn">Next</button>
+        </div>
+    </div>
+
+    <script>
+        let currentSlide = 0;
+        const slides = document.querySelectorAll('.slide');
+        const totalSlides = slides.length;
+
+        function showSlide(n) {
+            slides[currentSlide].classList.remove('active');
+            currentSlide = (n + totalSlides) % totalSlides;
+            slides[currentSlide].classList.add('active');
+            
+            // Update button states
+            document.getElementById('prevBtn').disabled = currentSlide === 0;
+            document.getElementById('nextBtn').disabled = currentSlide === totalSlides - 1;
+        }
+
+        function nextSlide() {
+            if (currentSlide < totalSlides - 1) {
+                showSlide(currentSlide + 1);
+            }
+        }
+
+        function previousSlide() {
+            if (currentSlide > 0) {
+                showSlide(currentSlide - 1);
+            }
+        }
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight') nextSlide();
+            if (e.key === 'ArrowLeft') previousSlide();
+        });
+
+        // Initialize
+        document.getElementById('prevBtn').disabled = true;
+    </script>
+</body>
+</html>
