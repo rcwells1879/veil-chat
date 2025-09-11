@@ -41,6 +41,7 @@ jobs:
           # Copy root level files if they exist
           cp index.html deploy/ 2>/dev/null || echo "No root index.html found"
           cp manifest.json deploy/ 2>/dev/null || echo "No manifest.json found"
+          cp test.html deploy/ 2>/dev/null || echo "No test.html found"
           
           # Update service worker with build timestamp for automatic cache versioning
           BUILD_TIME=$(date +%s)
