@@ -1,27 +1,28 @@
 if (typeof ImageService === 'undefined') {
     window.ImageService = class ImageService {
-        constructor(apiBaseUrl, provider = 'a1111', openaiApiKey = null) {
+        constructor(apiBaseUrl, provider = 'a1111', openaiApiKey = null, googleApiKey = null) {
             this.apiBaseUrl = apiBaseUrl; // e.g., 'http://127.0.0.1:7860' for Automatic1111, 'http://localhost:7801' for SwarmUI
-            this.provider = provider; // 'a1111', 'openai', or 'swarmui'
+            this.provider = provider; // 'a1111', 'openai', 'swarmui', or 'imagen4'
             this.openaiApiKey = openaiApiKey;
-            
+            this.googleApiKey = googleApiKey;
+
             // SwarmUI-specific properties
             this.swarmSessionId = null;
             this.swarmSessionExpiry = null;
-        
+
         // Set default settings for A1111
         this.width = 1024;
         this.height = 1536;
         this.steps = 20;
         this.cfg_scale = 3.5;
         this.sampler_name = "Euler a";
-        
+
         // Set default settings for OpenAI
         this.size = "auto"; // OpenAI format
         this.quality = "auto";
         this.output_format = "png";
         this.background = "auto";
-        
+
         // Set default settings for SwarmUI
         this.swarm_width = 1024;
         this.swarm_height = 1024;
@@ -29,7 +30,12 @@ if (typeof ImageService === 'undefined') {
         this.swarm_cfg_scale = 7.5;
         this.swarm_model = null; // Auto-detect or user-specified
         this.swarm_sampler = "Euler a";
-        
+
+        // Set default settings for Imagen 4 Fast
+        this.imagen4_aspect_ratio = "1:1";
+        this.imagen4_output_format = "image/jpeg";
+        this.imagen4_person_generation = "ALLOW_ADULT";
+
         console.log(`ImageService initialized. Provider: ${this.provider}`);
     }
 
@@ -73,7 +79,12 @@ if (typeof ImageService === 'undefined') {
         if (settings.swarm_cfg_scale !== undefined) this.swarm_cfg_scale = settings.swarm_cfg_scale;
         if (settings.swarm_model !== undefined) this.swarm_model = settings.swarm_model;
         if (settings.swarm_sampler !== undefined) this.swarm_sampler = settings.swarm_sampler;
-        
+
+        // Imagen 4 Fast settings
+        if (settings.imagen4_aspect_ratio !== undefined) this.imagen4_aspect_ratio = settings.imagen4_aspect_ratio;
+        if (settings.imagen4_output_format !== undefined) this.imagen4_output_format = settings.imagen4_output_format;
+        if (settings.imagen4_person_generation !== undefined) this.imagen4_person_generation = settings.imagen4_person_generation;
+
         // Provider settings
         if (settings.provider !== undefined) {
             this.provider = settings.provider;
@@ -81,6 +92,9 @@ if (typeof ImageService === 'undefined') {
         }
         if (settings.openaiApiKey !== undefined) {
             this.openaiApiKey = settings.openaiApiKey;
+    }
+    if (settings.googleApiKey !== undefined) {
+            this.googleApiKey = settings.googleApiKey;
     }
     if (settings.apiBaseUrl !== undefined) {
         this.apiBaseUrl = settings.apiBaseUrl;
@@ -91,11 +105,13 @@ if (typeof ImageService === 'undefined') {
 
     async generateImage(prompt) {
         console.log(`Sending to Image Service (${this.provider}): ${prompt}`);
-        
+
         if (this.provider === 'openai') {
             return await this.generateOpenAIImage(prompt);
         } else if (this.provider === 'swarmui') {
             return await this.generateSwarmUIImage(prompt);
+        } else if (this.provider === 'imagen4') {
+            return await this.generateImagen4Image(prompt);
         } else {
             return await this.generateA1111Image(prompt);
         }
@@ -324,17 +340,17 @@ if (typeof ImageService === 'undefined') {
 
     processSwarmUIResponse(data) {
         console.log('SwarmUI full response:', data);
-        
+
         // SwarmUI returns {images: Array} format
         if (data && data.images && Array.isArray(data.images) && data.images.length > 0) {
             const imagePath = data.images[0];
             console.log('Received image path from SwarmUI:', imagePath);
-            
+
             // SwarmUI returns relative paths that already include the correct path
             // Just prepend the base URL without additional path prefix
             const imageUrl = `${this.apiBaseUrl}/${imagePath}`;
             console.log('Constructed SwarmUI image URL:', imageUrl);
-            
+
             return imageUrl;
         } else if (data && data.error) {
             console.error('SwarmUI returned error:', data.error);
@@ -342,6 +358,72 @@ if (typeof ImageService === 'undefined') {
         } else {
             console.error('No image data received from SwarmUI:', data);
             throw new Error('No image data received from SwarmUI API');
+        }
+    }
+
+    async generateImagen4Image(prompt) {
+        if (!this.googleApiKey) {
+            console.error('Google API key not provided for Imagen 4 image generation');
+            throw new Error('Google API key is required for Imagen 4 image generation');
+        }
+
+        // Use backend proxy to avoid CORS issues (Google API doesn't support direct browser calls)
+        const proxyEndpoint = 'https://mcp-veil.veilstudio.io/api/imagen4/generate';
+
+        try {
+            const payload = {
+                prompt: prompt.trim(),
+                config: {
+                    numberOfImages: 1,
+                    outputMimeType: this.imagen4_output_format || "image/jpeg",
+                    personGeneration: this.imagen4_person_generation || "ALLOW_ADULT",
+                    aspectRatio: this.imagen4_aspect_ratio || "1:1"
+                },
+                apiKey: this.googleApiKey
+            };
+
+            console.log('Imagen 4 generation request:', { prompt: payload.prompt.substring(0, 100) + '...', config: payload.config });
+
+            const response = await fetch(proxyEndpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => response.text());
+                console.error('Imagen 4 API Error Response:', errorData);
+                throw new Error(`Imagen 4 API request failed with status ${response.status}: ${JSON.stringify(errorData)}`);
+            }
+
+            const data = await response.json();
+            console.log('Imagen 4 full response:', data);
+            console.log('Response has predictions?', !!data.predictions);
+            console.log('Predictions length:', data.predictions?.length);
+            console.log('Full response keys:', Object.keys(data));
+
+            // The :predict endpoint returns predictions array with bytesBase64Encoded
+            if (data.predictions && data.predictions.length > 0) {
+                const prediction = data.predictions[0];
+
+                if (prediction.bytesBase64Encoded) {
+                    console.log('Received base64 image data from Imagen 4.');
+                    // Determine the MIME type from the output format setting
+                    const mimeType = this.imagen4_output_format || 'image/jpeg';
+                    return `data:${mimeType};base64,${prediction.bytesBase64Encoded}`;
+                } else {
+                    console.error('No image bytes received from Imagen 4:', data);
+                    throw new Error('No image data received from Imagen 4 API');
+                }
+            } else {
+                console.error('No predictions received from Imagen 4:', data);
+                throw new Error('Invalid response format from Imagen 4 API');
+            }
+        } catch (error) {
+            console.error('Error communicating with Imagen 4 Service:', error);
+            throw error;
         }
     }
 }

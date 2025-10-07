@@ -68,7 +68,12 @@ class DesktopInterface {
             imageSize: 'desktop-image-size',
             openaiQuality: 'desktop-openai-quality',
             openaiOutputFormat: 'desktop-openai-output-format',
-            openaiBackground: 'desktop-openai-background'
+            openaiBackground: 'desktop-openai-background',
+
+            // Imagen 4 Fast Settings
+            imagen4AspectRatio: 'desktop-imagen4-aspect-ratio',
+            imagen4OutputFormat: 'desktop-imagen4-output-format',
+            imagen4PersonGeneration: 'desktop-imagen4-person-generation'
         };
         
         this.init();
@@ -285,13 +290,15 @@ class DesktopInterface {
 
     saveSettingToLocalStorage(settingsKey, element) {
         const value = element.type === 'checkbox' ? element.checked : element.value;
+        console.log(`💾 Saving setting: ${settingsKey} = ${value}`);
         localStorage.setItem(settingsKey, value);
-        
+
         // Update global SETTINGS object if available
         if (window.SETTINGS) {
             window.SETTINGS[settingsKey] = value;
+            console.log(`✅ Updated SETTINGS.${settingsKey} = ${value}`);
         }
-        
+
         // Smart service reinitialization based on element type and setting importance
         if (window.smartServiceReinit && typeof window.smartServiceReinit === 'function') {
             window.smartServiceReinit(settingsKey, element.type);
@@ -425,7 +432,7 @@ class DesktopInterface {
 
     toggleImageProviderSections(provider) {
         // Hide all image provider sections
-        const sections = ['desktop-a1111-settings', 'desktop-swarmui-settings', 'desktop-openai-settings'];
+        const sections = ['desktop-a1111-settings', 'desktop-swarmui-settings', 'desktop-openai-settings', 'desktop-imagen4-settings'];
         sections.forEach(sectionId => {
             const section = document.getElementById(sectionId);
             if (section) {
@@ -441,6 +448,8 @@ class DesktopInterface {
             targetSection = 'desktop-swarmui-settings';
         } else if (provider === 'openai') {
             targetSection = 'desktop-openai-settings';
+        } else if (provider === 'imagen4') {
+            targetSection = 'desktop-imagen4-settings';
         }
 
         if (targetSection) {

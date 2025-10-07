@@ -267,9 +267,10 @@ async function initializeApp() {
         }
     );
     let imageService = new ImageService(
-        SETTINGS.customImageProvider === 'swarmui' ? SETTINGS.swarmuiApiUrl : SETTINGS.customImageApiUrl, 
-        SETTINGS.customImageProvider, 
-        SETTINGS.openaiApiKey
+        SETTINGS.customImageProvider === 'swarmui' ? SETTINGS.swarmuiApiUrl : SETTINGS.customImageApiUrl,
+        SETTINGS.customImageProvider,
+        SETTINGS.openaiApiKey,
+        SETTINGS.googleApiKey
     );
     let voiceService;
     try {
@@ -323,11 +324,12 @@ async function initializeApp() {
         
         if (currentImageApiUrl !== expectedImageApiUrl || 
             imageService.provider !== SETTINGS.customImageProvider) {
-            
+
             imageService = new ImageService(
                 expectedImageApiUrl,
-                SETTINGS.customImageProvider, 
-                SETTINGS.openaiApiKey
+                SETTINGS.customImageProvider,
+                SETTINGS.openaiApiKey,
+                SETTINGS.googleApiKey
             );
             console.log('🔧 ImageService reinitialized with:', {
                 provider: SETTINGS.customImageProvider,
@@ -343,13 +345,13 @@ async function initializeApp() {
             steps: parseInt(SETTINGS.imageSteps) || 20,
             cfg_scale: parseFloat(SETTINGS.imageCfgScale) || 1.4,
             sampler_name: SETTINGS.imageSampler || 'Euler a',
-            
+
             // OpenAI settings
             size: SETTINGS.imageSize || 'auto',
             quality: SETTINGS.openaiQuality || 'auto',
             output_format: SETTINGS.openaiOutputFormat || 'png',
             background: SETTINGS.openaiBackground || 'auto',
-            
+
             // SwarmUI settings - this is the critical part that was missing!
             swarm_width: parseInt(SETTINGS.swarmuiWidth) || 1024,
             swarm_height: parseInt(SETTINGS.swarmuiHeight) || 1024,
@@ -357,7 +359,12 @@ async function initializeApp() {
             swarm_cfg_scale: parseFloat(SETTINGS.swarmuiCfgScale) || 7.5,
             swarm_model: SETTINGS.swarmuiModel || null,
             swarm_sampler: SETTINGS.swarmuiSampler || 'Euler a',
-            
+
+            // Imagen 4 Fast settings
+            imagen4_aspect_ratio: SETTINGS.imagen4AspectRatio || '1:1',
+            imagen4_output_format: SETTINGS.imagen4OutputFormat || 'image/jpeg',
+            imagen4_person_generation: SETTINGS.imagen4PersonGeneration || 'ALLOW_ADULT',
+
             // Provider and API settings
             provider: SETTINGS.customImageProvider,
             openaiApiKey: SETTINGS.openaiApiKey,
@@ -421,7 +428,7 @@ async function initializeApp() {
     // Smart service reinitialization utilities
     const SERVICE_AFFECTING_SETTINGS = {
         // Image Service settings
-        image: ['customImageProvider', 'customImageApiUrl', 'swarmuiApiUrl', 'imageWidth', 'imageHeight', 'imageSteps', 'imageCfgScale', 'imageSampler', 'swarmuiWidth', 'swarmuiHeight', 'swarmuiSteps', 'swarmuiCfgScale', 'swarmuiModel', 'swarmuiSampler', 'imageSize', 'openaiQuality', 'openaiOutputFormat', 'openaiBackground'],
+        image: ['customImageProvider', 'customImageApiUrl', 'swarmuiApiUrl', 'imageWidth', 'imageHeight', 'imageSteps', 'imageCfgScale', 'imageSampler', 'swarmuiWidth', 'swarmuiHeight', 'swarmuiSteps', 'swarmuiCfgScale', 'swarmuiModel', 'swarmuiSampler', 'imageSize', 'openaiQuality', 'openaiOutputFormat', 'openaiBackground', 'imagen4AspectRatio', 'imagen4OutputFormat', 'imagen4PersonGeneration'],
         
         // LLM Service settings
         llm: ['customLlmProvider', 'customLlmApiUrl', 'customLlmModelIdentifier', 'customLlmApiKey', 'openaiModelIdentifier', 'openaiApiKey', 'anthropicModelIdentifier', 'anthropicApiKey', 'googleModelIdentifier', 'googleApiKey'],
@@ -1507,6 +1514,9 @@ Type **"/list"** anytime to see this help again.`;
         swarmuiCfgScale: 'swarmui-cfg-scale',
         swarmuiModel: 'swarmui-model',
         swarmuiSampler: 'swarmui-sampler',
+        imagen4AspectRatio: 'imagen4-aspect-ratio',
+        imagen4OutputFormat: 'imagen4-output-format',
+        imagen4PersonGeneration: 'imagen4-person-generation',
         ttsVoice: 'select-tts-voice',
         voiceSpeed: 'slider-voice-speed',
         voicePitch: 'slider-voice-pitch',
@@ -1717,9 +1727,10 @@ Type **"/list"** anytime to see this help again.`;
         }
         if (imageSettingsChanged) {
             imageService = new ImageService(
-                SETTINGS.customImageProvider === 'swarmui' ? SETTINGS.swarmuiApiUrl : SETTINGS.customImageApiUrl, 
-                SETTINGS.customImageProvider, 
-                SETTINGS.openaiApiKey
+                SETTINGS.customImageProvider === 'swarmui' ? SETTINGS.swarmuiApiUrl : SETTINGS.customImageApiUrl,
+                SETTINGS.customImageProvider,
+                SETTINGS.openaiApiKey,
+                SETTINGS.googleApiKey
             );
         }
         
@@ -1866,22 +1877,26 @@ Type **"/list"** anytime to see this help again.`;
         const a1111Settings = container.querySelector('.a1111-settings');
         const openaiSettings = container.querySelector('.openai-settings');
         const swarmuiSettings = container.querySelector('.swarmui-settings');
+        const imagen4Settings = container.querySelector('.imagen4-settings');
 
         function toggleProviderSettings() {
             if (!imageProviderSelect || !a1111Settings || !openaiSettings || !swarmuiSettings) return;
-            
+
             const provider = imageProviderSelect.value;
 
             // Hide all settings first
             a1111Settings.style.display = 'none';
             openaiSettings.style.display = 'none';
             swarmuiSettings.style.display = 'none';
+            if (imagen4Settings) imagen4Settings.style.display = 'none';
 
             // Show the selected provider's settings
             if (provider === 'openai') {
                 openaiSettings.style.display = 'block';
             } else if (provider === 'swarmui') {
                 swarmuiSettings.style.display = 'block';
+            } else if (provider === 'imagen4') {
+                if (imagen4Settings) imagen4Settings.style.display = 'block';
             } else { // a1111
                 a1111Settings.style.display = 'block';
             }

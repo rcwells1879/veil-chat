@@ -69,20 +69,9 @@
                 <div class="setting-item">
                     <label for="openai-model-identifier">OpenAI Model</label>
                     <select id="openai-model-identifier">
-                        <option value="gpt-4.1">GPT-4.1</option>
-                        <option value="gpt-4.1-mini">GPT-4.1 Mini</option>
-                        <option value="gpt-4.1-nano">GPT-4.1 Nano</option>
-                        <option value="gpt-4o">GPT-4o</option>
-                        <option value="gpt-4o-mini">GPT-4o Mini</option>
                         <option value="gpt-5">GPT-5</option>
                         <option value="gpt-5-mini">GPT-5 Mini</option>
                         <option value="gpt-5-nano">GPT-5 Nano</option>
-                        <option value="o1">o1</option>
-                        <option value="o1-mini">o1-mini</option>
-                        <option value="o3">o3</option>
-                        <option value="o3-mini">o3-mini</option>
-                        <option value="o3-pro">o3-pro</option>
-                        <option value="o4-mini">o4-mini</option>
                     </select>
                 </div>
                 <div class="setting-item">
@@ -335,6 +324,7 @@
                         <option value="a1111">Local A1111</option>
                         <option value="swarmui">SwarmUI</option>
                         <option value="openai">OpenAI (GPT-image-1)</option>
+                        <option value="imagen4">Google Imagen 4 Fast</option>
                     </select>
                 </div>
 
@@ -446,6 +436,34 @@
                             <option value="auto" selected>Auto</option>
                             <option value="opaque">Opaque</option>
                             <option value="transparent">Transparent</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Imagen 4 Fast-specific settings -->
+                <div class="imagen4-settings" style="display: none;">
+                    <div class="setting-item">
+                        <label for="imagen4-aspect-ratio">Aspect Ratio</label>
+                        <select id="imagen4-aspect-ratio">
+                            <option value="1:1" selected>1:1 (1024x1024)</option>
+                            <option value="3:4">3:4 (896x1280)</option>
+                            <option value="4:3">4:3 (1280x896)</option>
+                            <option value="9:16">9:16 (768x1408)</option>
+                            <option value="16:9">16:9 (1408x768)</option>
+                        </select>
+                    </div>
+                    <div class="setting-item">
+                        <label for="imagen4-output-format">Output Format</label>
+                        <select id="imagen4-output-format">
+                            <option value="image/jpeg" selected>JPEG</option>
+                            <option value="image/png">PNG</option>
+                        </select>
+                    </div>
+                    <div class="setting-item">
+                        <label for="imagen4-person-generation">Person Generation</label>
+                        <select id="imagen4-person-generation">
+                            <option value="ALLOW_ADULT" selected>Allow Adult</option>
+                            <option value="DONT_ALLOW">Don't Allow</option>
                         </select>
                     </div>
                 </div>

@@ -532,6 +532,77 @@ class MCPHTTPServer {
             }
         });
 
+        // Imagen 4 Fast proxy endpoint (required due to CORS restrictions)
+        this.app.post('/api/imagen4/generate', async (req, res) => {
+            try {
+                const { prompt, config, apiKey } = req.body;
+
+                if (!apiKey) {
+                    return res.status(400).json({ error: 'Google API key is required' });
+                }
+
+                if (!prompt) {
+                    return res.status(400).json({ error: 'Prompt is required' });
+                }
+
+                const imagen4Endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-fast-generate-001:predict';
+
+                const payload = {
+                    instances: [
+                        {
+                            prompt: prompt.trim()
+                        }
+                    ],
+                    parameters: {
+                        sampleCount: config?.numberOfImages || 1,
+                        aspectRatio: config?.aspectRatio || "1:1",
+                        personGeneration: config?.personGeneration || "ALLOW_ADULT",
+                        outputMimeType: config?.outputMimeType || "image/jpeg"
+                    }
+                };
+
+                console.log('Proxying Imagen 4 request with payload:', JSON.stringify(payload, null, 2));
+
+                const response = await fetch(imagen4Endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-goog-api-key': apiKey
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                console.log('Imagen 4 API response status:', response.status);
+
+                const responseText = await response.text();
+                console.log('Imagen 4 API raw response:', responseText.substring(0, 500));
+
+                let data;
+                try {
+                    data = JSON.parse(responseText);
+                } catch (parseError) {
+                    console.error('Failed to parse Imagen 4 response as JSON:', parseError);
+                    return res.status(500).json({
+                        error: 'Invalid JSON response from Imagen 4 API',
+                        rawResponse: responseText.substring(0, 500)
+                    });
+                }
+
+                if (!response.ok) {
+                    console.error('Imagen 4 API Error:', data);
+                    return res.status(response.status).json({
+                        error: 'Imagen 4 API error',
+                        details: data
+                    });
+                }
+
+                res.json(data);
+            } catch (error) {
+                console.error('Imagen 4 proxy error:', error);
+                res.status(500).json({ error: error.message });
+            }
+        });
+
         // Serve the main chat interface
         this.app.get('/', (req, res) => {
             res.sendFile('index.html', { root: '.' });

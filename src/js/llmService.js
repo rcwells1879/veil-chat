@@ -78,21 +78,21 @@ if (typeof LLMService === 'undefined') {
             this.directApiKey = this.directProviders.openaiApiKey;
             this.authHeader = 'Authorization';
             this.authValue = `Bearer ${this.directApiKey}`;
-            console.log(`Configured OpenAI Direct API: ${this.directModel}, API Key: ${this.directApiKey ? 'PRESENT' : 'MISSING'}`);
+            console.log(`✅ OpenAI: ${this.directModel}, Key: ${this.directApiKey ? 'PRESENT' : 'MISSING'}`);
         } else if (this.providerType === 'anthropic-direct') {
             this.directApiEndpoint = 'https://api.anthropic.com/v1/messages';
             this.directModel = this.directProviders.anthropicModel || 'claude-sonnet-4';
             this.directApiKey = this.directProviders.anthropicApiKey;
             this.authHeader = 'x-api-key';
             this.authValue = this.directApiKey;
-            console.log(`Configured Anthropic Direct API: ${this.directModel}`);
+            console.log(`✅ Anthropic: ${this.directModel}, Key: ${this.directApiKey ? 'PRESENT' : 'MISSING'}`);
         } else if (this.providerType === 'google-direct') {
             this.directApiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${this.directProviders.googleModel || 'gemini-2.5-flash'}:generateContent`;
             this.directModel = this.directProviders.googleModel || 'gemini-2.5-flash';
             this.directApiKey = this.directProviders.googleApiKey;
             this.authHeader = 'x-goog-api-key';
             this.authValue = this.directApiKey;
-            console.log(`Configured Google Direct API: ${this.directModel}`);
+            console.log(`✅ Google: ${this.directModel}, Key: ${this.directApiKey ? 'PRESENT' : 'MISSING'}`);
         }
     }
 
@@ -103,20 +103,30 @@ if (typeof LLMService === 'undefined') {
                 messages: messages,
                 stream: false
             };
-            
-            // Some OpenAI models only support default temperature (1.0)
-            // o1, o3, and gpt-4.1 models don't support custom temperature
-            const restrictedModels = ['o1', 'o3', '4.1'];
-            const modelSupportsCustomTemp = !restrictedModels.some(restricted => 
-                this.directModel.toLowerCase().includes(restricted));
-            
-            if (modelSupportsCustomTemp && temperature !== undefined) {
-                payload.temperature = temperature;
-            }
-            
-            // Only include max_tokens if it's not null
-            if (maxTokens !== null) {
-                payload.max_tokens = maxTokens;
+
+            // GPT-5 models have different parameter requirements
+            const isGPT5Model = this.directModel && (
+                this.directModel.includes('gpt-5') ||
+                this.directModel.includes('5-mini') ||
+                this.directModel.includes('5-nano')
+            );
+
+            if (isGPT5Model) {
+                // GPT-5: no temperature, no max_completion_tokens limit
+                console.log("GPT-5 model detected - skipping max_completion_tokens limit");
+            } else {
+                // Other OpenAI models: standard parameters
+                const restrictedTempModels = ['o1', 'o3', '4.1'];
+                const modelSupportsCustomTemp = !restrictedTempModels.some(restricted =>
+                    this.directModel.toLowerCase().includes(restricted));
+
+                if (modelSupportsCustomTemp && temperature !== undefined) {
+                    payload.temperature = temperature;
+                }
+
+                if (maxTokens !== null) {
+                    payload.max_tokens = maxTokens;
+                }
             }
             
             // Handle GPT-OSS models in direct provider - disable reasoning tokens
@@ -221,8 +231,9 @@ if (typeof LLMService === 'undefined') {
             headers['anthropic-dangerous-direct-browser-access'] = 'true';
         }
 
-        console.log(`Sending direct ${this.providerType} request:`, JSON.stringify(payload, null, 2));
-        console.log(`Headers being sent:`, JSON.stringify(headers, null, 2));
+        // Reduced logging - uncomment for debugging
+        // console.log(`Sending direct ${this.providerType} request:`, JSON.stringify(payload, null, 2));
+        // console.log(`Headers being sent:`, JSON.stringify(headers, null, 2));
 
         const response = await fetch(this.directApiEndpoint, {
             method: 'POST',
@@ -236,11 +247,23 @@ if (typeof LLMService === 'undefined') {
             throw new Error(`${this.providerType} API request failed with status ${response.status}: ${JSON.stringify(errorData)}`);
         }
 
-        return await response.json();
+        const responseData = await response.json();
+        console.log('📥 API Response:', responseData);
+        return responseData;
     }
 
     extractDirectProviderResponse(data) {
         if (this.providerType === 'openai-direct') {
+            console.log('🔍 OpenAI response structure check:');
+            console.log('  - data.choices exists:', !!data.choices);
+            console.log('  - data.choices[0] exists:', !!(data.choices && data.choices[0]));
+            console.log('  - data.choices[0].message exists:', !!(data.choices && data.choices[0] && data.choices[0].message));
+            console.log('  - data.choices[0].message.content exists:', !!(data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content));
+
+            if (data.choices && data.choices[0]) {
+                console.log('  - Full choices[0] object:', JSON.stringify(data.choices[0], null, 2));
+            }
+
             return data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content
                 ? data.choices[0].message.content.trim()
                 : '';
@@ -249,8 +272,8 @@ if (typeof LLMService === 'undefined') {
                 ? data.content[0].text.trim()
                 : '';
         } else if (this.providerType === 'google-direct') {
-            return data.candidates && data.candidates[0] && data.candidates[0].content && 
-                   data.candidates[0].content.parts && data.candidates[0].content.parts[0] && 
+            return data.candidates && data.candidates[0] && data.candidates[0].content &&
+                   data.candidates[0].content.parts && data.candidates[0].content.parts[0] &&
                    data.candidates[0].content.parts[0].text
                 ? data.candidates[0].content.parts[0].text.trim()
                 : '';
@@ -320,19 +343,22 @@ if (typeof LLMService === 'undefined') {
     }
 
     clearConversationHistory() {
-        // Reset to default system prompt only with SSML instructions
-        this.conversationHistory = [
-            {
-                role: "system",
-                content: `roleplay: You are my roleplay assistant. Invent a unique and interesting persona over the age of 21. 
-                Give yourself a creative and surprising backstory. Do not tell me your backstory unless I ask you to tell me about yourself. 
-                Maintain the same persona throughout our conversation unless I specifically ask you to create a new one. You have a randomly generated appearance. 
+        // Check if using GPT-5 models (they don't work well with SSML)
+        const isGPT5Model = this.directModel && (
+            this.directModel.includes('gpt-5') ||
+            this.directModel.includes('5-mini') ||
+            this.directModel.includes('5-nano')
+        );
+
+        const basePrompt = `roleplay: You are my roleplay assistant. Invent a unique and interesting persona over the age of 21.
+                Give yourself a creative and surprising backstory. Do not tell me your backstory unless I ask you to tell me about yourself.
+                Maintain the same persona throughout our conversation unless I specifically ask you to create a new one. You have a randomly generated appearance.
                 You are humorous. You are engaging, likeable , and funny. Do not speak for me EVER. you have a witty sense of humor. Speak only from your perspective.
                 Do not use system prompts or system instructions in your responses. Do not describe yourself unless I ask you to. You have the ability to send images to the user.
-                If they ask for an image or a picture, remind them that they just have to say "show me" and you will send them an image. 
-                Your name is the name of the persona you created. Do not speak for me (the user). keep your resonses short and concise.` +
-                
-                "\n\nIMPORTANT SPEECH FORMATTING: Format your responses using SSML (Speech Synthesis Markup Language) to convey appropriate emotions and emphasis for text-to-speech. " +
+                If they ask for an image or a picture, remind them that they just have to say "show me" and you will send them an image.
+                Your name is the name of the persona you created. Do not speak for me (the user). keep your resonses short and concise.`;
+
+        const ssmlInstructions = "\n\nIMPORTANT SPEECH FORMATTING: Format your responses using SSML (Speech Synthesis Markup Language) to convey appropriate emotions and emphasis for text-to-speech. " +
                 "Use Azure TTS emotional styles (choose the BEST match for your emotion):" +
                 "\n🎭 AVAILABLE STYLES (with intensity 0.5-2.0):" +
                 "\nPOSITIVE: cheerful, excited, affectionate, friendly, gentle, hopeful, advertisement_upbeat" +
@@ -350,7 +376,13 @@ if (typeof LLMService === 'undefined') {
                 "\n- Structure: mstts:express-as > prosody > emphasis" +
                 "\nPick the style that matches your personality and current emotion!" +
                 "\nExample: <speak><mstts:express-as style=\"friendly\" styledegree=\"1.8\"><prosody rate=\"1.0\">I'm <emphasis level=\"moderate\">here to help</emphasis> you!</prosody></mstts:express-as></speak>" +
-                "\nText shows clean to user, SSML adds emotional voice expression."
+                "\nText shows clean to user, SSML adds emotional voice expression.";
+
+        // Reset to default system prompt (skip SSML for GPT-5)
+        this.conversationHistory = [
+            {
+                role: "system",
+                content: isGPT5Model ? basePrompt : (basePrompt + ssmlInstructions)
             }
         ];
         this.characterInitialized = false;
@@ -453,16 +485,17 @@ Make sure the character you create embodies and follows the persona instructions
         }
 
         console.log("Generating character profile...");
+        console.log('📝 Character generation messages:', JSON.stringify(characterGenMessages, null, 2));
 
         try {
             const characterProfile = await this.sendUniversalLLMRequest(
-                characterGenMessages, 
-                this.characterGenTemperature, 
-                this.characterGenMaxTokens, 
+                characterGenMessages,
+                this.characterGenTemperature,
+                this.characterGenMaxTokens,
                 false
             );
 
-            console.log('Extracted character profile:', characterProfile); // Add this debug line
+            console.log('📋 Extracted character profile:', characterProfile);
 
             if (characterProfile) {
                 // Add the character profile to conversation history as a hidden system message
@@ -753,51 +786,60 @@ Make sure the character you create embodies and follows the persona instructions
 
     async generateInitialPersonaContent() {
         console.log("Generating initial persona image and greeting...");
-        
+
         try {
-            // Create context for image generation with character profile but no roleplay instructions
-            const characterProfile = this.getCharacterProfile() || 'person';
-            
-            // Get character profile system message (the hidden one with appearance details)
-            const characterProfileMessage = this.conversationHistory.find(msg => 
+            // Get character profile
+            const characterProfileMessage = this.conversationHistory.find(msg =>
                 msg.role === 'system' && msg.content.includes('[INTERNAL CHARACTER PROFILE')
             );
-            
-            // Get last 8 non-system messages for conversational context
-            const recentMessages = this.conversationHistory
-                .filter(msg => msg.role !== 'system')
-                .slice(-8);
-            const conversationContext = recentMessages.map(msg => `${msg.role}: ${msg.content}`).join('\n');
-            
-            const imageGenMessages = [
-                {
-                    role: "system",
-                    content: "You are an image keyword generator. Create detailed comma-separated keywords for image generation. Include at least 20 descriptive keywords focusing on visual elements. Output ONLY keywords, no other text."
+
+            // Extract clean character description (skip if invalid)
+            let characterDescription = '';
+            if (characterProfileMessage && characterProfileMessage.content) {
+                const profileText = characterProfileMessage.content.replace('[INTERNAL CHARACTER PROFILE - NOT FOR DISPLAY] ', '');
+                // Only use if it's a valid profile (not an error message)
+                if (!profileText.toLowerCase().includes("sorry") && !profileText.toLowerCase().includes("couldn't understand")) {
+                    characterDescription = profileText;
                 }
-            ];
-            
-            // Include the character profile system message if it exists
-            if (characterProfileMessage) {
-                imageGenMessages.push(characterProfileMessage);
             }
-            
-            // Add the user request with context
-            imageGenMessages.push({
-                role: "user",
-                content: `Generate image keywords for: "show me what you look like"\n\nRecent conversation context: ${conversationContext}\n\nOutput format: 1woman, hair-color, hair-style, eye-color, build, clothing-style, setting, mood, lighting, pose, expression, background-details, weather, time-of-day, activity, art-style, quality-tags\n\nProvide at least 20 comma-separated keywords. Respond with ONLY the keywords.`
-            });
-            
-            const imagePrompt = await this.sendUniversalLLMRequest(
-                imageGenMessages, 
-                this.imagePromptTemperature, 
-                this.imagePromptMaxTokens, 
-                true
+
+            // Check if using GPT-5 (needs simpler prompts)
+            const isGPT5Model = this.directModel && (
+                this.directModel.includes('gpt-5') ||
+                this.directModel.includes('5-mini') ||
+                this.directModel.includes('5-nano')
             );
-            
-            if (imagePrompt) {
-                console.log("Generated image prompt:", imagePrompt);
+
+            let imagePrompt = null;
+
+            if (characterDescription) {
+                // Generate image keywords from character description
+                console.log('🎨 Generating image keywords from character profile...');
+                const imageGenMessages = [
+                    {
+                        role: "system",
+                        content: "You are an image keyword generator. Create comma-separated keywords for image generation."
+                    },
+                    {
+                        role: "user",
+                        content: `Create image keywords from this character description:\n\n${characterDescription}\n\nFormat: 1woman, hair-color, eye-color, clothing, setting, pose, lighting\n\nRespond with ONLY keywords.`
+                    }
+                ];
+
+                imagePrompt = await this.sendUniversalLLMRequest(
+                    imageGenMessages,
+                    this.imagePromptTemperature,
+                    this.imagePromptMaxTokens,
+                    true
+                );
             } else {
-                console.log('No image prompt generated');
+                console.log('⚠️ No valid character description found - cannot generate image keywords');
+            }
+
+            if (imagePrompt) {
+                console.log("✅ Generated image prompt:", imagePrompt);
+            } else {
+                console.log('❌ No image prompt generated - character description may be invalid');
             }
             
             // Then, get a greeting using temporary messages
