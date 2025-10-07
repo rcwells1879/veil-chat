@@ -539,7 +539,7 @@ class DesktopInterface {
                             source: 'desktop-persona-creation'
                         });
                         
-                        this.showNotification('⚠️ Your persona description contains potentially unsafe content and was blocked for security reasons. Please rephrase your persona.');
+                        this.showNotification('Your persona description contains potentially unsafe content and was blocked for security reasons. Please rephrase your persona.');
                         return; // Block the persona creation
                     }
                     
@@ -798,7 +798,7 @@ class DesktopInterface {
                             source: 'desktop-interface'
                         });
                         
-                        this.showNotification('⚠️ Your message contains potentially unsafe content and was blocked for security reasons. Please rephrase your request.');
+                        this.showNotification('Your message contains potentially unsafe content and was blocked for security reasons. Please rephrase your request.');
                         return; // Block the message from being sent
                     }
                     
