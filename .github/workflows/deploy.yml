@@ -58,14 +58,24 @@ jobs:
           ls -la deploy/css/desktop-styles.css 2>/dev/null && echo "✅ desktop-styles.css found" || echo "❌ desktop-styles.css missing"  
           ls -la deploy/js/desktopInterface.js 2>/dev/null && echo "✅ desktopInterface.js found" || echo "❌ desktopInterface.js missing"
 
+      - name: 🔍 Debug FTP Configuration
+        run: |
+          echo "FTP Server: ${{ secrets.FTP_SERVER }}"
+          echo "FTP Username: ${{ secrets.FTP_USERNAME }}"
+          echo "Server directory: ./public_html/veilchat/"
+          echo "Local directory contents:"
+          ls -la ./deploy/ | head -20
+
       - name: 📂 Deploy to FTP server
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftp
+          port: 21
           local-dir: ./deploy/
-          server-dir: ./public_html/veilchat/
+          server-dir: /public_html/veilchat/
           dry-run: false
           log-level: verbose
           exclude: |
