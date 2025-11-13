@@ -299,6 +299,7 @@ function isExternalAPI(request) {
     request.url.includes('speech.microsoft.com') ||
     request.url.includes('litellm') ||
     request.url.includes('swarmui-veil.veilstudio.io') ||
+    request.url.includes('mcp-veil.veilstudio.io') ||
     request.url.includes('localhost:3001') ||
     request.url.includes('localhost:7860')
   );
