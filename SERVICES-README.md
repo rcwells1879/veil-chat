@@ -43,7 +43,16 @@ The `manage-veil-services.sh` script provides easy control:
 ✅ **Auto-start is already enabled!**
 
 The services will automatically start when you log in to macOS. This is managed by launchd using the configuration file:
-- `~/Library/LaunchAgents/com.veilstudio.veilchat.plist`
+- [~/Library/LaunchAgents/com.veilstudio.veilchat.plist](~/Library/LaunchAgents/com.veilstudio.veilchat.plist)
+
+### Network Availability Checks
+
+The startup script includes intelligent network checking to handle system restarts:
+- **Waits for network connectivity** before starting services (up to 60 seconds)
+- **Retries health checks** if services don't respond immediately
+- **Logs all attempts** for troubleshooting
+
+This ensures the Cloudflare tunnel can connect properly even when starting immediately after login.
 
 ### What Runs at Startup
 
