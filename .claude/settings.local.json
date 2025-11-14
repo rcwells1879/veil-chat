@@ -33,7 +33,10 @@
       "WebFetch(domain:simonwillison.net)",
       "WebFetch(domain:lmstudio.ai)",
       "WebFetch(domain:developers.cloudflare.com)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(/opt/homebrew/bin/cloudflared tunnel token:*)",
+      "Bash(launchctl unload:*)",
+      "Bash(launchctl load:*)"
     ],
     "deny": []
   },

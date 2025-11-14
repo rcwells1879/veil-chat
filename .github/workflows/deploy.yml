@@ -75,7 +75,7 @@ jobs:
           protocol: ftp
           port: 21
           local-dir: ./deploy/
-          server-dir: /public_html/veilchat/
+          server-dir: ./public_html/veilchat/
           dry-run: false
           log-level: verbose
           exclude: |
