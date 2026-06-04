@@ -1,101 +1,43 @@
-name: 🚀 Deploy VeilChat to Production
+name: Build VeilChat
 
 on:
   push:
     branches:
-      - main  # Deploy when pushing to main branch
-  workflow_dispatch:  # Allow manual deployment
+      - main
+  workflow_dispatch:
 
 jobs:
-  deploy:
-    name: 🎉 Deploy to Namecheap FTP
+  build:
     runs-on: ubuntu-latest
-    
+
     steps:
-      - name: 🚚 Get latest code
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: 🔧 Setup Node.js
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18'
           cache: 'npm'
 
-      - name: 📦 Install dependencies
+      - name: Install dependencies
         run: npm ci
 
-      - name: 🏗️ Build application
+      - name: Build application
         run: npm run build
 
-      - name: 🧹 Prepare deployment files
+      - name: Validate static files
         run: |
-          # Create deployment directory
-          mkdir -p deploy
-          
-          # Copy contents of src/ directly to deploy/ (not the src folder itself)
-          cp -r src/* deploy/
-          
-          # Remove server-side files from deployment
-          rm -rf deploy/server/ 2>/dev/null || echo "No server directory to remove"
-          
-          # Copy root level files if they exist
-          cp index.html deploy/ 2>/dev/null || echo "No root index.html found"
-          cp manifest.json deploy/ 2>/dev/null || echo "No manifest.json found"
-          cp test.html deploy/ 2>/dev/null || echo "No test.html found"
-          
-          # Update service worker with build timestamp for automatic cache versioning
-          BUILD_TIME=$(date +%s)
-          sed -i "s/const CACHE_VERSION = Date\.now();/const CACHE_VERSION = '${BUILD_TIME}';/" deploy/service-worker.js
-          echo "✅ Updated service worker cache version to: ${BUILD_TIME}"
-          
-          # List what will be deployed
-          echo "📁 Files prepared for deployment:"
-          find deploy -type f | head -20
-          
-          # Debug: Show specific files we expect
-          echo "🔍 Checking for key files:"
-          ls -la deploy/index.html 2>/dev/null && echo "✅ index.html found" || echo "❌ index.html missing"
-          ls -la deploy/css/desktop-styles.css 2>/dev/null && echo "✅ desktop-styles.css found" || echo "❌ desktop-styles.css missing"  
-          ls -la deploy/js/desktopInterface.js 2>/dev/null && echo "✅ desktopInterface.js found" || echo "❌ desktopInterface.js missing"
+          test -f src/index.html
+          test -f src/service-worker.js
+          test -d src/js
+          test -d src/css
 
-      - name: 🔍 Debug FTP Configuration
-        run: |
-          echo "FTP Server: ${{ secrets.FTP_SERVER }}"
-          echo "FTP Username: ${{ secrets.FTP_USERNAME }}"
-          echo "Server directory: ./public_html/veilchat/"
-          echo "Local directory contents:"
-          ls -la ./deploy/ | head -20
-
-      - name: 📂 Deploy to FTP server
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+      - name: Trigger VeilStudio Cloudflare Pages deployment
+        if: github.event_name == 'push'
+        uses: peter-evans/repository-dispatch@v3
         with:
-          server: ${{ secrets.FTP_SERVER }}
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          protocol: ftp
-          port: 21
-          local-dir: ./deploy/
-          server-dir: ./public_html/veilchat/
-          dry-run: false
-          log-level: verbose
-          exclude: |
-            **/node_modules/**
-            **/server/**
-            **/.git/**
-            **/.github/**
-            **/test/**
-            **/tests/**
-            **/*.test.js
-            **/*.spec.js
-            **/package*.json
-            **/CLAUDE*.md
-            **/claude-startup.sh
-            **/lmstudio-proxy.js
-            **/.env*
-            **/.*
-
-      - name: ✅ Deployment complete
-        run: |
-          echo "🎉 VeilChat has been successfully deployed!"
-          echo "🌐 Your application is available at: https://veilstudio.io/veilchat"
-          echo "📝 Remember to hard refresh (Ctrl+Shift+R) to see changes"
+          token: ${{ secrets.VEILSTUDIO_DISPATCH_TOKEN }}
+          repository: rcwells1879/VeilStudio
+          event-type: veilchat-updated
+          client-payload: '{"source_repo":"veil-chat","source_sha":"${{ github.sha }}","source_ref":"${{ github.ref_name }}"}'
