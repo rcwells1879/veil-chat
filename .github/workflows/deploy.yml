@@ -17,7 +17,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20.19.0'
           cache: 'npm'
 
       - name: Install dependencies
@@ -28,10 +28,12 @@ jobs:
 
       - name: Validate static files
         run: |
-          test -f src/index.html
-          test -f src/service-worker.js
-          test -d src/js
-          test -d src/css
+          test -f dist/index.html
+          test -f dist/service-worker.js
+          test -f dist/manifest.json
+          test -d dist/assets
+          test -d dist/js
+          test -d dist/icons
 
       - name: Trigger VeilStudio Cloudflare Pages deployment
         if: github.event_name == 'push'

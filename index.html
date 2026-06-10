@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>VeilChat - Creative AI Chat</title>
+    <meta
+      name="description"
+      content="A refined AI chat interface with persona creation, voice, image generation, documents, and enhanced reasoning."
+    />
+    <meta name="theme-color" content="#101611" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="VeilChat" />
+    <link rel="manifest" href="manifest.json" />
+    <link rel="icon" type="image/png" sizes="16x16" href="icons/icon-16x16.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32x32.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png" />
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+    <script src="https://aka.ms/csspeech/jsbrowserpackageraw"></script>
+
+    <script src="js/securityValidator.js"></script>
+    <script src="js/offlineManager.js"></script>
+    <script src="js/contextservice.js"></script>
+    <script src="js/imageService.js"></script>
+    <script src="js/ssmlProcessor.js"></script>
+    <script src="js/llmService.js"></script>
+    <script src="js/azureTTSService.js"></script>
+    <script src="js/azureSTTService.js"></script>
+    <script src="js/voiceService.js"></script>
+    <script src="js/mcpClient.js"></script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

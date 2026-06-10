@@ -2,33 +2,46 @@
   "name": "llm-chat-interface",
   "version": "1.0.0",
   "description": "A web-based chat interface with AI capabilities, voice interaction, image generation, and enhanced reasoning through Model Context Protocol (MCP) integration.",
-  "main": "src/js/main.js",
+  "main": "src/main.tsx",
   "type": "module",
   "scripts": {
-    "start": "live-server src",
+    "start": "vite --host 127.0.0.1",
     "start:both": "node src/server/start-servers.js",
     "start:http": "node src/server/mcp-http-server.js",
     "start:mcp": "node src/server/mcp-server.js",
-    "dev": "live-server src --port=8080",
+    "dev": "vite --host 127.0.0.1",
     "dev:http": "node --watch src/server/mcp-http-server.js",
     "dev:mcp": "node --watch src/server/mcp-server.js",
-    "build": "echo 'Build step can be added here'"
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@fontsource/cormorant-garamond": "^5.2.11",
     "@modelcontextprotocol/sdk": "^0.4.0",
     "@mozilla/readability": "^0.6.0",
+    "@vitejs/plugin-react": "^6.0.2",
     "axios": "^1.9.0",
     "cheerio": "^1.1.0",
     "cors": "^2.8.5",
     "express": "^4.18.2",
     "http-proxy": "^1.18.1",
     "jsdom": "^26.1.0",
+    "lucide-react": "^1.17.0",
+    "marked": "^18.0.5",
+    "motion": "^12.40.0",
     "node-fetch": "^3.3.2",
     "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
-    "turndown": "^7.2.0"
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "turndown": "^7.2.0",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.16"
   },
   "devDependencies": {
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
     "live-server": "^1.2.0"
   },
   "keywords": [
@@ -45,6 +58,6 @@
   "author": "Your Name",
   "license": "MIT",
   "engines": {
-    "node": ">=18.0.0"
+    "node": "^20.19.0 || >=22.12.0"
   }
 }
