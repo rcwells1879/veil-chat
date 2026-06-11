@@ -66,10 +66,141 @@ export const KIE_IMAGE_MODELS = [
   { group: "Qwen", value: "qwen/image-edit", label: "Qwen Edit" },
   { group: "Qwen", value: "qwen2/text-to-image", label: "Qwen2 Text" },
   { group: "Qwen", value: "qwen2/image-edit", label: "Qwen2 Edit" },
-  { group: "Wan", value: "wan/2-7-image", label: "Wan 2.7 Image" },
-  { group: "Wan", value: "wan/2-7-image-pro", label: "Wan 2.7 Image Pro" },
+  { group: "Wan", value: "wan/2-7-image", label: "Wan 2.7 Image (Gen/Edit)" },
+  { group: "Wan", value: "wan/2-7-image-pro", label: "Wan 2.7 Image Pro (Gen/Edit)" },
   { group: "Z", value: "z-image", label: "Z-Image" },
 ] as const;
+
+export type SelectOption = { value: string; label: string };
+
+export interface KieImageModelControls {
+  aspectRatios: readonly SelectOption[];
+  qualities: readonly SelectOption[];
+  resolutions: readonly SelectOption[];
+  outputs: readonly SelectOption[];
+  defaults: {
+    aspectRatio?: string;
+    quality?: string;
+    resolution?: string;
+    outputFormat?: string;
+  };
+}
+
+const STANDARD_ASPECT_RATIOS = [
+  { value: "1:1", label: "1:1" },
+  { value: "16:9", label: "16:9" },
+  { value: "9:16", label: "9:16" },
+  { value: "4:3", label: "4:3" },
+  { value: "3:4", label: "3:4" },
+  { value: "3:2", label: "3:2" },
+  { value: "2:3", label: "2:3" },
+  { value: "auto", label: "Auto" },
+] as const;
+
+const WAN_ASPECT_RATIOS = [
+  { value: "1:1", label: "1:1" },
+  { value: "3:4", label: "3:4" },
+  { value: "4:3", label: "4:3" },
+  { value: "1:8", label: "1:8" },
+  { value: "8:1", label: "8:1" },
+  { value: "9:16", label: "9:16" },
+  { value: "16:9", label: "16:9" },
+  { value: "21:9", label: "21:9" },
+] as const;
+
+const KIE_RESOLUTIONS = [
+  { value: "1K", label: "1K" },
+  { value: "2K", label: "2K" },
+  { value: "4K", label: "4K" },
+] as const;
+
+const WAN_RESOLUTIONS = [
+  { value: "1K", label: "1K" },
+  { value: "2K", label: "2K" },
+] as const;
+
+const KIE_OUTPUTS = [
+  { value: "png", label: "PNG" },
+  { value: "jpg", label: "JPG" },
+] as const;
+
+const EMPTY_OPTIONS: readonly SelectOption[] = [];
+
+const ASPECT_RATIO_MODELS = new Set([
+  "seedream/4.5-text-to-image",
+  "seedream/4.5-edit",
+  "seedream/5-lite-text-to-image",
+  "seedream/5-lite-image-to-image",
+  "nano-banana-2",
+  "google/imagen4-fast",
+  "google/imagen4",
+  "google/imagen4-ultra",
+  "google/nano-banana",
+  "google/nano-banana-edit",
+  "nano-banana-pro",
+  "flux-2/pro-text-to-image",
+  "flux-2/pro-image-to-image",
+  "flux-2/flex-text-to-image",
+  "flux-2/flex-image-to-image",
+  "grok-imagine/text-to-image",
+  "gpt-image/1.5-text-to-image",
+  "gpt-image/1.5-image-to-image",
+  "gpt-image-2-text-to-image",
+  "gpt-image-2-image-to-image",
+  "z-image",
+]);
+
+const RESOLUTION_MODELS = new Set([
+  "bytedance/seedream-v4-text-to-image",
+  "bytedance/seedream-v4-edit",
+  "nano-banana-2",
+  "nano-banana-pro",
+  "flux-2/pro-text-to-image",
+  "flux-2/pro-image-to-image",
+  "flux-2/flex-text-to-image",
+  "flux-2/flex-image-to-image",
+  "gpt-image-2-text-to-image",
+  "gpt-image-2-image-to-image",
+]);
+
+const OUTPUT_MODELS = new Set([
+  "nano-banana-2",
+  "google/nano-banana",
+  "google/nano-banana-edit",
+  "nano-banana-pro",
+  "qwen/text-to-image",
+  "qwen/image-to-image",
+  "qwen/image-edit",
+  "qwen2/text-to-image",
+  "qwen2/image-edit",
+]);
+
+export function getKieImageModelControls(model: string): KieImageModelControls {
+  if (model === "wan/2-7-image" || model === "wan/2-7-image-pro") {
+    return {
+      aspectRatios: WAN_ASPECT_RATIOS,
+      qualities: EMPTY_OPTIONS,
+      resolutions: model === "wan/2-7-image-pro" ? KIE_RESOLUTIONS : WAN_RESOLUTIONS,
+      outputs: EMPTY_OPTIONS,
+      defaults: {
+        aspectRatio: "1:1",
+        resolution: "2K",
+      },
+    };
+  }
+
+  return {
+    aspectRatios: ASPECT_RATIO_MODELS.has(model) ? STANDARD_ASPECT_RATIOS : EMPTY_OPTIONS,
+    qualities: EMPTY_OPTIONS,
+    resolutions: RESOLUTION_MODELS.has(model) ? KIE_RESOLUTIONS : EMPTY_OPTIONS,
+    outputs: OUTPUT_MODELS.has(model) ? KIE_OUTPUTS : EMPTY_OPTIONS,
+    defaults: {
+      aspectRatio: "1:1",
+      resolution: "1K",
+      outputFormat: "png",
+    },
+  };
+}
 
 export interface AppSettings {
   customLlmProvider: LlmProvider;

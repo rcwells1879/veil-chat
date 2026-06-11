@@ -8,7 +8,22 @@ type KieConfig = {
   imageSizeDefault?: string;
   qualityDefault?: string;
   qualityValues?: string[];
+  aspectRatioDefault?: string;
+  aspectRatioValues?: string[];
+  resolutionDefault?: string;
+  resolutionValues?: string[];
+  seedDefault?: number;
 };
+
+type GeneratedImageReference = {
+  url: string;
+  prompt: string;
+  provider: ImageProvider;
+  createdAt: string;
+  kieUrl?: string;
+};
+
+const LAST_GENERATED_IMAGE_KEY = "veilchatLastGeneratedImage";
 
 const KIE_IMAGE_CONFIGS: Record<string, KieConfig> = {
   "bytedance/seedream": { fields: ["prompt", "image_size", "guidance_scale", "seed"], imageSizeDefault: "regular" },
@@ -46,8 +61,8 @@ const KIE_IMAGE_CONFIGS: Record<string, KieConfig> = {
   "qwen/image-edit": { fields: ["prompt", "image_url", "acceleration", "image_size", "num_inference_steps", "seed", "guidance_scale", "sync_mode", "num_images", "enable_safety_checker", "output_format", "negative_prompt"], imageField: "image_url", imageSizeDefault: "square_hd" },
   "qwen2/text-to-image": { fields: ["prompt", "image_size", "seed", "output_format", "nsfw_checker"], imageSizeDefault: "square_hd" },
   "qwen2/image-edit": { fields: ["prompt", "image_url", "image_size", "seed", "output_format", "nsfw_checker"], imageField: "image_url", imageSizeDefault: "square_hd" },
-  "wan/2-7-image": { fields: ["prompt", "input_urls", "aspect_ratio", "enable_sequential", "resolution", "thinking_mode", "color_palette"], imageField: "input_urls", optionalImage: true },
-  "wan/2-7-image-pro": { fields: ["prompt", "input_urls", "aspect_ratio", "enable_sequential", "resolution", "thinking_mode", "color_palette"], imageField: "input_urls", optionalImage: true },
+  "wan/2-7-image": { fields: ["prompt", "input_urls", "aspect_ratio", "enable_sequential", "n", "resolution", "thinking_mode", "watermark", "seed", "nsfw_checker", "bbox_list", "color_palette"], imageField: "input_urls", optionalImage: true, aspectRatioDefault: "1:1", aspectRatioValues: ["1:1", "3:4", "4:3", "1:8", "8:1", "9:16", "16:9", "21:9"], resolutionDefault: "2K", resolutionValues: ["1K", "2K"], seedDefault: 0 },
+  "wan/2-7-image-pro": { fields: ["prompt", "input_urls", "aspect_ratio", "enable_sequential", "n", "resolution", "thinking_mode", "watermark", "seed", "nsfw_checker", "bbox_list", "color_palette"], imageField: "input_urls", optionalImage: true, aspectRatioDefault: "1:1", aspectRatioValues: ["1:1", "3:4", "4:3", "1:8", "8:1", "9:16", "16:9", "21:9"], resolutionDefault: "2K", resolutionValues: ["1K", "2K", "4K"], seedDefault: 0 },
   "z-image": { fields: ["prompt", "aspect_ratio", "nsfw_checker"] },
 };
 
@@ -56,9 +71,11 @@ export class ImageService {
   private swarmSessionId: string | null = null;
   private swarmSessionExpiry: number | null = null;
   private kieReferenceImageUrls: string[] = [];
+  private lastGeneratedImage: GeneratedImageReference | null = null;
 
   constructor(settings: AppSettings) {
     this.settings = settings;
+    this.lastGeneratedImage = this.loadLastGeneratedImage();
   }
 
   updateSettings(settings: AppSettings) {
@@ -66,11 +83,13 @@ export class ImageService {
   }
 
   getReferenceImageCount() {
-    return this.kieReferenceImageUrls.length;
+    return this.kieReferenceImageUrls.length + (this.lastGeneratedImage ? 1 : 0);
   }
 
   clearReferenceImages() {
     this.kieReferenceImageUrls = [];
+    this.lastGeneratedImage = null;
+    sessionStorage.removeItem(LAST_GENERATED_IMAGE_KEY);
   }
 
   async attachReferenceImages(files: File[]) {
@@ -81,28 +100,8 @@ export class ImageService {
       if (!file.type.startsWith("image/")) continue;
       if (file.size > 10 * 1024 * 1024) throw new Error(`${file.name} is larger than Kie's 10MB image limit.`);
 
-      const base64Data = await this.readFileAsDataUrl(file);
-      const response = await fetch("https://api.kie.ai/api/file-base64-upload", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${this.settings.kieApiKey}`,
-        },
-        body: JSON.stringify({
-          base64Data,
-          uploadPath: "images/veilchat",
-          fileName: file.name,
-        }),
-      });
-
-      const data = await this.readJsonOrText(response);
-      if (!response.ok || data.success === false) {
-        throw new Error(data.msg || `Kie upload failed with status ${response.status}`);
-      }
-
-      const downloadUrl = data.data?.downloadUrl;
-      if (!downloadUrl) throw new Error("Kie upload did not return a download URL.");
-      uploadedUrls.push(downloadUrl);
+      const base64Data = await this.readBlobAsDataUrl(file, file.name);
+      uploadedUrls.push(await this.uploadBase64Reference(base64Data, file.name));
     }
 
     this.kieReferenceImageUrls.push(...uploadedUrls);
@@ -110,17 +109,25 @@ export class ImageService {
   }
 
   async generateImage(prompt: string): Promise<string | null> {
+    const provider = this.settings.customImageProvider;
+    let imageUrl: string | null = null;
     switch (this.settings.customImageProvider) {
       case "openai":
-        return this.generateOpenAIImage(prompt);
+        imageUrl = await this.generateOpenAIImage(prompt);
+        break;
       case "swarmui":
-        return this.generateSwarmUIImage(prompt);
+        imageUrl = await this.generateSwarmUIImage(prompt);
+        break;
       case "kie":
-        return this.generateKieImage(prompt);
+        imageUrl = await this.generateKieImage(prompt);
+        break;
       case "a1111":
       default:
-        return this.generateA1111Image(prompt);
+        imageUrl = await this.generateA1111Image(prompt);
+        break;
     }
+    if (imageUrl) this.recordGeneratedImage(imageUrl, prompt, provider);
+    return imageUrl;
   }
 
   private apiBaseUrl(provider: ImageProvider = this.settings.customImageProvider) {
@@ -264,6 +271,7 @@ export class ImageService {
 
     const model = this.settings.kieImageModelIdentifier || "gpt-image/1.5-text-to-image";
     const config = KIE_IMAGE_CONFIGS[model] ?? KIE_IMAGE_CONFIGS["gpt-image/1.5-text-to-image"];
+    const input = await this.createKieImageInput(prompt, config);
     const response = await fetch("https://api.kie.ai/api/v1/jobs/createTask", {
       method: "POST",
       headers: {
@@ -272,7 +280,7 @@ export class ImageService {
       },
       body: JSON.stringify({
         model,
-        input: this.createKieImageInput(prompt, config),
+        input,
       }),
     });
 
@@ -289,18 +297,18 @@ export class ImageService {
     return imageUrl;
   }
 
-  private createKieImageInput(prompt: string, config: KieConfig) {
+  private async createKieImageInput(prompt: string, config: KieConfig) {
     const fields = new Set(config.fields);
     const input: Record<string, unknown> = { prompt: prompt.trim() };
-    this.applyKieImageSources(input, config);
+    await this.applyKieImageSources(input, config);
 
-    if (fields.has("aspect_ratio")) input.aspect_ratio = this.settings.kieImageAspectRatio || "1:1";
+    if (fields.has("aspect_ratio")) input.aspect_ratio = this.pickAllowedSetting(this.settings.kieImageAspectRatio, config.aspectRatioValues, config.aspectRatioDefault ?? "1:1");
     if (fields.has("quality")) {
       const requested = this.settings.kieImageQuality || config.qualityDefault;
       input.quality = config.qualityValues?.length && requested ? (config.qualityValues.includes(requested) ? requested : config.qualityDefault) : requested;
     }
-    if (fields.has("resolution")) input.resolution = this.settings.kieImageResolution || "1K";
-    if (fields.has("image_resolution")) input.image_resolution = this.settings.kieImageResolution || "1K";
+    if (fields.has("resolution")) input.resolution = this.pickAllowedSetting(this.settings.kieImageResolution, config.resolutionValues, config.resolutionDefault ?? "1K");
+    if (fields.has("image_resolution")) input.image_resolution = this.pickAllowedSetting(this.settings.kieImageResolution, config.resolutionValues, config.resolutionDefault ?? "1K");
     if (fields.has("output_format")) input.output_format = this.settings.kieImageOutputFormat || "png";
     if (fields.has("image_size") && config.imageSizeDefault) input.image_size = config.imageSizeDefault;
     if (fields.has("nsfw_checker")) input.nsfw_checker = !this.settings.veilChatAfterDark;
@@ -310,27 +318,179 @@ export class ImageService {
     if (fields.has("style")) input.style = "AUTO";
     if (fields.has("num_images")) input.num_images = 1;
     if (fields.has("max_images")) input.max_images = 1;
+    if (fields.has("n")) input.n = 1;
     if (fields.has("enable_pro")) input.enable_pro = false;
     if (fields.has("enable_sequential")) input.enable_sequential = false;
     if (fields.has("thinking_mode")) input.thinking_mode = false;
+    if (fields.has("watermark")) input.watermark = false;
     if (fields.has("strength")) input.strength = 0.8;
     if (fields.has("negative_prompt")) input.negative_prompt = this.createNegativePrompt();
-    if (fields.has("seed")) input.seed = -1;
+    if (fields.has("seed")) input.seed = config.seedDefault ?? -1;
     return input;
   }
 
-  private applyKieImageSources(input: Record<string, unknown>, config: KieConfig) {
-    if (config.imageField && !this.kieReferenceImageUrls.length && !config.optionalImage) {
-      throw new Error("Attach an image before using this Kie image-editing model.");
-    }
-    if (!config.imageField || !this.kieReferenceImageUrls.length) return;
+  private pickAllowedSetting(value: string, allowedValues: string[] | undefined, fallback: string) {
+    const normalized = value.trim() || fallback;
+    if (!allowedValues?.length) return normalized;
+    return allowedValues.includes(normalized) ? normalized : fallback;
+  }
 
-    if (config.imageField === "image_url") input.image_url = this.kieReferenceImageUrls[0];
-    else input[config.imageField] = this.kieReferenceImageUrls;
+  private async applyKieImageSources(input: Record<string, unknown>, config: KieConfig) {
+    if (!config.imageField) return;
 
-    if (config.extraImageField && this.kieReferenceImageUrls.length > 1) {
-      input[config.extraImageField] = this.kieReferenceImageUrls.slice(1);
+    const sourceUrls = await this.getKieImageSourceUrls();
+    if (!sourceUrls.length) {
+      if (!config.optionalImage) {
+        throw new Error("Generate an image first or attach an image before using this Kie image-editing model.");
+      }
+      return;
     }
+
+    if (config.imageField === "image_url") input.image_url = sourceUrls[0];
+    else input[config.imageField] = sourceUrls;
+
+    if (config.extraImageField && sourceUrls.length > 1) {
+      input[config.extraImageField] = sourceUrls.slice(1);
+    }
+  }
+
+  private async getKieImageSourceUrls() {
+    const urls: string[] = [];
+    const generatedUrl = await this.getLastGeneratedKieReferenceUrl();
+    if (generatedUrl) urls.push(generatedUrl);
+
+    for (const url of this.kieReferenceImageUrls) {
+      if (!urls.includes(url)) urls.push(url);
+    }
+    return urls;
+  }
+
+  private async getLastGeneratedKieReferenceUrl() {
+    if (!this.lastGeneratedImage) return null;
+    if (this.lastGeneratedImage.kieUrl) return this.lastGeneratedImage.kieUrl;
+
+    const url = this.lastGeneratedImage.url;
+    if (this.isExternallyReachableImageUrl(url)) {
+      this.lastGeneratedImage.kieUrl = url;
+      this.saveLastGeneratedImage();
+      return url;
+    }
+
+    try {
+      const dataUrl = await this.resolveImageUrlToDataUrl(url);
+      const extension = this.extensionFromDataUrl(dataUrl);
+      const kieUrl = await this.uploadBase64Reference(dataUrl, `last-generated-${Date.now()}.${extension}`);
+      this.lastGeneratedImage.kieUrl = kieUrl;
+      this.saveLastGeneratedImage();
+      return kieUrl;
+    } catch (error) {
+      throw new Error(`Could not prepare the previous generated image for Kie editing: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  private recordGeneratedImage(url: string, prompt: string, provider: ImageProvider) {
+    this.lastGeneratedImage = {
+      url,
+      prompt: prompt.trim(),
+      provider,
+      createdAt: new Date().toISOString(),
+      kieUrl: this.isExternallyReachableImageUrl(url) ? url : undefined,
+    };
+    this.saveLastGeneratedImage();
+  }
+
+  private loadLastGeneratedImage() {
+    try {
+      const raw = sessionStorage.getItem(LAST_GENERATED_IMAGE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as Partial<GeneratedImageReference>;
+      if (!parsed.url || !this.isExternallyReachableImageUrl(parsed.url)) return null;
+      const provider = parsed.provider === "a1111" || parsed.provider === "swarmui" || parsed.provider === "openai" || parsed.provider === "kie" ? parsed.provider : "kie";
+      return {
+        url: parsed.url,
+        prompt: parsed.prompt ?? "",
+        provider,
+        createdAt: parsed.createdAt ?? new Date().toISOString(),
+        kieUrl: parsed.kieUrl && this.isExternallyReachableImageUrl(parsed.kieUrl) ? parsed.kieUrl : parsed.url,
+      };
+    } catch {
+      sessionStorage.removeItem(LAST_GENERATED_IMAGE_KEY);
+      return null;
+    }
+  }
+
+  private saveLastGeneratedImage() {
+    if (!this.lastGeneratedImage) {
+      sessionStorage.removeItem(LAST_GENERATED_IMAGE_KEY);
+      return;
+    }
+    const persistedUrl = this.isExternallyReachableImageUrl(this.lastGeneratedImage.url)
+      ? this.lastGeneratedImage.url
+      : this.lastGeneratedImage.kieUrl;
+    if (!persistedUrl || !this.isExternallyReachableImageUrl(persistedUrl)) {
+      sessionStorage.removeItem(LAST_GENERATED_IMAGE_KEY);
+      return;
+    }
+    sessionStorage.setItem(
+      LAST_GENERATED_IMAGE_KEY,
+      JSON.stringify({
+        ...this.lastGeneratedImage,
+        url: persistedUrl,
+        kieUrl: persistedUrl,
+      })
+    );
+  }
+
+  private isExternallyReachableImageUrl(url: string) {
+    try {
+      const parsed = new URL(url);
+      if (!["http:", "https:"].includes(parsed.protocol)) return false;
+      return !this.isLocalOrPrivateHost(parsed.hostname);
+    } catch {
+      return false;
+    }
+  }
+
+  private isLocalOrPrivateHost(hostname: string) {
+    const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
+    if (host === "localhost" || host === "::1" || host === "0.0.0.0") return true;
+    if (host.startsWith("127.") || host.startsWith("10.") || host.startsWith("192.168.")) return true;
+    const parts = host.split(".").map((part) => Number(part));
+    return parts.length === 4 && parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31;
+  }
+
+  private async resolveImageUrlToDataUrl(url: string) {
+    if (url.startsWith("data:image/")) return url;
+
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`image fetch failed with status ${response.status}`);
+    const blob = await response.blob();
+    if (!blob.type.startsWith("image/")) throw new Error("the previous result is not an image response");
+    return this.readBlobAsDataUrl(blob, "previous generated image");
+  }
+
+  private async uploadBase64Reference(base64Data: string, fileName: string) {
+    const response = await fetch("https://api.kie.ai/api/file-base64-upload", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${this.settings.kieApiKey}`,
+      },
+      body: JSON.stringify({
+        base64Data,
+        uploadPath: "images/veilchat",
+        fileName,
+      }),
+    });
+
+    const data = await this.readJsonOrText(response);
+    if (!response.ok || data.success === false) {
+      throw new Error(data.msg || `Kie upload failed with status ${response.status}`);
+    }
+
+    const downloadUrl = data.data?.downloadUrl;
+    if (!downloadUrl) throw new Error("Kie upload did not return a download URL.");
+    return downloadUrl;
   }
 
   private async pollKieTask(taskId: string) {
@@ -395,13 +555,20 @@ export class ImageService {
     return data.url || data.imageUrl || parsed.url || parsed.imageUrl || null;
   }
 
-  private readFileAsDataUrl(file: File) {
+  private readBlobAsDataUrl(blob: Blob, label: string) {
     return new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(String(reader.result));
-      reader.onerror = () => reject(new Error(`Could not read ${file.name}`));
-      reader.readAsDataURL(file);
+      reader.onerror = () => reject(new Error(`Could not read ${label}`));
+      reader.readAsDataURL(blob);
     });
+  }
+
+  private extensionFromDataUrl(dataUrl: string) {
+    const mime = dataUrl.match(/^data:image\/([a-z0-9.+-]+);/i)?.[1]?.toLowerCase();
+    if (mime === "jpeg" || mime === "pjpeg") return "jpg";
+    if (mime === "svg+xml") return "svg";
+    return mime || "png";
   }
 
   private async readJsonOrText(response: Response) {

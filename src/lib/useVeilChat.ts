@@ -208,6 +208,7 @@ export function useVeilChat() {
           setBusy("image");
           addMessage(createTextMessage("assistant", "Composing image..."), false);
           const imageUrl = await image.generateImage(imageValidation.sanitizedInput);
+          setImageReferencesCount(image.getReferenceImageCount());
           addMessage(imageUrl ? createImageMessage("assistant", imageUrl, prompt) : createTextMessage("assistant", "Image generation returned no image."), false);
           return;
         }
@@ -227,6 +228,7 @@ export function useVeilChat() {
         if (response.type === "image_request") {
           setBusy("image");
           const imageUrl = await image.generateImage(response.prompt);
+          setImageReferencesCount(image.getReferenceImageCount());
           addMessage(imageUrl ? createImageMessage("assistant", imageUrl, "Generated image") : createTextMessage("assistant", "I could not generate the image this time."), false);
         } else {
           addMessage(createTextMessage("assistant", displayResponseContent(response)), response.type === "text");
@@ -358,6 +360,7 @@ export function useVeilChat() {
         if (initial.imagePrompt && imageRef.current) {
           try {
             const imageUrl = await imageRef.current.generateImage(initial.imagePrompt);
+            setImageReferencesCount(imageRef.current.getReferenceImageCount());
             if (imageUrl) addMessage(createImageMessage("assistant", imageUrl, "Persona appearance"), false);
           } catch (error) {
             addMessage(createTextMessage("system", `Persona image generation failed: ${error instanceof Error ? error.message : String(error)}`), false);

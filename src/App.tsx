@@ -27,7 +27,7 @@ import {
 import { type ChangeEvent, type FormEvent, type ReactNode, useLayoutEffect, useRef, useState } from "react";
 
 import { cleanAssistantText, markdownToHtml, type ChatMessage } from "./lib/format";
-import { KIE_CHAT_MODELS, KIE_IMAGE_MODELS, type AppSettings } from "./lib/settings";
+import { getKieImageModelControls, KIE_CHAT_MODELS, KIE_IMAGE_MODELS, type AppSettings, type SelectOption } from "./lib/settings";
 import { useVeilChat } from "./lib/useVeilChat";
 import "@fontsource/cormorant-garamond/500-italic.css";
 import "./styles.css";
@@ -578,46 +578,7 @@ function SettingsView({ settings, onChange }: { settings: AppSettings; onChange:
           </>
         )}
         {settings.customImageProvider === "kie" && (
-          <>
-            <Field label="Kie image model">
-              <GroupedSelect value={settings.kieImageModelIdentifier} groups={KIE_IMAGE_MODELS} onChange={(value) => onChange("kieImageModelIdentifier", value)} />
-            </Field>
-            <Field label="Kie key">
-              <input type="password" value={settings.kieApiKey} onChange={(event) => onChange("kieApiKey", event.target.value)} />
-            </Field>
-            <Field label="Aspect">
-              <select value={settings.kieImageAspectRatio} onChange={(event) => onChange("kieImageAspectRatio", event.target.value)}>
-                <option value="1:1">1:1</option>
-                <option value="16:9">16:9</option>
-                <option value="9:16">9:16</option>
-                <option value="4:3">4:3</option>
-                <option value="3:4">3:4</option>
-                <option value="3:2">3:2</option>
-                <option value="2:3">2:3</option>
-                <option value="auto">Auto</option>
-              </select>
-            </Field>
-            <Field label="Quality">
-              <select value={settings.kieImageQuality} onChange={(event) => onChange("kieImageQuality", event.target.value)}>
-                <option value="basic">Basic</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-              </select>
-            </Field>
-            <Field label="Resolution">
-              <select value={settings.kieImageResolution} onChange={(event) => onChange("kieImageResolution", event.target.value)}>
-                <option value="1K">1K</option>
-                <option value="2K">2K</option>
-                <option value="4K">4K</option>
-              </select>
-            </Field>
-            <Field label="Output">
-              <select value={settings.kieImageOutputFormat} onChange={(event) => onChange("kieImageOutputFormat", event.target.value)}>
-                <option value="png">PNG</option>
-                <option value="jpg">JPG</option>
-              </select>
-            </Field>
-          </>
+          <KieImageSettings settings={settings} onChange={onChange} />
         )}
       </SettingsSection>
 
@@ -669,6 +630,89 @@ function SettingsView({ settings, onChange }: { settings: AppSettings; onChange:
       </SettingsSection>
     </div>
   );
+}
+
+function KieImageSettings({ settings, onChange }: { settings: AppSettings; onChange: <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => void }) {
+  const controls = getKieImageModelControls(settings.kieImageModelIdentifier);
+
+  const updateModel = (value: string) => {
+    const nextControls = getKieImageModelControls(value);
+    onChange("kieImageModelIdentifier", value);
+    syncSelectSetting("kieImageAspectRatio", settings.kieImageAspectRatio, nextControls.aspectRatios, nextControls.defaults.aspectRatio);
+    syncSelectSetting("kieImageQuality", settings.kieImageQuality, nextControls.qualities, nextControls.defaults.quality);
+    syncSelectSetting("kieImageResolution", settings.kieImageResolution, nextControls.resolutions, nextControls.defaults.resolution);
+    syncSelectSetting("kieImageOutputFormat", settings.kieImageOutputFormat, nextControls.outputs, nextControls.defaults.outputFormat);
+  };
+
+  const syncSelectSetting = <K extends "kieImageAspectRatio" | "kieImageQuality" | "kieImageResolution" | "kieImageOutputFormat">(
+    key: K,
+    currentValue: AppSettings[K],
+    options: readonly SelectOption[],
+    fallback?: string
+  ) => {
+    if (!options.length || options.some((option) => option.value === currentValue)) return;
+    onChange(key, (fallback ?? options[0].value) as AppSettings[K]);
+  };
+
+  return (
+    <>
+      <Field label="Kie image model">
+        <GroupedSelect value={settings.kieImageModelIdentifier} groups={KIE_IMAGE_MODELS} onChange={updateModel} />
+      </Field>
+      <Field label="Kie key">
+        <input type="password" value={settings.kieApiKey} onChange={(event) => onChange("kieApiKey", event.target.value)} />
+      </Field>
+      {controls.aspectRatios.length > 0 && (
+        <Field label="Aspect">
+          <select value={selectSettingValue(settings.kieImageAspectRatio, controls.aspectRatios, controls.defaults.aspectRatio)} onChange={(event) => onChange("kieImageAspectRatio", event.target.value)}>
+            {controls.aspectRatios.map((option) => (
+              <option value={option.value} key={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </Field>
+      )}
+      {controls.qualities.length > 1 && (
+        <Field label="Quality">
+          <select value={selectSettingValue(settings.kieImageQuality, controls.qualities, controls.defaults.quality)} onChange={(event) => onChange("kieImageQuality", event.target.value)}>
+            {controls.qualities.map((option) => (
+              <option value={option.value} key={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </Field>
+      )}
+      {controls.resolutions.length > 0 && (
+        <Field label="Resolution">
+          <select value={selectSettingValue(settings.kieImageResolution, controls.resolutions, controls.defaults.resolution)} onChange={(event) => onChange("kieImageResolution", event.target.value)}>
+            {controls.resolutions.map((option) => (
+              <option value={option.value} key={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </Field>
+      )}
+      {controls.outputs.length > 0 && (
+        <Field label="Output">
+          <select value={selectSettingValue(settings.kieImageOutputFormat, controls.outputs, controls.defaults.outputFormat)} onChange={(event) => onChange("kieImageOutputFormat", event.target.value)}>
+            {controls.outputs.map((option) => (
+              <option value={option.value} key={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </Field>
+      )}
+    </>
+  );
+}
+
+function selectSettingValue(value: string, options: readonly SelectOption[], fallback?: string) {
+  if (options.some((option) => option.value === value)) return value;
+  return fallback ?? options[0]?.value ?? value;
 }
 
 function A1111Settings({ settings, onChange }: { settings: AppSettings; onChange: <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => void }) {
