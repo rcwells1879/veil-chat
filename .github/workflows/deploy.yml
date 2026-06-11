@@ -32,7 +32,8 @@ jobs:
           test -f dist/service-worker.js
           test -f dist/manifest.json
           test -d dist/assets
-          test -d dist/js
+          test -n "$(find dist/assets -maxdepth 1 -name '*.js' -print -quit)"
+          test -n "$(find dist/assets -maxdepth 1 -name '*.css' -print -quit)"
           test -d dist/icons
 
       - name: Trigger VeilStudio Cloudflare Pages deployment
