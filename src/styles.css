@@ -421,6 +421,8 @@ button {
 .composer {
   width: min(960px, calc(100% - 10px));
   margin: 0 auto;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .chat-layout.is-empty .composer {
@@ -455,6 +457,8 @@ button {
   display: flex;
   align-items: flex-end;
   gap: 8px;
+  width: 100%;
+  min-width: 0;
   padding: 10px 10px 10px 12px;
   border: 1px solid rgba(232, 240, 226, 0.18);
   border-radius: 8px;
@@ -487,6 +491,7 @@ button {
 .composer-actions {
   display: flex;
   align-items: center;
+  flex: 0 0 auto;
   gap: 2px;
 }
 
@@ -788,7 +793,7 @@ button {
   height: 54px;
   padding: 0 16px;
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
   cursor: pointer;
@@ -813,6 +818,7 @@ button {
 
 .field {
   display: grid;
+  min-width: 0;
   gap: 7px;
   color: var(--muted);
   font-size: 13px;
@@ -822,6 +828,7 @@ button {
 .field select {
   height: 42px;
   font-size: 14px;
+  text-overflow: ellipsis;
 }
 
 .field input[type="range"] {
@@ -844,6 +851,7 @@ button {
   align-items: center;
   min-width: 0;
   gap: 8px;
+  overflow-wrap: anywhere;
 }
 
 .age-gate-icon {
@@ -1085,24 +1093,24 @@ button {
   }
 
   .message-stream {
-    padding: 28px 18px 132px;
+    padding: 24px clamp(12px, 4vw, 18px) 132px;
   }
 
   .message-item.from-user,
   .message-item.from-assistant,
   .message-item.from-system {
-    width: min(760px, 88%);
+    width: min(760px, 100%);
     max-width: 100%;
     align-self: center;
   }
 
   .message-item.from-user {
-    transform: translateX(clamp(12px, 4vw, 34px));
+    transform: none;
   }
 
   .message-item.from-assistant,
   .message-item.from-system {
-    transform: translateX(calc(clamp(12px, 4vw, 34px) * -1));
+    transform: none;
   }
 
   .chat-layout.is-empty .composer {
@@ -1110,16 +1118,19 @@ button {
   }
 
   .chat-layout:not(.is-empty) .composer {
-    bottom: 14px;
-    width: min(760px, calc(100% - 24px));
+    bottom: max(12px, env(safe-area-inset-bottom));
+    width: min(760px, calc(100% - 20px));
   }
 
   .composer {
-    width: 100%;
+    width: min(100%, 760px);
   }
 
   .composer-box {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: flex-end;
+    gap: 6px;
   }
 
   .composer-actions {
@@ -1137,7 +1148,7 @@ button {
   }
 
   .panel-view {
-    padding: 10px;
+    padding: 12px;
     overflow-y: auto;
   }
 
@@ -1147,15 +1158,40 @@ button {
   }
 
   .panel-content {
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
     padding: 16px;
+  }
+
+  .settings-section summary {
+    min-height: 54px;
+    height: auto;
+    padding-block: 12px;
+  }
+
+  .settings-fields {
+    padding-inline: 14px;
+  }
+
+  .toggle-field {
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 }
 
 @media (max-width: 560px) {
   .empty-experience {
-    gap: 18px;
-    padding: 26px 14px 30px;
-    transform: translateY(-3vh);
+    min-height: 100%;
+    align-content: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 18px 12px calc(18px + env(safe-area-inset-bottom));
+    transform: none;
+  }
+
+  .empty-prompt {
+    width: 100%;
+    max-width: 360px;
   }
 
   .empty-prompt h1 {
@@ -1186,16 +1222,16 @@ button {
   .message-item {
     grid-template-columns: 30px minmax(0, 1fr);
     gap: 8px;
-    width: calc(100% - 22px);
+    width: 100%;
   }
 
   .message-item.from-user {
-    transform: translateX(10px);
+    transform: none;
   }
 
   .message-item.from-assistant,
   .message-item.from-system {
-    transform: translateX(-10px);
+    transform: none;
   }
 
   .message-avatar {
@@ -1205,6 +1241,37 @@ button {
 
   .message-body {
     padding: 11px 12px;
+  }
+
+  .panel-view {
+    padding: 8px;
+  }
+
+  .panel-content {
+    padding: 12px;
+  }
+
+  .panel-header {
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+
+  .panel-icon {
+    width: 32px;
+    height: 32px;
+  }
+
+  .panel-header h2 {
+    font-size: clamp(25px, 9vw, 36px);
+  }
+
+  .settings-section summary {
+    padding-inline: 12px;
+  }
+
+  .settings-fields {
+    gap: 10px;
+    padding: 0 12px 12px;
   }
 
   .history-actions {
