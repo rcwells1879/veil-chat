@@ -528,6 +528,7 @@ export function useVeilChat() {
             if (imageUrl) addMessage(createImageMessage("assistant", imageUrl, "Persona appearance"), false);
           } catch (error) {
             console.warn("Persona image generation failed:", error);
+            addMessage(createTextMessage("system", `Persona image generation failed: ${error instanceof Error ? error.message : String(error)}`), false);
           }
         }
         if (initial.greeting) addMessage(createTextMessage("assistant", initial.greeting), true);

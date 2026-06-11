@@ -124,6 +124,45 @@ if (typeof LLMService === 'undefined') {
                 Your name is the name of the persona you created. Keep your responses short and concise. Use plain conversational text.`;
     }
 
+    stripSpeechMarkup(text) {
+        if (typeof text !== 'string') return text;
+        return text
+            .replace(/<\/?(?:speak|voice|prosody|emphasis|break|phoneme|sub|say-as|mstts:express-as)\b[^>]*>/gi, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
+    hasLegacySpeechFormatting(text) {
+        return typeof text === 'string' && /IMPORTANT SPEECH FORMATTING|Speech Synthesis Markup|mstts:express-as|<\/?speak\b/i.test(text);
+    }
+
+    sanitizeConversationHistory(history) {
+        const basePrompt = this.createBaseSystemPrompt();
+        let hasBasePrompt = false;
+
+        const sanitized = history.map((message) => {
+            if (!message || typeof message.content !== 'string') return message;
+            if (message.role === 'system' && this.hasLegacySpeechFormatting(message.content)) {
+                if (/roleplay:/i.test(message.content)) {
+                    hasBasePrompt = true;
+                    return { ...message, content: basePrompt };
+                }
+                return { ...message, content: this.stripSpeechMarkup(message.content) };
+            }
+            if (message.role === 'assistant' && this.hasLegacySpeechFormatting(message.content)) {
+                return { ...message, content: this.stripSpeechMarkup(message.content) };
+            }
+            if (message.role === 'system' && message.content === basePrompt) hasBasePrompt = true;
+            return message;
+        }).filter((message) => message && message.content);
+
+        if (!hasBasePrompt) {
+            sanitized.unshift({ role: 'system', content: basePrompt });
+        }
+
+        return sanitized;
+    }
+
     normalizeKieTextContent(content) {
         if (typeof content === 'string') return content;
         if (Array.isArray(content)) {
@@ -544,8 +583,9 @@ if (typeof LLMService === 'undefined') {
                 const isRecent = (Date.now() - historyData.timestamp) < maxAge;
 
                 if (isRecent && historyData.conversationHistory && Array.isArray(historyData.conversationHistory)) {
-                    this.conversationHistory = historyData.conversationHistory;
+                    this.conversationHistory = this.sanitizeConversationHistory(historyData.conversationHistory);
                     this.characterInitialized = historyData.characterInitialized || false;
+                    this.saveConversationHistory();
                 } else {
                     console.log('Saved conversation history is too old or invalid, starting fresh');
                     this.clearConversationHistory();
@@ -903,7 +943,7 @@ Make sure the character you create embodies and follows the persona instructions
                 : "";
         }
 
-        return response || (isImagePrompt ? "" : "Sorry, I couldn't understand that.");
+        return this.stripSpeechMarkup(response || (isImagePrompt ? "" : "Sorry, I couldn't understand that."));
     }
 
     // Helper function to sanitize payload for logging (removes safety settings)

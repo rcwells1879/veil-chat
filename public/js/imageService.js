@@ -318,23 +318,37 @@ if (typeof ImageService === 'undefined') {
 
     extractKieResultUrl(record) {
         const resultJson = record && record.data && record.data.resultJson;
-        if (!resultJson) return null;
+        if (!resultJson && !(record && record.data)) return null;
 
         let parsed;
         try {
             parsed = typeof resultJson === 'string' ? JSON.parse(resultJson) : resultJson;
         } catch (error) {
+            if (typeof resultJson === 'string' && /^https?:\/\//i.test(resultJson)) {
+                return resultJson;
+            }
             console.warn('Could not parse Kie resultJson:', resultJson, error);
-            return null;
+            parsed = {};
         }
 
+        const data = record && record.data ? record.data : {};
         const candidates = [
+            data.resultUrls,
+            data.result_urls,
+            data.imageUrls,
+            data.images,
+            data.urls,
+            data.files,
+            data.response && data.response.resultUrls,
+            data.response && data.response.imageUrls,
             parsed.resultUrls,
             parsed.result_urls,
             parsed.imageUrls,
             parsed.images,
             parsed.urls,
-            parsed.files
+            parsed.files,
+            parsed.data && parsed.data.resultUrls,
+            parsed.data && parsed.data.imageUrls
         ];
 
         for (const candidate of candidates) {
@@ -345,7 +359,7 @@ if (typeof ImageService === 'undefined') {
             }
         }
 
-        return parsed.url || parsed.imageUrl || null;
+        return data.url || data.imageUrl || parsed.url || parsed.imageUrl || null;
     }
 
     async pollKieTask(taskId) {
@@ -374,9 +388,9 @@ if (typeof ImageService === 'undefined') {
                 throw new Error(data.msg || `Kie task polling failed with status ${response.status}`);
             }
 
-            const state = data && data.data && data.data.state;
-            if (state === 'success') return data;
-            if (['failed', 'fail', 'error'].includes(state)) {
+            const state = String(data && data.data && (data.data.state || data.data.status || data.data.taskStatus) || '').toLowerCase();
+            if (['success', 'succeeded', 'completed', 'complete', 'done'].includes(state)) return data;
+            if (['failed', 'fail', 'error', 'cancelled', 'canceled'].includes(state)) {
                 throw new Error((data.data && (data.data.failMsg || data.data.failCode)) || 'Kie image task failed.');
             }
         }

@@ -39,12 +39,19 @@ export function createImageMessage(role: MessageRole, imageUrl: string, alt = "G
 export function cleanAssistantText(text: string) {
   const source = text.trim();
   if (!source) return source;
-  return stripMarkdownFence(source);
+  return stripSpeechMarkup(stripMarkdownFence(source));
 }
 
 export function stripMarkdownFence(text: string) {
   const match = text.trim().match(/```(?:markdown)?\n?([\s\S]*?)\n?```/i);
   return match ? match[1].trim() : text.trim();
+}
+
+export function stripSpeechMarkup(text: string) {
+  return text
+    .replace(/<\/?(?:speak|voice|prosody|emphasis|break|phoneme|sub|say-as|mstts:express-as)\b[^>]*>/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 export function markdownToHtml(text: string) {
