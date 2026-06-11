@@ -71,6 +71,21 @@ export const KIE_IMAGE_MODELS = [
   { group: "Z", value: "z-image", label: "Z-Image" },
 ] as const;
 
+const KIE_IMAGE_MODEL_ALIASES: Record<string, string> = {
+  "wan-2-7-image": "wan/2-7-image",
+  "wan/2.7-image": "wan/2-7-image",
+  "wan-2.7-image": "wan/2-7-image",
+  "wan/2-7-image-standard": "wan/2-7-image",
+  "wan-2-7-image-pro": "wan/2-7-image-pro",
+  "wan/2.7-image-pro": "wan/2-7-image-pro",
+  "wan-2.7-image-pro": "wan/2-7-image-pro",
+};
+
+export function normalizeKieImageModelIdentifier(model: string) {
+  const trimmed = model.trim();
+  return KIE_IMAGE_MODEL_ALIASES[trimmed.toLowerCase()] ?? trimmed;
+}
+
 export type SelectOption = { value: string; label: string };
 
 export interface KieImageModelControls {
@@ -176,11 +191,13 @@ const OUTPUT_MODELS = new Set([
 ]);
 
 export function getKieImageModelControls(model: string): KieImageModelControls {
-  if (model === "wan/2-7-image" || model === "wan/2-7-image-pro") {
+  const normalizedModel = normalizeKieImageModelIdentifier(model);
+
+  if (normalizedModel === "wan/2-7-image" || normalizedModel === "wan/2-7-image-pro") {
     return {
       aspectRatios: WAN_ASPECT_RATIOS,
       qualities: EMPTY_OPTIONS,
-      resolutions: model === "wan/2-7-image-pro" ? KIE_RESOLUTIONS : WAN_RESOLUTIONS,
+      resolutions: normalizedModel === "wan/2-7-image-pro" ? KIE_RESOLUTIONS : WAN_RESOLUTIONS,
       outputs: EMPTY_OPTIONS,
       defaults: {
         aspectRatio: "1:1",
@@ -190,10 +207,10 @@ export function getKieImageModelControls(model: string): KieImageModelControls {
   }
 
   return {
-    aspectRatios: ASPECT_RATIO_MODELS.has(model) ? STANDARD_ASPECT_RATIOS : EMPTY_OPTIONS,
+    aspectRatios: ASPECT_RATIO_MODELS.has(normalizedModel) ? STANDARD_ASPECT_RATIOS : EMPTY_OPTIONS,
     qualities: EMPTY_OPTIONS,
-    resolutions: RESOLUTION_MODELS.has(model) ? KIE_RESOLUTIONS : EMPTY_OPTIONS,
-    outputs: OUTPUT_MODELS.has(model) ? KIE_OUTPUTS : EMPTY_OPTIONS,
+    resolutions: RESOLUTION_MODELS.has(normalizedModel) ? KIE_RESOLUTIONS : EMPTY_OPTIONS,
+    outputs: OUTPUT_MODELS.has(normalizedModel) ? KIE_OUTPUTS : EMPTY_OPTIONS,
     defaults: {
       aspectRatio: "1:1",
       resolution: "1K",
@@ -353,7 +370,7 @@ export function readSettings(): AppSettings {
     swarmuiCfgScale: getNumber("swarmuiCfgScale", 7.5),
     swarmuiModel: get("swarmuiModel"),
     swarmuiSampler: get("swarmuiSampler", "Euler a"),
-    kieImageModelIdentifier: get("kieImageModelIdentifier", "gpt-image/1.5-text-to-image"),
+    kieImageModelIdentifier: normalizeKieImageModelIdentifier(get("kieImageModelIdentifier", "gpt-image/1.5-text-to-image")),
     kieImageAspectRatio: get("kieImageAspectRatio", "1:1"),
     kieImageQuality: get("kieImageQuality", "medium"),
     kieImageResolution: get("kieImageResolution", "1K"),
@@ -388,7 +405,9 @@ export function persistSettings(settings: AppSettings) {
 export function updateSetting<K extends keyof AppSettings>(settings: AppSettings, key: K, value: AppSettings[K]): AppSettings {
   const next = key === "fontSize"
     ? { ...settings, fontSize: clampNumber(Number(value), 12, 22) }
-    : { ...settings, [key]: value };
+    : key === "kieImageModelIdentifier"
+      ? { ...settings, kieImageModelIdentifier: normalizeKieImageModelIdentifier(String(value)) }
+      : { ...settings, [key]: value };
   persistSettings(next);
   return next;
 }

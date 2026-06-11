@@ -1,4 +1,4 @@
-import type { AppSettings, ImageProvider } from "../settings";
+import { normalizeKieImageModelIdentifier, type AppSettings, type ImageProvider } from "../settings";
 
 type KieConfig = {
   fields: string[];
@@ -12,6 +12,7 @@ type KieConfig = {
   aspectRatioValues?: string[];
   resolutionDefault?: string;
   resolutionValues?: string[];
+  forceNsfwChecker?: boolean;
   seedDefault?: number;
 };
 
@@ -61,8 +62,8 @@ const KIE_IMAGE_CONFIGS: Record<string, KieConfig> = {
   "qwen/image-edit": { fields: ["prompt", "image_url", "acceleration", "image_size", "num_inference_steps", "seed", "guidance_scale", "sync_mode", "num_images", "enable_safety_checker", "output_format", "negative_prompt"], imageField: "image_url", imageSizeDefault: "square_hd" },
   "qwen2/text-to-image": { fields: ["prompt", "image_size", "seed", "output_format", "nsfw_checker"], imageSizeDefault: "square_hd" },
   "qwen2/image-edit": { fields: ["prompt", "image_url", "image_size", "seed", "output_format", "nsfw_checker"], imageField: "image_url", imageSizeDefault: "square_hd" },
-  "wan/2-7-image": { fields: ["prompt", "input_urls", "aspect_ratio", "enable_sequential", "n", "resolution", "thinking_mode", "watermark", "seed", "nsfw_checker", "bbox_list", "color_palette"], imageField: "input_urls", optionalImage: true, aspectRatioDefault: "1:1", aspectRatioValues: ["1:1", "3:4", "4:3", "1:8", "8:1", "9:16", "16:9", "21:9"], resolutionDefault: "2K", resolutionValues: ["1K", "2K"], seedDefault: 0 },
-  "wan/2-7-image-pro": { fields: ["prompt", "input_urls", "aspect_ratio", "enable_sequential", "n", "resolution", "thinking_mode", "watermark", "seed", "nsfw_checker", "bbox_list", "color_palette"], imageField: "input_urls", optionalImage: true, aspectRatioDefault: "1:1", aspectRatioValues: ["1:1", "3:4", "4:3", "1:8", "8:1", "9:16", "16:9", "21:9"], resolutionDefault: "2K", resolutionValues: ["1K", "2K", "4K"], seedDefault: 0 },
+  "wan/2-7-image": { fields: ["prompt", "input_urls", "aspect_ratio", "enable_sequential", "n", "resolution", "thinking_mode", "watermark", "seed", "nsfw_checker", "bbox_list", "color_palette"], imageField: "input_urls", optionalImage: true, aspectRatioDefault: "1:1", aspectRatioValues: ["1:1", "3:4", "4:3", "1:8", "8:1", "9:16", "16:9", "21:9"], resolutionDefault: "2K", resolutionValues: ["1K", "2K"], forceNsfwChecker: true, seedDefault: 0 },
+  "wan/2-7-image-pro": { fields: ["prompt", "input_urls", "aspect_ratio", "enable_sequential", "n", "resolution", "thinking_mode", "watermark", "seed", "nsfw_checker", "bbox_list", "color_palette"], imageField: "input_urls", optionalImage: true, aspectRatioDefault: "1:1", aspectRatioValues: ["1:1", "3:4", "4:3", "1:8", "8:1", "9:16", "16:9", "21:9"], resolutionDefault: "2K", resolutionValues: ["1K", "2K", "4K"], forceNsfwChecker: true, seedDefault: 0 },
   "z-image": { fields: ["prompt", "aspect_ratio", "nsfw_checker"] },
 };
 
@@ -269,7 +270,7 @@ export class ImageService {
       throw new Error("Kie API key is required for Kie image generation.");
     }
 
-    const model = this.settings.kieImageModelIdentifier || "gpt-image/1.5-text-to-image";
+    const model = normalizeKieImageModelIdentifier(this.settings.kieImageModelIdentifier || "gpt-image/1.5-text-to-image");
     const config = KIE_IMAGE_CONFIGS[model] ?? KIE_IMAGE_CONFIGS["gpt-image/1.5-text-to-image"];
     const input = await this.createKieImageInput(prompt, config);
     const response = await fetch("https://api.kie.ai/api/v1/jobs/createTask", {
@@ -311,7 +312,7 @@ export class ImageService {
     if (fields.has("image_resolution")) input.image_resolution = this.pickAllowedSetting(this.settings.kieImageResolution, config.resolutionValues, config.resolutionDefault ?? "1K");
     if (fields.has("output_format")) input.output_format = this.settings.kieImageOutputFormat || "png";
     if (fields.has("image_size") && config.imageSizeDefault) input.image_size = config.imageSizeDefault;
-    if (fields.has("nsfw_checker")) input.nsfw_checker = !this.settings.veilChatAfterDark;
+    if (fields.has("nsfw_checker") || config.forceNsfwChecker) input.nsfw_checker = this.settings.veilChatAfterDark ? false : true;
     if (fields.has("enable_safety_checker")) input.enable_safety_checker = true;
     if (fields.has("rendering_speed")) input.rendering_speed = "BALANCED";
     if (fields.has("expand_prompt")) input.expand_prompt = true;
