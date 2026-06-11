@@ -1,6 +1,6 @@
 import { marked } from "marked";
 
-import type { LegacyLLMMessage } from "../types/legacy";
+import type { LLMMessage } from "./services/types";
 
 export type MessageRole = "user" | "assistant" | "system";
 
@@ -58,7 +58,7 @@ export function markdownToHtml(text: string) {
   return marked.parse(cleanAssistantText(text), { async: false }) as string;
 }
 
-export function historyToMessages(history: LegacyLLMMessage[]): ChatMessage[] {
+export function historyToMessages(history: LLMMessage[]): ChatMessage[] {
   return history
     .filter((message) => message.role !== "system" && !message.hidden && message.content)
     .map((message) => {
@@ -84,9 +84,7 @@ export function keywordsHelp() {
     '- `xx ...` generates an image directly from your prompt.',
     "",
     "**Research and reasoning**",
-    "- `search for ...`, `look up ...`, and `web search ...` use the configured search provider.",
-    "- `research ...`, `investigate ...`, and `find out about ...` can use the MCP research workflow.",
-    "- `break down ...`, `reason through ...`, and `analyze step by step ...` use sequential reasoning when MCP is enabled.",
+    "- `search for ...`, `look up ...`, and `web search ...` use the configured direct search provider.",
     "",
     "**Files and voice**",
     "- Attach documents with the paperclip and ask questions against their content.",

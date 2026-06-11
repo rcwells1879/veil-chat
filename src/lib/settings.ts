@@ -1,6 +1,7 @@
 export type LlmProvider = "litellm" | "lmstudio" | "ollama" | "openai-direct" | "anthropic-direct" | "google-direct" | "kie-direct";
-export type ImageProvider = "a1111" | "swarmui" | "openai" | "imagen4" | "kie";
+export type ImageProvider = "a1111" | "swarmui" | "openai" | "kie";
 export type KieReasoningLevel = "high" | "low" | "off";
+export type SearchProvider = "brave" | "google";
 
 export const KIE_CHAT_MODELS = [
   { group: "GPT", value: "gpt-5-2", label: "GPT 5.2" },
@@ -102,28 +103,22 @@ export interface AppSettings {
   swarmuiCfgScale: number;
   swarmuiModel: string;
   swarmuiSampler: string;
-  imagen4AspectRatio: string;
-  imagen4OutputFormat: string;
-  imagen4PersonGeneration: string;
   kieImageModelIdentifier: string;
   kieImageAspectRatio: string;
   kieImageQuality: string;
   kieImageResolution: string;
   kieImageOutputFormat: string;
+  veilChatAfterDark: boolean;
   ttsVoice: string;
   voiceSpeed: number;
   voicePitch: number;
-  azureApiKey: string;
-  azureRegion: string;
   fontSize: number;
-  mcpEnabled: boolean;
-  mcpServerUrl: string;
   searchEnabled: boolean;
-  searchProvider: string;
-  searchApiKey: string;
+  searchProvider: SearchProvider;
+  braveSearchApiKey: string;
+  googleSearchApiKey: string;
+  googleSearchEngineId: string;
   searchResultsLimit: string;
-  searchAutoSummarize: boolean;
-  searchTimeFilter: string;
   chatBackdropEnabled: boolean;
 }
 
@@ -133,10 +128,23 @@ const SECRET_SETTING_KEYS = new Set([
   "anthropicApiKey",
   "googleApiKey",
   "kieApiKey",
+  "braveSearchApiKey",
+  "googleSearchApiKey",
+]);
+
+const LEGACY_SETTING_KEYS = [
   "azureApiKey",
   "azure-api-key",
+  "azureRegion",
+  "mcpEnabled",
+  "mcpServerUrl",
   "searchApiKey",
-]);
+  "searchAutoSummarize",
+  "searchTimeFilter",
+  "imagen4AspectRatio",
+  "imagen4OutputFormat",
+  "imagen4PersonGeneration",
+];
 
 const get = (key: string, fallback = "") => localStorage.getItem(key) ?? fallback;
 const getSecret = (key: string, fallback = "") => sessionStorage.getItem(key) ?? localStorage.getItem(key) ?? fallback;
@@ -151,8 +159,37 @@ const getBool = (key: string, fallback = false) => {
   const value = localStorage.getItem(key);
   return value === null ? fallback : value === "true";
 };
+const getSearchProvider = () => {
+  const provider = get("searchProvider", "brave");
+  return provider === "google" ? "google" : "brave";
+};
+
+function migrateLegacySettings() {
+  const oldImageProvider = localStorage.getItem("customImageProvider");
+  if (oldImageProvider === "imagen4") {
+    localStorage.setItem("customImageProvider", "kie");
+    if (!localStorage.getItem("kieImageModelIdentifier")) {
+      localStorage.setItem("kieImageModelIdentifier", "google/imagen4-fast");
+    }
+  }
+
+  const legacySearchKey = sessionStorage.getItem("searchApiKey") ?? localStorage.getItem("searchApiKey");
+  if (legacySearchKey) {
+    const targetKey = getSearchProvider() === "google" ? "googleSearchApiKey" : "braveSearchApiKey";
+    if (!sessionStorage.getItem(targetKey) && !localStorage.getItem(targetKey)) {
+      sessionStorage.setItem(targetKey, legacySearchKey);
+    }
+  }
+
+  for (const key of LEGACY_SETTING_KEYS) {
+    localStorage.removeItem(key);
+    sessionStorage.removeItem(key);
+  }
+}
 
 export function readSettings(): AppSettings {
+  migrateLegacySettings();
+
   return {
     customLlmProvider: get("customLlmProvider", "litellm") as LlmProvider,
     customLlmApiUrl: get("customLlmApiUrl").replace(/\/$/, ""),
@@ -185,28 +222,22 @@ export function readSettings(): AppSettings {
     swarmuiCfgScale: getNumber("swarmuiCfgScale", 7.5),
     swarmuiModel: get("swarmuiModel"),
     swarmuiSampler: get("swarmuiSampler", "Euler a"),
-    imagen4AspectRatio: get("imagen4AspectRatio", "1:1"),
-    imagen4OutputFormat: get("imagen4OutputFormat", "image/jpeg"),
-    imagen4PersonGeneration: get("imagen4PersonGeneration", "ALLOW_ADULT"),
     kieImageModelIdentifier: get("kieImageModelIdentifier", "gpt-image/1.5-text-to-image"),
     kieImageAspectRatio: get("kieImageAspectRatio", "1:1"),
     kieImageQuality: get("kieImageQuality", "medium"),
     kieImageResolution: get("kieImageResolution", "1K"),
     kieImageOutputFormat: get("kieImageOutputFormat", "png"),
+    veilChatAfterDark: getBool("veilChatAfterDark"),
     ttsVoice: get("ttsVoice", "Sonia"),
     voiceSpeed: getNumber("voiceSpeed", 1),
     voicePitch: getNumber("voicePitch", 1),
-    azureApiKey: getSecret("azureApiKey") || getSecret("azure-api-key"),
-    azureRegion: get("azureRegion", "eastus"),
     fontSize: clampNumber(getNumber("fontSize", 16), 12, 22),
-    mcpEnabled: getBool("mcpEnabled"),
-    mcpServerUrl: get("mcpServerUrl"),
     searchEnabled: getBool("searchEnabled"),
-    searchProvider: get("searchProvider", "brave"),
-    searchApiKey: getSecret("searchApiKey"),
+    searchProvider: getSearchProvider(),
+    braveSearchApiKey: getSecret("braveSearchApiKey"),
+    googleSearchApiKey: getSecret("googleSearchApiKey"),
+    googleSearchEngineId: get("googleSearchEngineId"),
     searchResultsLimit: get("searchResultsLimit", "10"),
-    searchAutoSummarize: getBool("searchAutoSummarize", true),
-    searchTimeFilter: get("searchTimeFilter", "any"),
     chatBackdropEnabled: getBool("chatBackdropEnabled", true),
   };
 }
@@ -221,17 +252,6 @@ export function persistSettings(settings: AppSettings) {
     }
     localStorage.setItem(key, String(value));
   });
-  if (settings.azureApiKey) sessionStorage.setItem("azure-api-key", settings.azureApiKey);
-  else sessionStorage.removeItem("azure-api-key");
-  localStorage.removeItem("azure-api-key");
-  exposeSettings(settings);
-}
-
-export function exposeSettings(settings: AppSettings) {
-  window.SETTINGS = Object.fromEntries(Object.entries(settings).map(([key, value]) => [
-    key,
-    SECRET_SETTING_KEYS.has(key) ? "" : value,
-  ]));
 }
 
 export function updateSetting<K extends keyof AppSettings>(settings: AppSettings, key: K, value: AppSettings[K]): AppSettings {

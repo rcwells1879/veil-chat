@@ -7,15 +7,7 @@ const PRECACHE = [
   "/veilchat/manifest.json",
   "/veilchat/assets/veilchat-aether-bg.png",
   "/veilchat/icons/icon-192x192.png",
-  "/veilchat/icons/icon-512x512.png",
-  "/veilchat/js/securityValidator.js",
-  "/veilchat/js/contextservice.js",
-  "/veilchat/js/imageService.js",
-  "/veilchat/js/llmService.js",
-  "/veilchat/js/azureTTSService.js",
-  "/veilchat/js/azureSTTService.js",
-  "/veilchat/js/voiceService.js",
-  "/veilchat/js/mcpClient.js"
+  "/veilchat/icons/icon-512x512.png"
 ];
 
 self.addEventListener("install", (event) => {
@@ -52,7 +44,7 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  if (url.pathname.startsWith("/veilchat/assets/") || url.pathname.startsWith("/veilchat/icons/") || url.pathname.startsWith("/veilchat/js/")) {
+  if (url.pathname.startsWith("/veilchat/assets/") || url.pathname.startsWith("/veilchat/icons/")) {
     event.respondWith(
       caches.match(request).then((cached) => {
         if (cached) return cached;

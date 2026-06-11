@@ -537,12 +537,17 @@ function SettingsView({ settings, onChange }: { settings: AppSettings; onChange:
         <Field label="Provider">
           <select value={settings.customImageProvider} onChange={(event) => onChange("customImageProvider", event.target.value as AppSettings["customImageProvider"])}>
             <option value="openai">OpenAI GPT-image-1</option>
-            <option value="imagen4">Google Imagen 4 Fast</option>
             <option value="kie">Kie.AI</option>
             <option value="a1111">Local A1111</option>
             <option value="swarmui">SwarmUI</option>
           </select>
         </Field>
+        <ToggleField
+          label="VeilChat After Dark"
+          icon={<AgeGateIcon />}
+          checked={settings.veilChatAfterDark}
+          onChange={(value) => onChange("veilChatAfterDark", value)}
+        />
         {settings.customImageProvider === "a1111" && <A1111Settings settings={settings} onChange={onChange} />}
         {settings.customImageProvider === "swarmui" && <SwarmSettings settings={settings} onChange={onChange} />}
         {settings.customImageProvider === "openai" && (
@@ -568,25 +573,6 @@ function SettingsView({ settings, onChange }: { settings: AppSettings; onChange:
                 <option value="png">PNG</option>
                 <option value="jpeg">JPEG</option>
                 <option value="webp">WebP</option>
-              </select>
-            </Field>
-          </>
-        )}
-        {settings.customImageProvider === "imagen4" && (
-          <>
-            <Field label="Aspect ratio">
-              <select value={settings.imagen4AspectRatio} onChange={(event) => onChange("imagen4AspectRatio", event.target.value)}>
-                <option value="1:1">1:1</option>
-                <option value="16:9">16:9</option>
-                <option value="9:16">9:16</option>
-                <option value="4:3">4:3</option>
-                <option value="3:4">3:4</option>
-              </select>
-            </Field>
-            <Field label="Person generation">
-              <select value={settings.imagen4PersonGeneration} onChange={(event) => onChange("imagen4PersonGeneration", event.target.value)}>
-                <option value="ALLOW_ADULT">Allow Adult</option>
-                <option value="DONT_ALLOW">Do Not Allow</option>
               </select>
             </Field>
           </>
@@ -645,32 +631,34 @@ function SettingsView({ settings, onChange }: { settings: AppSettings; onChange:
         <Field label={`Pitch ${settings.voicePitch.toFixed(1)}`}>
           <input type="range" min="0.5" max="2" step="0.1" value={settings.voicePitch} onChange={(event) => onChange("voicePitch", Number(event.target.value))} />
         </Field>
-        <Field label="Azure key">
-          <input type="password" value={settings.azureApiKey} onChange={(event) => onChange("azureApiKey", event.target.value)} />
-        </Field>
-        <Field label="Azure region">
-          <input value={settings.azureRegion} onChange={(event) => onChange("azureRegion", event.target.value)} />
-        </Field>
       </SettingsSection>
 
-      <SettingsSection icon={<Search size={19} />} title="Search And Reasoning">
-        <ToggleField label="Enable MCP" checked={settings.mcpEnabled} onChange={(value) => onChange("mcpEnabled", value)} />
-        <Field label="MCP server">
-          <input value={settings.mcpServerUrl} onChange={(event) => onChange("mcpServerUrl", event.target.value)} placeholder="http://localhost:3001" />
-        </Field>
+      <SettingsSection icon={<Search size={19} />} title="Search">
         <ToggleField label="Enable search" checked={settings.searchEnabled} onChange={(value) => onChange("searchEnabled", value)} />
         <Field label="Search provider">
-          <select value={settings.searchProvider} onChange={(event) => onChange("searchProvider", event.target.value)}>
+          <select value={settings.searchProvider} onChange={(event) => onChange("searchProvider", event.target.value as AppSettings["searchProvider"])}>
             <option value="brave">Brave</option>
-            <option value="duckduckgo">DuckDuckGo</option>
             <option value="google">Google Custom Search</option>
-            <option value="bing">Bing</option>
           </select>
         </Field>
-        <Field label="Search key">
-          <input type="password" value={settings.searchApiKey} onChange={(event) => onChange("searchApiKey", event.target.value)} />
+        {settings.searchProvider === "brave" && (
+          <Field label="Brave key">
+            <input type="password" value={settings.braveSearchApiKey} onChange={(event) => onChange("braveSearchApiKey", event.target.value)} />
+          </Field>
+        )}
+        {settings.searchProvider === "google" && (
+          <>
+            <Field label="Google key">
+              <input type="password" value={settings.googleSearchApiKey} onChange={(event) => onChange("googleSearchApiKey", event.target.value)} />
+            </Field>
+            <Field label="Engine ID">
+              <input value={settings.googleSearchEngineId} onChange={(event) => onChange("googleSearchEngineId", event.target.value)} />
+            </Field>
+          </>
+        )}
+        <Field label="Result limit">
+          <input type="number" min="1" max="10" value={settings.searchResultsLimit} onChange={(event) => onChange("searchResultsLimit", event.target.value)} />
         </Field>
-        <ToggleField label="Auto summarize" checked={settings.searchAutoSummarize} onChange={(value) => onChange("searchAutoSummarize", value)} />
       </SettingsSection>
 
       <SettingsSection icon={<Waves size={19} />} title="Interface">
@@ -855,13 +843,24 @@ function GroupedSelect({
   );
 }
 
-function ToggleField({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) {
+function ToggleField({ checked, icon, label, onChange }: { checked: boolean; icon?: ReactNode; label: string; onChange: (value: boolean) => void }) {
   return (
     <label className="toggle-field">
-      <span>{label}</span>
+      <span className="toggle-label">
+        {icon}
+        {label}
+      </span>
       <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} />
       <i aria-hidden="true" />
     </label>
+  );
+}
+
+function AgeGateIcon() {
+  return (
+    <span className="age-gate-icon" aria-hidden="true">
+      18+
+    </span>
   );
 }
 
