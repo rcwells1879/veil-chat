@@ -36,6 +36,15 @@ if (typeof ImageService === 'undefined') {
         this.imagen4_output_format = "image/jpeg";
         this.imagen4_person_generation = "ALLOW_ADULT";
 
+        // Kie.AI settings
+        this.kieApiKey = null;
+        this.kie_image_model = "gpt-image/1.5-text-to-image";
+        this.kie_aspect_ratio = "1:1";
+        this.kie_quality = "medium";
+        this.kie_resolution = "1K";
+        this.kie_output_format = "png";
+        this.kie_reference_image_urls = [];
+
         console.log(`ImageService initialized. Provider: ${this.provider}`);
     }
 
@@ -43,8 +52,8 @@ if (typeof ImageService === 'undefined') {
     processPromptWithQualityTags(prompt) {
         const qualityTags = "best quality, dynamic lighting";
         const userOrLlmPrompt = prompt.trim();
-        return userOrLlmPrompt 
-            ? `${qualityTags}, ${userOrLlmPrompt}` 
+        return userOrLlmPrompt
+            ? `${qualityTags}, ${userOrLlmPrompt}`
             : qualityTags;
     }
 
@@ -65,13 +74,13 @@ if (typeof ImageService === 'undefined') {
         if (settings.steps !== undefined) this.steps = settings.steps;
         if (settings.cfg_scale !== undefined) this.cfg_scale = settings.cfg_scale;
         if (settings.sampler_name !== undefined) this.sampler_name = settings.sampler_name;
-        
+
         // OpenAI settings
         if (settings.size !== undefined) this.size = settings.size;
         if (settings.quality !== undefined) this.quality = settings.quality;
         if (settings.output_format !== undefined) this.output_format = settings.output_format;
         if (settings.background !== undefined) this.background = settings.background;
-        
+
         // SwarmUI settings
         if (settings.swarm_width !== undefined) this.swarm_width = settings.swarm_width;
         if (settings.swarm_height !== undefined) this.swarm_height = settings.swarm_height;
@@ -84,6 +93,14 @@ if (typeof ImageService === 'undefined') {
         if (settings.imagen4_aspect_ratio !== undefined) this.imagen4_aspect_ratio = settings.imagen4_aspect_ratio;
         if (settings.imagen4_output_format !== undefined) this.imagen4_output_format = settings.imagen4_output_format;
         if (settings.imagen4_person_generation !== undefined) this.imagen4_person_generation = settings.imagen4_person_generation;
+
+        // Kie.AI settings
+        if (settings.kieApiKey !== undefined) this.kieApiKey = settings.kieApiKey;
+        if (settings.kie_image_model !== undefined) this.kie_image_model = settings.kie_image_model;
+        if (settings.kie_aspect_ratio !== undefined) this.kie_aspect_ratio = settings.kie_aspect_ratio;
+        if (settings.kie_quality !== undefined) this.kie_quality = settings.kie_quality;
+        if (settings.kie_resolution !== undefined) this.kie_resolution = settings.kie_resolution;
+        if (settings.kie_output_format !== undefined) this.kie_output_format = settings.kie_output_format;
 
         // Provider settings
         if (settings.provider !== undefined) {
@@ -99,8 +116,20 @@ if (typeof ImageService === 'undefined') {
     if (settings.apiBaseUrl !== undefined) {
         this.apiBaseUrl = settings.apiBaseUrl;
     }
-        
-        console.log('ImageService: Settings updated:', settings);
+
+        console.log('ImageService: Settings updated:', this.redactSecrets(settings));
+    }
+
+    redactSecrets(value) {
+        if (!value || typeof value !== 'object') return value;
+        if (Array.isArray(value)) return value.map((item) => this.redactSecrets(item));
+
+        return Object.fromEntries(Object.entries(value).map(([key, item]) => {
+            if (/apiKey|api_key|authorization|token|secret|password/i.test(key)) {
+                return [key, item ? 'PRESENT' : 'MISSING'];
+            }
+            return [key, this.redactSecrets(item)];
+        }));
     }
 
     async generateImage(prompt) {
@@ -112,9 +141,284 @@ if (typeof ImageService === 'undefined') {
             return await this.generateSwarmUIImage(prompt);
         } else if (this.provider === 'imagen4') {
             return await this.generateImagen4Image(prompt);
+        } else if (this.provider === 'kie') {
+            return await this.generateKieImage(prompt);
         } else {
             return await this.generateA1111Image(prompt);
         }
+    }
+
+    getKieImageModelConfig(model) {
+        const configs = {
+            'bytedance/seedream': { fields: ['prompt', 'image_size', 'guidance_scale', 'seed'], imageSizeDefault: 'regular' },
+            'bytedance/seedream-v4-text-to-image': { fields: ['prompt', 'image_size', 'image_resolution', 'max_images', 'seed', 'nsfw_checker'], imageSizeDefault: 'regular' },
+            'bytedance/seedream-v4-edit': { fields: ['prompt', 'image_urls', 'image_size', 'image_resolution', 'max_images', 'seed', 'nsfw_checker'], imageField: 'image_urls', imageSizeDefault: 'regular' },
+            'seedream/4.5-text-to-image': { fields: ['prompt', 'aspect_ratio', 'quality', 'nsfw_checker'] },
+            'seedream/4.5-edit': { fields: ['prompt', 'image_urls', 'aspect_ratio', 'quality', 'nsfw_checker'], imageField: 'image_urls' },
+            'seedream/5-lite-text-to-image': { fields: ['prompt', 'aspect_ratio', 'quality', 'nsfw_checker'] },
+            'seedream/5-lite-image-to-image': { fields: ['prompt', 'image_urls', 'aspect_ratio', 'quality', 'nsfw_checker'], imageField: 'image_urls' },
+            'nano-banana-2': { fields: ['prompt', 'image_input', 'aspect_ratio', 'resolution', 'output_format'], imageField: 'image_input', optionalImage: true },
+            'google/imagen4-fast': { fields: ['prompt', 'negative_prompt', 'aspect_ratio', 'seed'] },
+            'google/imagen4': { fields: ['prompt', 'negative_prompt', 'aspect_ratio', 'seed'] },
+            'google/imagen4-ultra': { fields: ['prompt', 'negative_prompt', 'aspect_ratio', 'seed'] },
+            'google/nano-banana': { fields: ['prompt', 'output_format', 'aspect_ratio', 'image_size', 'nsfw_checker'], imageSizeDefault: 'auto' },
+            'google/nano-banana-edit': { fields: ['prompt', 'image_urls', 'output_format', 'aspect_ratio', 'image_size'], imageField: 'image_urls', imageSizeDefault: 'auto' },
+            'nano-banana-pro': { fields: ['prompt', 'image_input', 'aspect_ratio', 'resolution', 'output_format'], imageField: 'image_input' },
+            'flux-2/pro-text-to-image': { fields: ['prompt', 'aspect_ratio', 'resolution', 'nsfw_checker'] },
+            'flux-2/pro-image-to-image': { fields: ['input_urls', 'prompt', 'aspect_ratio', 'resolution', 'nsfw_checker'], imageField: 'input_urls' },
+            'flux-2/flex-text-to-image': { fields: ['prompt', 'aspect_ratio', 'resolution', 'nsfw_checker'] },
+            'flux-2/flex-image-to-image': { fields: ['input_urls', 'prompt', 'aspect_ratio', 'resolution', 'nsfw_checker'], imageField: 'input_urls' },
+            'grok-imagine/text-to-image': { fields: ['prompt', 'aspect_ratio', 'nsfw_checker', 'enable_pro'] },
+            'grok-imagine/image-to-image': { fields: ['prompt', 'image_urls', 'nsfw_checker'], imageField: 'image_urls' },
+            'gpt-image/1.5-text-to-image': { fields: ['prompt', 'aspect_ratio', 'quality'] },
+            'gpt-image/1.5-image-to-image': { fields: ['input_urls', 'prompt', 'aspect_ratio', 'quality'], imageField: 'input_urls' },
+            'gpt-image-2-text-to-image': { fields: ['prompt', 'aspect_ratio', 'resolution'] },
+            'gpt-image-2-image-to-image': { fields: ['prompt', 'input_urls', 'aspect_ratio', 'resolution'], imageField: 'input_urls' },
+            'ideogram/v3-text-to-image': { fields: ['prompt', 'rendering_speed', 'expand_prompt', 'image_size', 'negative_prompt'], imageSizeDefault: 'square_hd' },
+            'ideogram/v3-edit': { fields: ['prompt', 'image_url', 'rendering_speed', 'expand_prompt'], imageField: 'image_url' },
+            'ideogram/v3-remix': { fields: ['prompt', 'image_url', 'rendering_speed', 'expand_prompt', 'image_size', 'negative_prompt'], imageField: 'image_url', imageSizeDefault: 'square_hd' },
+            'ideogram/character': { fields: ['prompt', 'reference_image_urls', 'rendering_speed', 'style', 'expand_prompt', 'num_images', 'image_size', 'negative_prompt'], imageField: 'reference_image_urls', optionalImage: true, imageSizeDefault: 'square_hd' },
+            'ideogram/character-edit': { fields: ['prompt', 'image_url', 'reference_image_urls', 'rendering_speed', 'style', 'expand_prompt', 'num_images'], imageField: 'image_url', extraImageField: 'reference_image_urls' },
+            'ideogram/character-remix': { fields: ['prompt', 'image_url', 'reference_image_urls', 'rendering_speed', 'style', 'expand_prompt', 'image_size', 'num_images', 'strength', 'negative_prompt'], imageField: 'image_url', extraImageField: 'reference_image_urls', imageSizeDefault: 'square_hd' },
+            'qwen/text-to-image': { fields: ['prompt', 'image_size', 'num_inference_steps', 'seed', 'guidance_scale', 'enable_safety_checker', 'output_format', 'negative_prompt', 'acceleration', 'nsfw_checker'], imageSizeDefault: 'square_hd' },
+            'qwen/image-to-image': { fields: ['prompt', 'image_url', 'strength', 'output_format', 'acceleration', 'negative_prompt', 'seed', 'num_inference_steps', 'guidance_scale', 'enable_safety_checker', 'nsfw_checker'], imageField: 'image_url' },
+            'qwen/image-edit': { fields: ['prompt', 'image_url', 'acceleration', 'image_size', 'num_inference_steps', 'seed', 'guidance_scale', 'sync_mode', 'num_images', 'enable_safety_checker', 'output_format', 'negative_prompt'], imageField: 'image_url', imageSizeDefault: 'square_hd' },
+            'qwen2/text-to-image': { fields: ['prompt', 'image_size', 'seed', 'output_format', 'nsfw_checker'], imageSizeDefault: 'square_hd' },
+            'qwen2/image-edit': { fields: ['prompt', 'image_url', 'image_size', 'seed', 'output_format', 'nsfw_checker'], imageField: 'image_url', imageSizeDefault: 'square_hd' },
+            'wan/2-7-image': { fields: ['prompt', 'input_urls', 'aspect_ratio', 'enable_sequential', 'resolution', 'thinking_mode', 'color_palette'], imageField: 'input_urls', optionalImage: true },
+            'wan/2-7-image-pro': { fields: ['prompt', 'input_urls', 'aspect_ratio', 'enable_sequential', 'resolution', 'thinking_mode', 'color_palette'], imageField: 'input_urls', optionalImage: true },
+            'z-image': { fields: ['prompt', 'aspect_ratio', 'nsfw_checker'] }
+        };
+        return configs[model] || configs['gpt-image/1.5-text-to-image'];
+    }
+
+    getReferenceImageCount() {
+        return this.kie_reference_image_urls.length;
+    }
+
+    clearReferenceImages() {
+        this.kie_reference_image_urls = [];
+    }
+
+    readFileAsDataUrl(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = () => reject(new Error(`Could not read ${file.name}`));
+            reader.readAsDataURL(file);
+        });
+    }
+
+    async attachReferenceImages(files) {
+        if (!this.kieApiKey) {
+            throw new Error('Kie API key is required before attaching image references.');
+        }
+
+        const uploadedUrls = [];
+        for (const file of files) {
+            if (!file.type.startsWith('image/')) continue;
+            if (file.size > 10 * 1024 * 1024) {
+                throw new Error(`${file.name} is larger than Kie's 10MB image limit.`);
+            }
+
+            const base64Data = await this.readFileAsDataUrl(file);
+            const response = await fetch('https://api.kie.ai/api/file-base64-upload', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.kieApiKey}`
+                },
+                body: JSON.stringify({
+                    base64Data,
+                    uploadPath: 'images/veilchat',
+                    fileName: file.name
+                })
+            });
+
+            const responseText = await response.text();
+            let data;
+            try {
+                data = JSON.parse(responseText);
+            } catch (_) {
+                data = { msg: responseText };
+            }
+
+            if (!response.ok || data.success === false) {
+                throw new Error(data.msg || `Kie upload failed with status ${response.status}`);
+            }
+
+            const downloadUrl = data.data && data.data.downloadUrl;
+            if (!downloadUrl) {
+                throw new Error('Kie upload did not return a download URL.');
+            }
+            uploadedUrls.push(downloadUrl);
+        }
+
+        this.kie_reference_image_urls.push(...uploadedUrls);
+        return uploadedUrls;
+    }
+
+    applyKieImageSources(input, config) {
+        const refs = this.kie_reference_image_urls;
+        if (config.imageField && refs.length === 0 && !config.optionalImage) {
+            throw new Error('Attach an image before using this Kie image-editing model.');
+        }
+        if (!config.imageField || refs.length === 0) return;
+
+        if (config.imageField === 'image_url') {
+            input.image_url = refs[0];
+        } else {
+            input[config.imageField] = refs;
+        }
+
+        if (config.extraImageField && refs.length > 1) {
+            input[config.extraImageField] = refs.slice(1);
+        }
+    }
+
+    createKieImageInput(prompt, config) {
+        const fields = new Set(config.fields);
+        const input = { prompt: prompt.trim() };
+
+        this.applyKieImageSources(input, config);
+
+        if (fields.has('aspect_ratio')) input.aspect_ratio = this.kie_aspect_ratio || '1:1';
+        if (fields.has('quality')) input.quality = this.kie_quality || 'medium';
+        if (fields.has('resolution')) input.resolution = this.kie_resolution || '1K';
+        if (fields.has('image_resolution')) input.image_resolution = this.kie_resolution || '1K';
+        if (fields.has('output_format')) input.output_format = this.kie_output_format || 'png';
+        if (fields.has('image_size') && config.imageSizeDefault) input.image_size = config.imageSizeDefault;
+        if (fields.has('nsfw_checker')) input.nsfw_checker = true;
+        if (fields.has('enable_safety_checker')) input.enable_safety_checker = true;
+        if (fields.has('rendering_speed')) input.rendering_speed = 'BALANCED';
+        if (fields.has('expand_prompt')) input.expand_prompt = true;
+        if (fields.has('style')) input.style = 'AUTO';
+        if (fields.has('num_images')) input.num_images = 1;
+        if (fields.has('max_images')) input.max_images = 1;
+        if (fields.has('enable_pro')) input.enable_pro = false;
+        if (fields.has('enable_sequential')) input.enable_sequential = false;
+        if (fields.has('thinking_mode')) input.thinking_mode = false;
+        if (fields.has('strength')) input.strength = 0.8;
+
+        return input;
+    }
+
+    extractKieTaskId(data) {
+        return data && data.data && data.data.taskId ? data.data.taskId : null;
+    }
+
+    extractKieResultUrl(record) {
+        const resultJson = record && record.data && record.data.resultJson;
+        if (!resultJson) return null;
+
+        let parsed;
+        try {
+            parsed = typeof resultJson === 'string' ? JSON.parse(resultJson) : resultJson;
+        } catch (error) {
+            console.warn('Could not parse Kie resultJson:', resultJson, error);
+            return null;
+        }
+
+        const candidates = [
+            parsed.resultUrls,
+            parsed.result_urls,
+            parsed.imageUrls,
+            parsed.images,
+            parsed.urls,
+            parsed.files
+        ];
+
+        for (const candidate of candidates) {
+            if (Array.isArray(candidate) && candidate.length) {
+                const first = candidate[0];
+                if (typeof first === 'string') return first;
+                if (first && typeof first.url === 'string') return first.url;
+            }
+        }
+
+        return parsed.url || parsed.imageUrl || null;
+    }
+
+    async pollKieTask(taskId) {
+        const maxAttempts = 48;
+        const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+            if (attempt > 0) await delay(Math.min(2500 + attempt * 250, 6000));
+
+            const response = await fetch(`https://api.kie.ai/api/v1/jobs/recordInfo?taskId=${encodeURIComponent(taskId)}`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${this.kieApiKey}`
+                }
+            });
+
+            const responseText = await response.text();
+            let data;
+            try {
+                data = JSON.parse(responseText);
+            } catch (_) {
+                data = { msg: responseText };
+            }
+
+            if (!response.ok) {
+                throw new Error(data.msg || `Kie task polling failed with status ${response.status}`);
+            }
+
+            const state = data && data.data && data.data.state;
+            if (state === 'success') return data;
+            if (['failed', 'fail', 'error'].includes(state)) {
+                throw new Error((data.data && (data.data.failMsg || data.data.failCode)) || 'Kie image task failed.');
+            }
+        }
+
+        throw new Error('Kie image task timed out before a result was ready.');
+    }
+
+    async generateKieImage(prompt) {
+        if (!this.kieApiKey) {
+            throw new Error('Kie API key is required for Kie image generation.');
+        }
+
+        const model = this.kie_image_model || 'gpt-image/1.5-text-to-image';
+        const config = this.getKieImageModelConfig(model);
+        const payload = {
+            model,
+            input: this.createKieImageInput(prompt, config)
+        };
+
+        const response = await fetch('https://api.kie.ai/api/v1/jobs/createTask', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${this.kieApiKey}`
+            },
+            body: JSON.stringify(payload)
+        });
+
+        const responseText = await response.text();
+        let data;
+        try {
+            data = JSON.parse(responseText);
+        } catch (_) {
+            data = { msg: responseText };
+        }
+
+        if (!response.ok || (data.code && Number(data.code) !== 200)) {
+            throw new Error(data.msg || `Kie image task failed with status ${response.status}`);
+        }
+
+        const taskId = this.extractKieTaskId(data);
+        if (!taskId) {
+            throw new Error('Kie did not return a taskId.');
+        }
+
+        const record = await this.pollKieTask(taskId);
+        const imageUrl = this.extractKieResultUrl(record);
+        if (!imageUrl) {
+            throw new Error('Kie image task completed without an image URL.');
+        }
+        return imageUrl;
     }
 
     async generateOpenAIImage(prompt) {
@@ -124,7 +428,7 @@ if (typeof ImageService === 'undefined') {
         }
 
         const openaiEndpoint = 'https://api.openai.com/v1/images/generations';
-        
+
         try {
             const payload = {
                 model: "gpt-image-1",
@@ -157,7 +461,7 @@ if (typeof ImageService === 'undefined') {
             // gpt-image-1 always returns base64-encoded images
             if (data.data && data.data.length > 0) {
                 const imageData = data.data[0];
-                
+
                 if (imageData.b64_json) {
                     console.log('Received base64 image data from OpenAI.');
                     return `data:image/${this.output_format || 'png'};base64,${imageData.b64_json}`;
@@ -186,7 +490,7 @@ if (typeof ImageService === 'undefined') {
                 },
                 body: JSON.stringify({
                     prompt: currentPrompt,
-                    negative_prompt: this.createNegativePrompt(), 
+                    negative_prompt: this.createNegativePrompt(),
                     width: this.width || 1024,
                     height: this.height || 1536,
                     steps: this.steps || 20,
@@ -247,7 +551,7 @@ if (typeof ImageService === 'undefined') {
             }
 
             const data = await response.json();
-            
+
             if (data.session_id) {
                 this.swarmSessionId = data.session_id;
                 // Set session to expire in 30 minutes (SwarmUI default is usually longer, but this is safe)
@@ -300,16 +604,16 @@ if (typeof ImageService === 'undefined') {
 
             if (!response.ok) {
                 const errorData = await response.text();
-                
+
                 // Check if it's a session error and retry once
                 if (errorData.includes('invalid_session_id') || response.status === 401) {
                     console.log('Session invalid, getting new session and retrying...');
                     this.swarmSessionId = null;
                     this.swarmSessionExpiry = null;
-                    
+
                     const newSessionId = await this.ensureSwarmSession();
                     payload.session_id = newSessionId;
-                    
+
                     const retryResponse = await fetch(`${this.apiBaseUrl}/API/GenerateText2Image`, {
                         method: 'POST',
                         headers: {
@@ -317,15 +621,15 @@ if (typeof ImageService === 'undefined') {
                         },
                         body: JSON.stringify(payload)
                     });
-                    
+
                     if (!retryResponse.ok) {
                         await this.handleAPIError(retryResponse, 'SwarmUI (retry)');
                     }
-                    
+
                     const retryData = await retryResponse.json();
                     return this.processSwarmUIResponse(retryData);
                 }
-                
+
                 await this.handleAPIError(response, 'SwarmUI');
             }
 

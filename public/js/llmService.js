@@ -5,10 +5,10 @@ if (typeof LLMService === 'undefined') {
             this.providerType = providerType;
             this.modelIdentifier = modelIdentifier;
             this.apiKey = apiKey;
-            
+
             // Store direct provider configurations
             this.directProviders = directProviders || {};
-            
+
             // Set up direct API endpoints and settings
             this.setupDirectProviderConfig();
 
@@ -23,7 +23,7 @@ if (typeof LLMService === 'undefined') {
         // For "Show Me" Image Prompt Generation
         this.imagePromptTemperature = 0.5;
         this.imagePromptMaxTokens = 200;
-        
+
         // For Character Generation
         this.characterGenTemperature = 0.8;
         this.characterGenMaxTokens = 1200; // Even higher for very detailed profiles
@@ -39,7 +39,7 @@ if (typeof LLMService === 'undefined') {
                 " You have a dry, witty sense of humor. Your goal is to engage the user fully. Try to make the user like you as much as possible. Speak only from your perspective." +
                 " Do not use system prompts or system instructions in your responses. " +
                 "Do not describe yourself unless I ask you to. your name is the name of the persona you created. Do not speak for me (the user)." +
-                
+
                 "\n\nIMPORTANT SPEECH FORMATTING: Format your responses using SSML (Speech Synthesis Markup Language) to convey appropriate emotions and emphasis for text-to-speech. " +
                 "Use Azure TTS emotional styles (choose the BEST match for your emotion):" +
                 "\n🎭 AVAILABLE STYLES (with intensity 0.5-2.0):" +
@@ -61,12 +61,12 @@ if (typeof LLMService === 'undefined') {
                 "\nText shows clean to user, SSML adds emotional voice expression.`
             }
         ];
-        
+
         this.characterInitialized = false;
-        
+
         // Load saved conversation history and state
         this.loadConversationHistory();
-        
+
         console.log(`LLMService initialized. Provider: ${this.providerType}, Base URL: ${this.apiBaseUrl}, Model ID: ${this.modelIdentifier}`);
     }
 
@@ -93,7 +93,179 @@ if (typeof LLMService === 'undefined') {
             this.authHeader = 'x-goog-api-key';
             this.authValue = this.directApiKey;
             console.log(`✅ Google: ${this.directModel}, Key: ${this.directApiKey ? 'PRESENT' : 'MISSING'}`);
+        } else if (this.providerType === 'kie-direct') {
+            const kieConfig = this.getKieChatModelConfig(this.directProviders.kieModel || 'gpt-5-2');
+            this.directApiEndpoint = `https://api.kie.ai${kieConfig.endpoint}`;
+            this.directModel = kieConfig.model || this.directProviders.kieModel || 'gpt-5-2';
+            this.kieModelConfig = kieConfig;
+            this.kieReasoningLevel = this.directProviders.kieReasoningLevel || 'high';
+            this.directApiKey = this.directProviders.kieApiKey;
+            this.authHeader = 'Authorization';
+            this.authValue = `Bearer ${this.directApiKey}`;
+            console.log(`Kie.AI: ${this.directModel}, Family: ${kieConfig.family}, Key: ${this.directApiKey ? 'PRESENT' : 'MISSING'}`);
         }
+    }
+
+    getKieChatModelConfig(model) {
+        const modelMap = {
+            'gpt-5-2': { family: 'chat-completions', endpoint: '/gpt-5-2/v1/chat/completions' },
+            'gpt-5-4': { family: 'responses', endpoint: '/codex/v1/responses', model: 'gpt-5-4' },
+            'gpt-5-5': { family: 'responses', endpoint: '/codex/v1/responses', model: 'gpt-5-5' },
+            'gpt-5-codex': { family: 'responses', endpoint: '/api/v1/responses', model: 'gpt-5-codex' },
+            'gpt-5.1-codex': { family: 'responses', endpoint: '/api/v1/responses', model: 'gpt-5.1-codex' },
+            'gpt-5.2-codex': { family: 'responses', endpoint: '/api/v1/responses', model: 'gpt-5.2-codex' },
+            'gpt-5.3-codex': { family: 'responses', endpoint: '/api/v1/responses', model: 'gpt-5.3-codex' },
+            'gpt-5.4-codex': { family: 'responses', endpoint: '/api/v1/responses', model: 'gpt-5.4-codex' },
+            'claude-opus-4-7': { family: 'claude', endpoint: '/claude/v1/messages', model: 'claude-opus-4-7' },
+            'claude-opus-4-8': { family: 'claude', endpoint: '/claude/v1/messages', model: 'claude-opus-4-8' },
+            'claude-fable-5': { family: 'claude', endpoint: '/claude/v1/messages', model: 'claude-fable-5' },
+            'claude-haiku-4-5': { family: 'claude', endpoint: '/claude/v1/messages', model: 'claude-haiku-4-5' },
+            'claude-opus-4-5': { family: 'claude', endpoint: '/claude/v1/messages', model: 'claude-opus-4-5' },
+            'claude-opus-4-6': { family: 'claude', endpoint: '/claude/v1/messages', model: 'claude-opus-4-6' },
+            'claude-sonnet-4-5': { family: 'claude', endpoint: '/claude/v1/messages', model: 'claude-sonnet-4-5' },
+            'claude-sonnet-4-6': { family: 'claude', endpoint: '/claude/v1/messages', model: 'claude-sonnet-4-6' },
+            'gemini-2.5-pro': { family: 'chat-completions', endpoint: '/gemini-2.5-pro/v1/chat/completions' },
+            'gemini-3-pro': { family: 'chat-completions', endpoint: '/gemini-3-pro/v1/chat/completions' },
+            'gemini-3.1-pro': { family: 'chat-completions', endpoint: '/gemini-3.1-pro/v1/chat/completions' },
+            'gemini-2.5-flash': { family: 'chat-completions', endpoint: '/gemini-2.5-flash/v1/chat/completions' },
+            'gemini-3-flash': { family: 'chat-completions', endpoint: '/gemini-3-flash/v1/chat/completions' },
+            'gemini-3-5-flash-openai': { family: 'chat-completions', endpoint: '/gemini-3-5-flash-openai/v1/chat/completions' },
+            'gemini-3-5-flash-native': { family: 'gemini-native', endpoint: '/gemini/v1/models/gemini-3-5-flash:streamGenerateContent' },
+            'gemini-3-flash-v1beta-native': { family: 'gemini-native', endpoint: '/gemini/v1/models/gemini-3-flash-v1betamodels:streamGenerateContent' }
+        };
+        return modelMap[model] || modelMap['gpt-5-2'];
+    }
+
+    getKieReasoningLevel() {
+        return ['high', 'low', 'off'].includes(this.kieReasoningLevel) ? this.kieReasoningLevel : 'high';
+    }
+
+    normalizeKieTextContent(content) {
+        if (typeof content === 'string') return content;
+        if (Array.isArray(content)) {
+            return content.map((part) => {
+                if (typeof part === 'string') return part;
+                if (part && typeof part.text === 'string') return part.text;
+                return '';
+            }).filter(Boolean).join('\n');
+        }
+        return content == null ? '' : String(content);
+    }
+
+    createKieChatMessages(messages) {
+        return messages.map((message) => ({
+            role: message.role,
+            content: this.normalizeKieTextContent(message.content)
+        }));
+    }
+
+    createKieResponsesInput(messages) {
+        return messages.map((message) => ({
+            role: message.role === 'assistant' ? 'assistant' : message.role,
+            content: [
+                {
+                    type: 'input_text',
+                    text: this.normalizeKieTextContent(message.content)
+                }
+            ]
+        }));
+    }
+
+    createKieGeminiContents(messages) {
+        const contents = [];
+        let pendingUserText = [];
+
+        for (const message of messages.filter((item) => item.role !== 'system')) {
+            const text = this.normalizeKieTextContent(message.content);
+            if (!text) continue;
+
+            if (message.role === 'user') {
+                pendingUserText.push(text);
+                continue;
+            }
+
+            if (pendingUserText.length) {
+                contents.push({ role: 'user', parts: [{ text: pendingUserText.join('\n\n') }] });
+                pendingUserText = [];
+            }
+
+            contents.push({ role: 'model', parts: [{ text }] });
+        }
+
+        if (pendingUserText.length) {
+            contents.push({ role: 'user', parts: [{ text: pendingUserText.join('\n\n') }] });
+        }
+
+        return contents;
+    }
+
+    createKieDirectPayload(messages, temperature, maxTokens) {
+        const config = this.kieModelConfig || this.getKieChatModelConfig(this.directProviders.kieModel || 'gpt-5-2');
+        const reasoningLevel = this.getKieReasoningLevel();
+
+        if (config.family === 'responses') {
+            const payload = {
+                model: config.model,
+                stream: false,
+                input: this.createKieResponsesInput(messages)
+            };
+            if (reasoningLevel !== 'off') {
+                payload.reasoning = { effort: reasoningLevel };
+            }
+            return payload;
+        }
+
+        if (config.family === 'claude') {
+            const system = messages
+                .filter((message) => message.role === 'system')
+                .map((message) => this.normalizeKieTextContent(message.content))
+                .filter(Boolean)
+                .join('\n\n');
+            const payload = {
+                model: config.model,
+                stream: false,
+                messages: this.createKieChatMessages(messages.filter((message) => message.role !== 'system')),
+                max_tokens: maxTokens !== null ? maxTokens : 4096,
+                thinkingFlag: reasoningLevel !== 'off'
+            };
+            if (system) payload.system = system;
+            if (temperature !== undefined && temperature !== null) payload.temperature = temperature;
+            return payload;
+        }
+
+        if (config.family === 'gemini-native') {
+            const generationConfig = {};
+            if (temperature !== undefined && temperature !== null) generationConfig.temperature = temperature;
+            if (maxTokens !== null) generationConfig.maxOutputTokens = maxTokens;
+            generationConfig.thinkingConfig = reasoningLevel === 'off'
+                ? { includeThoughts: false }
+                : { includeThoughts: false, thinkingLevel: reasoningLevel };
+
+            const systemText = messages
+                .filter((message) => message.role === 'system')
+                .map((message) => this.normalizeKieTextContent(message.content))
+                .filter(Boolean)
+                .join('\n\n');
+
+            const payload = {
+                stream: false,
+                contents: this.createKieGeminiContents(messages),
+                generationConfig
+            };
+            if (systemText) {
+                payload.systemInstruction = { parts: [{ text: systemText }] };
+            }
+            return payload;
+        }
+
+        const payload = {
+            messages: this.createKieChatMessages(messages),
+            stream: false
+        };
+        if (reasoningLevel !== 'off') {
+            payload.reasoning_effort = reasoningLevel;
+        }
+        return payload;
     }
 
     createDirectProviderPayload(messages, temperature, maxTokens) {
@@ -128,7 +300,7 @@ if (typeof LLMService === 'undefined') {
                     payload.max_tokens = maxTokens;
                 }
             }
-            
+
             // Handle GPT-OSS models in direct provider - disable reasoning tokens
             if (this.directModel && this.directModel.toLowerCase().includes('gpt-oss')) {
                 console.log("Applying GPT-OSS-specific settings for direct model: " + this.directModel);
@@ -137,13 +309,13 @@ if (typeof LLMService === 'undefined') {
                 };
                 payload.raw_cot = false;
             }
-            
+
             return payload;
         } else if (this.providerType === 'anthropic-direct') {
             // Anthropic API format
             const anthropicMessages = messages.filter(msg => msg.role !== 'system');
             const systemPrompts = messages.filter(msg => msg.role === 'system').map(msg => msg.content).join('\n');
-            
+
             const payload = {
                 model: this.directModel,
                 temperature: temperature,
@@ -158,7 +330,7 @@ if (typeof LLMService === 'undefined') {
             // Combine consecutive user messages to avoid API errors
             const processedMessages = [];
             let currentUserContent = [];
-            
+
             for (const msg of messages.filter(msg => msg.role !== 'system')) {
                 if (msg.role === 'user') {
                     currentUserContent.push(msg.content);
@@ -178,7 +350,7 @@ if (typeof LLMService === 'undefined') {
                     });
                 }
             }
-            
+
             // Add any remaining user content
             if (currentUserContent.length > 0) {
                 processedMessages.push({
@@ -186,10 +358,10 @@ if (typeof LLMService === 'undefined') {
                     parts: [{ text: currentUserContent.join('\n\n') }]
                 });
             }
-            
+
             // Combine all system messages for Google API
             const systemMessages = messages.filter(msg => msg.role === 'system');
-            
+
             const generationConfig = {
                 temperature: temperature,
                 // Set thinking budget to 0 for Gemini 2.5 models
@@ -197,25 +369,27 @@ if (typeof LLMService === 'undefined') {
                     thinkingBudget: 0
                 }
             };
-            
+
             // Only include maxOutputTokens if it's not null
             if (maxTokens !== null) {
                 generationConfig.maxOutputTokens = maxTokens;
             }
-            
+
             const payload = {
                 contents: processedMessages,
                 generationConfig: generationConfig
             };
-            
+
             if (systemMessages.length > 0) {
                 const combinedSystemContent = systemMessages.map(msg => msg.content).join('\n\n');
                 payload.systemInstruction = {
                     parts: [{ text: combinedSystemContent }]
                 };
             }
-            
+
             return payload;
+        } else if (this.providerType === 'kie-direct') {
+            return this.createKieDirectPayload(messages, temperature, maxTokens);
         }
     }
 
@@ -242,7 +416,13 @@ if (typeof LLMService === 'undefined') {
         });
 
         if (!response.ok) {
-            const errorData = await response.json().catch(() => response.text());
+            const errorText = await response.text();
+            let errorData = errorText;
+            try {
+                errorData = JSON.parse(errorText);
+            } catch (_) {
+                // Keep the raw text response.
+            }
             console.error(`${this.providerType} API Error:`, errorData);
             throw new Error(`${this.providerType} API request failed with status ${response.status}: ${JSON.stringify(errorData)}`);
         }
@@ -250,6 +430,48 @@ if (typeof LLMService === 'undefined') {
         const responseData = await response.json();
         console.log('📥 API Response:', responseData);
         return responseData;
+    }
+
+    extractKieDirectResponse(data) {
+        const config = this.kieModelConfig || {};
+
+        if (config.family === 'chat-completions') {
+            return data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content
+                ? data.choices[0].message.content.trim()
+                : '';
+        }
+
+        if (config.family === 'claude') {
+            if (!Array.isArray(data.content)) return '';
+            return data.content
+                .map((part) => typeof part.text === 'string' ? part.text : '')
+                .filter(Boolean)
+                .join('\n')
+                .trim();
+        }
+
+        if (config.family === 'gemini-native') {
+            const parts = data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts;
+            return Array.isArray(parts)
+                ? parts.map((part) => part.text || '').filter(Boolean).join('\n').trim()
+                : '';
+        }
+
+        if (typeof data.output_text === 'string') return data.output_text.trim();
+        if (Array.isArray(data.output)) {
+            const chunks = [];
+            for (const item of data.output) {
+                if (typeof item.text === 'string') chunks.push(item.text);
+                if (Array.isArray(item.content)) {
+                    for (const content of item.content) {
+                        if (typeof content.text === 'string') chunks.push(content.text);
+                    }
+                }
+            }
+            return chunks.join('\n').trim();
+        }
+
+        return '';
     }
 
     extractDirectProviderResponse(data) {
@@ -277,6 +499,8 @@ if (typeof LLMService === 'undefined') {
                    data.candidates[0].content.parts[0].text
                 ? data.candidates[0].content.parts[0].text.trim()
                 : '';
+        } else if (this.providerType === 'kie-direct') {
+            return this.extractKieDirectResponse(data);
         }
         return '';
     }
@@ -294,7 +518,7 @@ if (typeof LLMService === 'undefined') {
             const historyData = JSON.parse(savedData);
             const maxAge = 24 * 60 * 60 * 1000; // 24 hours
             const isRecent = (Date.now() - (historyData.timestamp || 0)) < maxAge;
-            
+
             // A conversation exists if it's recent and has more than the initial system prompt.
             return isRecent && historyData.conversationHistory && historyData.conversationHistory.length > 1;
         } catch (error) {
@@ -321,11 +545,11 @@ if (typeof LLMService === 'undefined') {
             const savedData = localStorage.getItem('llmConversationHistory');
             if (savedData) {
                 const historyData = JSON.parse(savedData);
-                
+
                 // Check if the saved data is recent (within 24 hours)
                 const maxAge = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
                 const isRecent = (Date.now() - historyData.timestamp) < maxAge;
-                
+
                 if (isRecent && historyData.conversationHistory && Array.isArray(historyData.conversationHistory)) {
                     this.conversationHistory = historyData.conversationHistory;
                     this.characterInitialized = historyData.characterInitialized || false;
@@ -386,13 +610,13 @@ if (typeof LLMService === 'undefined') {
             }
         ];
         this.characterInitialized = false;
-        
+
         // Clear from localStorage
         localStorage.removeItem('llmConversationHistory');
-        
+
         // Also clear any saved persona when clearing conversation history
         localStorage.removeItem('currentPersonaPrompt');
-        
+
         console.log('Conversation history and saved persona cleared');
     }
 
@@ -403,34 +627,34 @@ if (typeof LLMService === 'undefined') {
         }
 
         // Check if there's already a custom persona set
-        const customPersonaMessage = this.conversationHistory.find(msg => 
+        const customPersonaMessage = this.conversationHistory.find(msg =>
             msg.content && msg.content.includes('[CUSTOM PERSONA')
         );
-        
+
         // Check if there's already a character profile (to avoid duplicates)
-        const hasCharacterProfile = this.conversationHistory.some(msg => 
+        const hasCharacterProfile = this.conversationHistory.some(msg =>
             msg.content && msg.content.includes('[INTERNAL CHARACTER PROFILE')
         );
-        
+
         if (hasCharacterProfile) {
             console.log("Character profile already exists, marking as initialized.");
             this.characterInitialized = true;
             this.saveConversationHistory();
             return;
         }
-        
-        const isDirectProvider = ['openai-direct', 'anthropic-direct', 'google-direct'].includes(this.providerType);
+
+        const isDirectProvider = ['openai-direct', 'anthropic-direct', 'google-direct', 'kie-direct'].includes(this.providerType);
         const endpoint = isDirectProvider ? this.directApiEndpoint : `${this.apiBaseUrl}/v1/chat/completions`;
-        
+
         // Create a separate message array for character generation
         let characterGenMessages;
-        
+
         if (customPersonaMessage) {
             console.log("Custom persona detected, generating character profile based on custom persona...");
-            
+
             // Extract the actual custom persona text
             const customPersonaText = customPersonaMessage.content.replace('[CUSTOM PERSONA - INTERNAL REFERENCE] ', '');
-            
+
             // 🔒 SECURITY: Validate custom persona text before processing
             if (window.securityValidator) {
                 const validation = window.securityValidator.validateUserInput(customPersonaText, 'characterPrompt');
@@ -441,23 +665,23 @@ if (typeof LLMService === 'undefined') {
                         violations: validation.violations,
                         riskLevel: validation.riskLevel
                     });
-                    
+
                     throw new Error(`Custom persona contains potentially unsafe content: ${validation.violations.join(', ')}`);
                 }
                 console.log('🔒 Security: Custom persona validated and approved');
             }
-            
+
             characterGenMessages = [
                 {
                     role: "system",
-                    content: `You are a character creation assistant. You will be given custom persona instructions and must create a detailed character 
+                    content: `You are a character creation assistant. You will be given custom persona instructions and must create a detailed character
                     profile that follows those instructions exactly.`
                 },
                 {
                     role: "user",
                     content: `Create a detailed internal character profile based on these specific persona instructions: "${customPersonaText}"
 
-Please create a character that follows these instructions and include: 
+Please create a character that follows these instructions and include:
 - Your name, gender (man or woman), age, physical appearance (hair color, eye color, height, build, style)
 - Personality traits that match the persona description
 - Any special abilities or background mentioned
@@ -504,12 +728,12 @@ Make sure the character you create embodies and follows the persona instructions
                     content: `[INTERNAL CHARACTER PROFILE - NOT FOR DISPLAY] ${characterProfile}`,
                     hidden: true
                 });
-                
+
                 this.characterInitialized = true;
                 this.saveConversationHistory(); // Save after character generation
                 console.log("Character profile generated and added to conversation history:");
                 console.log(characterProfile);
-                
+
                 // Update user voice setting based on character gender
                 if (window.voiceService && window.voiceService.updateUserVoiceSetting && window.SETTINGS) {
                     console.log('LLMService: Updating user voice setting based on character profile...');
@@ -523,7 +747,7 @@ Make sure the character you create embodies and follows the persona instructions
                 } else {
                     console.warn('❌ LLMService: voiceService.updateUserVoiceSetting or SETTINGS not available');
                 }
-                
+
                 return characterProfile;
             } else {
                 console.warn("Empty character profile received from LLM");
@@ -552,11 +776,11 @@ Make sure the character you create embodies and follows the persona instructions
         }
 
         const lowerCaseMessage = message.toLowerCase();
-        
+
         // Determine if we're using a direct provider
-        const isDirectProvider = ['openai-direct', 'anthropic-direct', 'google-direct'].includes(this.providerType);
+        const isDirectProvider = ['openai-direct', 'anthropic-direct', 'google-direct', 'kie-direct'].includes(this.providerType);
         const endpoint = isDirectProvider ? this.directApiEndpoint : `${this.apiBaseUrl}/v1/chat/completions`;
-        
+
         // Prepare the full message with document context if provided
         let fullMessage = message;
         if (documentContext) {
@@ -569,7 +793,7 @@ Make sure the character you create embodies and follows the persona instructions
 
         if (lowerCaseMessage.includes("show me")) {
             console.log(`"Show me" detected. Provider: ${this.providerType}. Processing image prompt for: ${message}`);
-            
+
             // Get last 5 messages from conversation history (excluding system/internal messages)
             const recentMessages = this.conversationHistory
                 .filter(msg => msg.role !== 'system' && !msg.content.includes('[INTERNAL'))
@@ -578,7 +802,7 @@ Make sure the character you create embodies and follows the persona instructions
             // Create a clean, focused context for image generation
             const characterProfile = this.getCharacterProfile() || 'person';
             const conversationContext = recentMessages.slice(-8).map(msg => `${msg.role}: ${msg.content}`).join('\n');
-            
+
             const imageGenMessagesForApiCall = [
                 {
                     role: "system",
@@ -591,11 +815,11 @@ Make sure the character you create embodies and follows the persona instructions
             ];
 
             console.log("Sending request for dedicated image prompt:", JSON.stringify(imageGenMessagesForApiCall, null, 2));
-            
+
             const rawReply = await this.sendUniversalLLMRequest(
-                imageGenMessagesForApiCall, 
-                this.imagePromptTemperature, 
-                this.imagePromptMaxTokens, 
+                imageGenMessagesForApiCall,
+                this.imagePromptTemperature,
+                this.imagePromptMaxTokens,
                 true
             );
 
@@ -613,7 +837,7 @@ Make sure the character you create embodies and follows the persona instructions
             if (documentContext) {
                 console.log("Document context being included in message:", documentContext.substring(0, 200) + "...");
             }
-            
+
             // Store original message without context in conversation history (unless already added)
             if (!skipAddingUserMessage) {
                 this.conversationHistory.push({ role: "user", content: message });
@@ -635,9 +859,9 @@ Make sure the character you create embodies and follows the persona instructions
 
             try {
                 const rawReply = await this.sendUniversalLLMRequest(
-                    messagesForAPI, 
-                    this.chatTemperature, 
-                    this.chatMaxTokens, 
+                    messagesForAPI,
+                    this.chatTemperature,
+                    this.chatMaxTokens,
                     false
                 );
 
@@ -664,19 +888,19 @@ Make sure the character you create embodies and follows the persona instructions
     resetCharacter() {
         this.characterInitialized = false;
         // Remove any existing character profiles from history
-        this.conversationHistory = this.conversationHistory.filter(msg => 
+        this.conversationHistory = this.conversationHistory.filter(msg =>
             !msg.content.includes('[INTERNAL CHARACTER PROFILE')
         );
-        
+
         console.log("Character profile reset. Will regenerate on next message.");
     }
 
     // --- CONSOLIDATED API REQUEST HANDLER ---
     async sendUniversalLLMRequest(messages, temperature, maxTokens, isImagePrompt = false) {
-        const isDirectProvider = ['openai-direct', 'anthropic-direct', 'google-direct'].includes(this.providerType);
-        
+        const isDirectProvider = ['openai-direct', 'anthropic-direct', 'google-direct', 'kie-direct'].includes(this.providerType);
+
         let payload, data, response;
-        
+
         if (isDirectProvider) {
             payload = this.createDirectProviderPayload(messages, temperature, maxTokens);
             console.log(`Sending direct provider request (${isImagePrompt ? 'image' : 'chat'}):`, JSON.stringify(this.sanitizePayloadForLogging(payload), null, 2));
@@ -714,7 +938,7 @@ Make sure the character you create embodies and follows the persona instructions
                 ? data.choices[0].message.content.trim()
                 : "";
         }
-        
+
         return response || (isImagePrompt ? "" : "Sorry, I couldn't understand that.");
     }
 
@@ -724,10 +948,10 @@ Make sure the character you create embodies and follows the persona instructions
         delete sanitized.safetySettings;
         return sanitized;
     }
-    
+
     // Method to get character profile (for debugging)
     getCharacterProfile() {
-        const profileMessage = this.conversationHistory.find(msg => 
+        const profileMessage = this.conversationHistory.find(msg =>
             msg.content.includes('[INTERNAL CHARACTER PROFILE')
         );
         return profileMessage ? profileMessage.content : null;
@@ -736,39 +960,39 @@ Make sure the character you create embodies and follows the persona instructions
     setCustomPersona(customPersonaPrompt, preserveHistory = false) {
         if (!preserveHistory) {
             // Only remove existing personas/profiles if we're not preserving history
-            this.conversationHistory = this.conversationHistory.filter(msg => 
-                !msg.content.includes('[INTERNAL CHARACTER PROFILE') && 
+            this.conversationHistory = this.conversationHistory.filter(msg =>
+                !msg.content.includes('[INTERNAL CHARACTER PROFILE') &&
                 !msg.content.includes('[CUSTOM PERSONA')
             );
         } else {
-            // When preserving history, only remove if there's already a custom persona 
+            // When preserving history, only remove if there's already a custom persona
             // (to avoid duplicates), but keep the conversation history
-            const hasExistingPersona = this.conversationHistory.some(msg => 
+            const hasExistingPersona = this.conversationHistory.some(msg =>
                 msg.content && msg.content.includes('[CUSTOM PERSONA')
             );
-            
+
             if (hasExistingPersona) {
                 // Remove only the existing custom persona, keep everything else
-                this.conversationHistory = this.conversationHistory.filter(msg => 
+                this.conversationHistory = this.conversationHistory.filter(msg =>
                     !msg.content.includes('[CUSTOM PERSONA')
                 );
             }
         }
-        
+
         // Add the custom persona to conversation history
         this.conversationHistory.push({
             role: "system",
                             content: "[CUSTOM PERSONA - INTERNAL REFERENCE] " + customPersonaPrompt,
             hidden: true
         });
-        
+
         // DON'T mark character as initialized yet - we still need to generate the character profile
         // The character profile generation will happen in createPersona() or generateCharacterProfile()
         this.characterInitialized = false;
-        
+
         // Save the updated conversation history
         this.saveConversationHistory();
-        
+
         console.log("Custom persona set:", customPersonaPrompt);
     }
 
@@ -776,11 +1000,11 @@ Make sure the character you create embodies and follows the persona instructions
     resetPersona() {
         this.characterInitialized = false;
         // Remove any existing character profiles or custom personas from history
-        this.conversationHistory = this.conversationHistory.filter(msg => 
-            !msg.content.includes('[INTERNAL CHARACTER PROFILE') && 
+        this.conversationHistory = this.conversationHistory.filter(msg =>
+            !msg.content.includes('[INTERNAL CHARACTER PROFILE') &&
             !msg.content.includes('[CUSTOM PERSONA')
         );
-        
+
         console.log("Persona reset. Will use default character generation on next message.");
     }
 
@@ -841,7 +1065,7 @@ Make sure the character you create embodies and follows the persona instructions
             } else {
                 console.log('❌ No image prompt generated - character description may be invalid');
             }
-            
+
             // Then, get a greeting using temporary messages
             const greetingMessages = [
                 ...this.conversationHistory,
@@ -850,23 +1074,23 @@ Make sure the character you create embodies and follows the persona instructions
                     content: "hello"
                 }
             ];
-            
+
             const greeting = await this.sendUniversalLLMRequest(
-                greetingMessages, 
-                this.chatTemperature, 
-                this.chatMaxTokens, 
+                greetingMessages,
+                this.chatTemperature,
+                this.chatMaxTokens,
                 false
             ) || "Hello there! What's your name?";
-            
+
             // Add the initial interaction to conversation history
             console.log('Adding initial greeting exchange to conversation history');
-            this.conversationHistory.push({ 
-                role: "user", 
-                content: "hello" 
+            this.conversationHistory.push({
+                role: "user",
+                content: "hello"
             });
-            this.conversationHistory.push({ 
-                role: "assistant", 
-                content: greeting 
+            this.conversationHistory.push({
+                role: "assistant",
+                content: greeting
             });
 
             console.log('Updated conversation history:', this.conversationHistory);
@@ -875,7 +1099,7 @@ Make sure the character you create embodies and follows the persona instructions
                 imagePrompt: imagePrompt,
                 greeting: greeting
             };
-            
+
         } catch (error) {
             console.error('Error generating initial persona content:', error);
             return {
@@ -889,13 +1113,13 @@ Make sure the character you create embodies and follows the persona instructions
         const isGemini = this.modelIdentifier && this.modelIdentifier.toLowerCase().includes('gemini');
         const isGptOss = this.modelIdentifier && this.modelIdentifier.toLowerCase().includes('gpt-oss');
         const isOllama = this.providerType === 'ollama' || (this.providerType === 'litellm' && this.modelIdentifier && this.modelIdentifier.startsWith('ollama/'));
-        
+
         const payload = {
             messages: messages,
             temperature: temperature,
             stream: false,
         };
-        
+
         // Only include max_tokens if it's not null
         if (maxTokens !== null) {
             payload.max_tokens = maxTokens;
@@ -908,12 +1132,12 @@ Make sure the character you create embodies and follows the persona instructions
         // Handle GPT-OSS parameters - disable reasoning tokens for GPT-OSS models
         if (isGptOss) {
             console.log("Applying GPT-OSS-specific settings for model: " + this.modelIdentifier);
-            
+
             // API-level reasoning suppression - exclude reasoning content entirely
             payload.reasoning = {
                 exclude: true
             };
-            
+
             // Additional parameter to suppress raw CoT
             payload.raw_cot = false;
         }
@@ -921,14 +1145,14 @@ Make sure the character you create embodies and follows the persona instructions
         // Handle Gemini parameters - disable thinking and set safety settings for ALL Gemini models
         if (isGemini) {
             console.log("Applying Gemini-specific settings for model: " + this.modelIdentifier);
-            
+
             // Disable thinking by setting thinkingBudget to 0 (works for all Gemini 2.5 models)
             payload.thinkingBudget = 0;
             payload.thinkingConfig = {
                 thinkingBudget: 0
             };
             payload.reasoning_effort = "low";
-            
+
             // Set safety settings to BLOCK_NONE for all categories to prevent content filtering
             payload.safetySettings = [
                 {
@@ -936,7 +1160,7 @@ Make sure the character you create embodies and follows the persona instructions
                     threshold: "BLOCK_NONE"
                 },
                 {
-                    category: "HARM_CATEGORY_HATE_SPEECH", 
+                    category: "HARM_CATEGORY_HATE_SPEECH",
                     threshold: "BLOCK_NONE"
                 },
                 {
@@ -972,7 +1196,7 @@ Make sure the character you create embodies and follows the persona instructions
         if (includeStop && !isGemini) {
             payload.stop = ["Human:", "User:", "###", "\n\nUser:"];
         }
-        
+
         return payload;
     }
 }

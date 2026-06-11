@@ -27,7 +27,7 @@ import {
 import { type ChangeEvent, type FormEvent, type ReactNode, useLayoutEffect, useRef, useState } from "react";
 
 import { cleanAssistantText, markdownToHtml, type ChatMessage } from "./lib/format";
-import type { AppSettings } from "./lib/settings";
+import { KIE_CHAT_MODELS, KIE_IMAGE_MODELS, type AppSettings } from "./lib/settings";
 import { useVeilChat } from "./lib/useVeilChat";
 import "@fontsource/cormorant-garamond/500-italic.css";
 import "./styles.css";
@@ -97,7 +97,7 @@ export default function App() {
   return (
     <div className={cx("app-shell", sidebarCollapsed && "sidebar-collapsed", hasMessages && "has-messages", state.settings.chatBackdropEnabled && "backdrop-on")}>
       <div className="atmosphere" aria-hidden="true" />
-      <input ref={fileInputRef} className="hidden-input" type="file" multiple accept=".txt,.js,.py,.json,.pdf,.docx,.html,.css,.md,.xml,.yaml,.yml,.log,.cpp,.h,.cs" onChange={handleFileAttach} />
+      <input ref={fileInputRef} className="hidden-input" type="file" multiple accept=".txt,.js,.py,.json,.pdf,.docx,.html,.css,.md,.xml,.yaml,.yml,.log,.cpp,.h,.cs,image/png,image/jpeg,image/webp" onChange={handleFileAttach} />
       <input ref={loadInputRef} className="hidden-input" type="file" accept=".json,application/json" onChange={handleConversationLoad} />
 
       <aside className={cx("sidebar", mobileNavOpen && "is-open")}>
@@ -178,6 +178,7 @@ export default function App() {
               <ChatView
                 busy={state.busy}
                 documentsCount={state.documents.length}
+                imageReferencesCount={state.imageReferencesCount}
                 input={state.input}
                 isListening={state.isListening}
                 messages={state.messages}
@@ -248,6 +249,7 @@ export default function App() {
 function ChatView(props: {
   busy: string;
   documentsCount: number;
+  imageReferencesCount: number;
   input: string;
   isListening: boolean;
   messages: ChatMessage[];
@@ -265,6 +267,7 @@ function ChatView(props: {
     <Composer
       busy={props.busy}
       documentsCount={props.documentsCount}
+      imageReferencesCount={props.imageReferencesCount}
       input={props.input}
       isListening={props.isListening}
       showBackdrop={props.settings.chatBackdropEnabled}
@@ -329,6 +332,7 @@ function PromptSuggestions({ onPrompt }: { onPrompt: (message?: string) => void 
 function Composer(props: {
   busy: string;
   documentsCount: number;
+  imageReferencesCount: number;
   input: string;
   isListening: boolean;
   showBackdrop: boolean;
@@ -359,6 +363,7 @@ function Composer(props: {
       <div className="composer-meta">
         <span>{props.busy === "idle" ? "Ready" : props.busy}</span>
         {props.documentsCount > 0 && <span>{props.documentsCount} file{props.documentsCount === 1 ? "" : "s"} attached</span>}
+        {props.imageReferencesCount > 0 && <span>{props.imageReferencesCount} image ref{props.imageReferencesCount === 1 ? "" : "s"}</span>}
       </div>
       <div className="composer-box">
         <button className="icon-button" type="button" aria-label="Attach documents" title="Attach documents" onClick={props.onAttach}>
@@ -463,6 +468,7 @@ function SettingsView({ settings, onChange }: { settings: AppSettings; onChange:
             <option value="openai-direct">OpenAI Direct</option>
             <option value="anthropic-direct">Anthropic Direct</option>
             <option value="google-direct">Google AI Studio</option>
+            <option value="kie-direct">Kie.AI</option>
           </select>
         </Field>
         {["litellm", "lmstudio", "ollama"].includes(settings.customLlmProvider) && (
@@ -508,6 +514,23 @@ function SettingsView({ settings, onChange }: { settings: AppSettings; onChange:
             </Field>
           </>
         )}
+        {settings.customLlmProvider === "kie-direct" && (
+          <>
+            <Field label="Kie model">
+              <GroupedSelect value={settings.kieModelIdentifier} groups={KIE_CHAT_MODELS} onChange={(value) => onChange("kieModelIdentifier", value)} />
+            </Field>
+            <Field label="Kie key">
+              <input type="password" value={settings.kieApiKey} onChange={(event) => onChange("kieApiKey", event.target.value)} />
+            </Field>
+            <Field label="Reasoning">
+              <select value={settings.kieReasoningLevel} onChange={(event) => onChange("kieReasoningLevel", event.target.value as AppSettings["kieReasoningLevel"])}>
+                <option value="high">High</option>
+                <option value="low">Low</option>
+                <option value="off">Off</option>
+              </select>
+            </Field>
+          </>
+        )}
       </SettingsSection>
 
       <SettingsSection icon={<ImageIcon size={19} />} title="Image Generation">
@@ -515,6 +538,7 @@ function SettingsView({ settings, onChange }: { settings: AppSettings; onChange:
           <select value={settings.customImageProvider} onChange={(event) => onChange("customImageProvider", event.target.value as AppSettings["customImageProvider"])}>
             <option value="openai">OpenAI GPT-image-1</option>
             <option value="imagen4">Google Imagen 4 Fast</option>
+            <option value="kie">Kie.AI</option>
             <option value="a1111">Local A1111</option>
             <option value="swarmui">SwarmUI</option>
           </select>
@@ -563,6 +587,47 @@ function SettingsView({ settings, onChange }: { settings: AppSettings; onChange:
               <select value={settings.imagen4PersonGeneration} onChange={(event) => onChange("imagen4PersonGeneration", event.target.value)}>
                 <option value="ALLOW_ADULT">Allow Adult</option>
                 <option value="DONT_ALLOW">Do Not Allow</option>
+              </select>
+            </Field>
+          </>
+        )}
+        {settings.customImageProvider === "kie" && (
+          <>
+            <Field label="Kie image model">
+              <GroupedSelect value={settings.kieImageModelIdentifier} groups={KIE_IMAGE_MODELS} onChange={(value) => onChange("kieImageModelIdentifier", value)} />
+            </Field>
+            <Field label="Kie key">
+              <input type="password" value={settings.kieApiKey} onChange={(event) => onChange("kieApiKey", event.target.value)} />
+            </Field>
+            <Field label="Aspect">
+              <select value={settings.kieImageAspectRatio} onChange={(event) => onChange("kieImageAspectRatio", event.target.value)}>
+                <option value="1:1">1:1</option>
+                <option value="16:9">16:9</option>
+                <option value="9:16">9:16</option>
+                <option value="4:3">4:3</option>
+                <option value="3:4">3:4</option>
+                <option value="3:2">3:2</option>
+                <option value="2:3">2:3</option>
+                <option value="auto">Auto</option>
+              </select>
+            </Field>
+            <Field label="Quality">
+              <select value={settings.kieImageQuality} onChange={(event) => onChange("kieImageQuality", event.target.value)}>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+              </select>
+            </Field>
+            <Field label="Resolution">
+              <select value={settings.kieImageResolution} onChange={(event) => onChange("kieImageResolution", event.target.value)}>
+                <option value="1K">1K</option>
+                <option value="2K">2K</option>
+                <option value="4K">4K</option>
+              </select>
+            </Field>
+            <Field label="Output">
+              <select value={settings.kieImageOutputFormat} onChange={(event) => onChange("kieImageOutputFormat", event.target.value)}>
+                <option value="png">PNG</option>
+                <option value="jpg">JPG</option>
               </select>
             </Field>
           </>
@@ -759,6 +824,33 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
       <span>{label}</span>
       {children}
     </label>
+  );
+}
+
+function GroupedSelect({
+  groups,
+  onChange,
+  value,
+}: {
+  groups: ReadonlyArray<{ group: string; value: string; label: string }>;
+  onChange: (value: string) => void;
+  value: string;
+}) {
+  const groupNames = Array.from(new Set(groups.map((item) => item.group)));
+  return (
+    <select value={value} onChange={(event) => onChange(event.target.value)}>
+      {groupNames.map((group) => (
+        <optgroup label={group} key={group}>
+          {groups
+            .filter((item) => item.group === group)
+            .map((item) => (
+              <option value={item.value} key={item.value}>
+                {item.label}
+              </option>
+            ))}
+        </optgroup>
+      ))}
+    </select>
   );
 }
 

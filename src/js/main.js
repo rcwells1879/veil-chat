@@ -22,12 +22,12 @@ async function initializeApp() {
     const micButton = document.getElementById('mic-button');
     const settingsButton = document.getElementById('settings-button');
     const settingsPanelContainer = document.getElementById('settings-panel-container');
-    
+
     // Check if essential elements exist
     if (!chatWindow || !userInput || !sendButton || !settingsButton) {
         console.error('Critical DOM elements missing!', {
             chatWindow: !!chatWindow,
-            userInput: !!userInput, 
+            userInput: !!userInput,
             sendButton: !!sendButton,
             settingsButton: !!settingsButton
         });
@@ -41,24 +41,24 @@ async function initializeApp() {
         console.log('Mobile debug - Viewport size:', window.innerWidth + 'x' + window.innerHeight);
         console.log('Mobile debug - Touch support:', 'ontouchstart' in window);
     }
-    
+
     const personaPanelContainer = document.createElement('div');
     personaPanelContainer.id = 'persona-panel-container';
     document.body.appendChild(personaPanelContainer);
-    
+
     // Get the existing attach button from HTML
     const attachButton = document.getElementById('attach-button');
     if (attachButton) {
         attachButton.title = 'Attach Documents';
     }
-    
+
     const fileInput = document.createElement('input');
     fileInput.type = 'file';
     fileInput.id = 'file-input';
     fileInput.multiple = true;
     fileInput.style.display = 'none';
     fileInput.accept = '.txt,.js,.py,.json,.pdf,.docx,.html,.css,.md,.xml,.yaml,.yml,.log,.cpp,.h,.cs';
-    
+
     const attachedDocsContainer = document.getElementById('attached-docs-container') || document.createElement('div');
     if (!document.getElementById('attached-docs-container')) {
         attachedDocsContainer.id = 'attached-docs-container';
@@ -67,9 +67,9 @@ async function initializeApp() {
             inputArea.parentNode.insertBefore(attachedDocsContainer, inputArea.nextSibling);
         }
     }
-    
+
     document.body.appendChild(fileInput);
-    
+
     const fullScreenImageViewer = document.createElement('div');
     fullScreenImageViewer.id = 'fullscreen-image-viewer';
     const fullScreenImage = document.createElement('img');
@@ -84,13 +84,13 @@ async function initializeApp() {
 
     // --- PWA Installation Handling ---
     let installPromptEvent = null;
-    
+
     // Listen for PWA install availability
     window.addEventListener('pwaInstallAvailable', (e) => {
         installPromptEvent = e.detail;
         showInstallButton();
     });
-    
+
     function showInstallButton() {
         // Only show if not already installed and prompt is available
         if (!window.matchMedia('(display-mode: standalone)').matches && installPromptEvent) {
@@ -112,7 +112,7 @@ async function initializeApp() {
                 z-index: 1000;
                 box-shadow: 0 2px 4px rgba(0,0,0,0.3);
             `;
-            
+
             installButton.addEventListener('click', async () => {
                 if (installPromptEvent) {
                     installPromptEvent.prompt();
@@ -124,11 +124,11 @@ async function initializeApp() {
                     installPromptEvent = null;
                 }
             });
-            
+
             // Only add if not already present
             if (!document.getElementById('pwa-install-button')) {
                 document.body.appendChild(installButton);
-                
+
                 // Auto-hide after 10 seconds
                 setTimeout(() => {
                     if (installButton.parentNode) {
@@ -138,11 +138,11 @@ async function initializeApp() {
             }
         }
     }
-    
+
     // Detect if running as PWA
-    const isPWA = window.matchMedia('(display-mode: standalone)').matches || 
+    const isPWA = window.matchMedia('(display-mode: standalone)').matches ||
                   window.navigator.standalone === true;
-    
+
     if (isPWA) {
         console.log('Running as PWA - adding pwa-mode class');
         document.body.classList.add('pwa-mode');
@@ -157,7 +157,7 @@ async function initializeApp() {
 
     async function initializeMCPClient() {
         if (!mcpEnabled) return;
-        
+
         try {
             mcpClient = new MCPClient(SETTINGS.mcpServerUrl);
             const connected = await mcpClient.connect();
@@ -180,7 +180,7 @@ async function initializeApp() {
             // Don't adjust height dynamically to prevent keyboard issues
             // Just ensure it uses the standard viewport height
             chatContainer.style.height = '100vh';
-            
+
             // Remove any CSS variable adjustments that cause resizing
             chatContainer.style.removeProperty('--vh');
         }
@@ -232,7 +232,7 @@ async function initializeApp() {
         voicePitch: parseFloat(localStorage.getItem('voicePitch')) || 1.0,
         azureApiKey: (() => {
             const camelCase = localStorage.getItem('azureApiKey');
-            const kebabCase = localStorage.getItem('azure-api-key'); 
+            const kebabCase = localStorage.getItem('azure-api-key');
             console.log('🔍 Azure key initialization:', {camelCase, kebabCase});
             return camelCase || kebabCase || '';
         })(),
@@ -253,9 +253,9 @@ async function initializeApp() {
 
     // --- Service Initialization ---
     let llmService = new LLMService(
-        SETTINGS.customLlmApiUrl, 
-        SETTINGS.customLlmProvider, 
-        SETTINGS.customLlmModelIdentifier, 
+        SETTINGS.customLlmApiUrl,
+        SETTINGS.customLlmProvider,
+        SETTINGS.customLlmModelIdentifier,
         SETTINGS.customLlmApiKey,
         {
             openaiModel: SETTINGS.openaiModelIdentifier,
@@ -281,19 +281,19 @@ async function initializeApp() {
         console.warn('VoiceService failed to initialize:', error);
         voiceService = null;
     }
-    
+
     // Make SETTINGS available globally for voice setting updates
     window.SETTINGS = SETTINGS;
-    
+
     const contextService = new ContextService();
-    
+
     if (voiceService) {
         voiceService.setVoiceRate(SETTINGS.voiceSpeed);
         voiceService.setVoicePitch(SETTINGS.voicePitch);
-        
+
         // Set callback for updating voice dropdown when persona voice is selected
         voiceService.setVoiceDropdownCallback(updateVoiceDropdown);
-        
+
         // Initialize Azure TTS if API key is provided
         if (SETTINGS.azureApiKey && SETTINGS.azureApiKey.trim()) {
             voiceService.setAzureConfig(SETTINGS.azureApiKey, SETTINGS.azureRegion);
@@ -302,18 +302,18 @@ async function initializeApp() {
 
     // Initialize MCP Client
     await initializeMCPClient();
-    
+
     // Apply initial font size from settings
     applyFontSize(SETTINGS.fontSize);
 
     // --- Service Reinitialization ---
     // Ensure all services are properly configured with current settings
     async function reinitializeServicesWithCurrentSettings() {
-        
+
         // Check if ImageService needs reinitialization based on provider
         const currentImageApiUrl = imageService.apiBaseUrl;
         const expectedImageApiUrl = SETTINGS.customImageProvider === 'swarmui' ? SETTINGS.swarmuiApiUrl : SETTINGS.customImageApiUrl;
-        
+
         console.log('🔧 Image provider check:', {
             provider: SETTINGS.customImageProvider,
             currentApiUrl: currentImageApiUrl,
@@ -321,8 +321,8 @@ async function initializeApp() {
             swarmuiApiUrl: SETTINGS.swarmuiApiUrl,
             customImageApiUrl: SETTINGS.customImageApiUrl
         });
-        
-        if (currentImageApiUrl !== expectedImageApiUrl || 
+
+        if (currentImageApiUrl !== expectedImageApiUrl ||
             imageService.provider !== SETTINGS.customImageProvider) {
 
             imageService = new ImageService(
@@ -336,7 +336,7 @@ async function initializeApp() {
                 apiUrl: expectedImageApiUrl
             });
         }
-        
+
         // Always update ImageService settings to ensure all parameters are current
         imageService.updateSettings({
             // A1111 settings
@@ -370,17 +370,17 @@ async function initializeApp() {
             openaiApiKey: SETTINGS.openaiApiKey,
             apiBaseUrl: expectedImageApiUrl
         });
-        
-        
+
+
         // Check if LLMService needs reinitialization
-        if (llmService.apiBaseUrl !== SETTINGS.customLlmApiUrl || 
+        if (llmService.apiBaseUrl !== SETTINGS.customLlmApiUrl ||
             llmService.providerType !== SETTINGS.customLlmProvider ||
             llmService.modelIdentifier !== SETTINGS.customLlmModelIdentifier) {
-            
+
             llmService = new LLMService(
-                SETTINGS.customLlmApiUrl, 
-                SETTINGS.customLlmProvider, 
-                SETTINGS.customLlmModelIdentifier, 
+                SETTINGS.customLlmApiUrl,
+                SETTINGS.customLlmProvider,
+                SETTINGS.customLlmModelIdentifier,
                 SETTINGS.customLlmApiKey,
                 {
                     openaiModel: SETTINGS.openaiModelIdentifier,
@@ -393,56 +393,56 @@ async function initializeApp() {
             );
             console.log('🔧 LLMService reinitialized');
         }
-        
+
         // Update voice service settings
         if (voiceService) {
             voiceService.setVoiceRate(SETTINGS.voiceSpeed);
             voiceService.setVoicePitch(SETTINGS.voicePitch);
-            
+
             if (SETTINGS.azureApiKey && SETTINGS.azureApiKey.trim()) {
                 voiceService.setAzureConfig(SETTINGS.azureApiKey, SETTINGS.azureRegion);
             }
         }
-        
+
         // Check if MCP client needs reinitialization
-        const needsMCPReinit = !mcpClient || 
+        const needsMCPReinit = !mcpClient ||
                               (mcpClient && mcpClient.serverUrl !== SETTINGS.mcpServerUrl) ||
                               (SETTINGS.mcpEnabled && !mcpClient);
-        
+
         if (needsMCPReinit && SETTINGS.mcpEnabled && SETTINGS.mcpServerUrl) {
-            
+
             // Update the global mcpEnabled variable
             mcpEnabled = SETTINGS.mcpEnabled;
-            
+
             // Reinitialize MCP client with current settings
             await initializeMCPClient();
         } else if (!SETTINGS.mcpEnabled) {
             mcpClient = null;
         }
-        
+
     }
-    
+
     // Expose globally for desktop interface
     window.reinitializeServicesWithCurrentSettings = reinitializeServicesWithCurrentSettings;
-    
+
     // Smart service reinitialization utilities
     const SERVICE_AFFECTING_SETTINGS = {
         // Image Service settings
         image: ['customImageProvider', 'customImageApiUrl', 'swarmuiApiUrl', 'imageWidth', 'imageHeight', 'imageSteps', 'imageCfgScale', 'imageSampler', 'swarmuiWidth', 'swarmuiHeight', 'swarmuiSteps', 'swarmuiCfgScale', 'swarmuiModel', 'swarmuiSampler', 'imageSize', 'openaiQuality', 'openaiOutputFormat', 'openaiBackground', 'imagen4AspectRatio', 'imagen4OutputFormat', 'imagen4PersonGeneration'],
-        
+
         // LLM Service settings
         llm: ['customLlmProvider', 'customLlmApiUrl', 'customLlmModelIdentifier', 'customLlmApiKey', 'openaiModelIdentifier', 'openaiApiKey', 'anthropicModelIdentifier', 'anthropicApiKey', 'googleModelIdentifier', 'googleApiKey'],
-        
+
         // Voice Service settings (Azure TTS)
         voice: ['azureApiKey', 'azureRegion'],
-        
+
         // MCP Service settings
         mcp: ['mcpEnabled', 'mcpServerUrl'],
-        
+
         // Search service settings
         search: ['searchEnabled', 'searchProvider', 'searchApiKey', 'searchResultsLimit', 'searchAutoSummarize', 'searchTimeFilter']
     };
-    
+
     // Flatten all service-affecting settings into one array
     const ALL_SERVICE_AFFECTING_SETTINGS = [
         ...SERVICE_AFFECTING_SETTINGS.image,
@@ -451,7 +451,7 @@ async function initializeApp() {
         ...SERVICE_AFFECTING_SETTINGS.mcp,
         ...SERVICE_AFFECTING_SETTINGS.search
     ];
-    
+
     // Debounced service reinitialization
     let serviceReinitTimeout = null;
     const debouncedServiceReinit = () => {
@@ -463,38 +463,38 @@ async function initializeApp() {
             }
         }, 750);
     };
-    
+
     // Smart service reinitialization function
     const smartServiceReinit = (settingsKey, elementType) => {
         // Only reinitialize for service-affecting settings
         if (!ALL_SERVICE_AFFECTING_SETTINGS.includes(settingsKey)) {
             return;
         }
-        
+
         // Immediate reinit for dropdowns and checkboxes (single changes)
         if (elementType === 'select-one' || elementType === 'checkbox') {
             if (window.reinitializeServicesWithCurrentSettings) {
                 window.reinitializeServicesWithCurrentSettings();
             }
-        } 
+        }
         // Debounced reinit for text inputs and ranges (continuous changes)
         else if (elementType === 'text' || elementType === 'password' || elementType === 'range' || elementType === 'number') {
             debouncedServiceReinit();
         }
     };
-    
+
     // Expose utilities globally
     window.smartServiceReinit = smartServiceReinit;
-    
+
     // Run service reinitialization to ensure everything is properly configured
     await reinitializeServicesWithCurrentSettings();
-    
+
     // --- Initial Settings Loading ---
     // Load settings into UI elements if settings panel is loaded
     function loadInitialSettingsToUI() {
-        // This ensures that when the settings panel is opened later, 
+        // This ensures that when the settings panel is opened later,
         // it will have the correct values from localStorage
-        
+
         // Settings will be loaded into UI elements when the settings panel is opened
         // by loadAllSettings() function, but we ensure the SETTINGS object is current
         console.log('🔧 Current SETTINGS object ready:', {
@@ -504,7 +504,7 @@ async function initializeApp() {
             llmProvider: SETTINGS.customLlmProvider
         });
     }
-    
+
     loadInitialSettingsToUI();
 
     // --- Proactive Settings Panel Loading ---
@@ -514,7 +514,7 @@ async function initializeApp() {
         if (!panelExists) {
             try {
                 await loadSettingsPanel();
-                
+
                 // Verify panel was actually loaded
                 const verifyPanel = settingsPanelContainer.querySelector('.settings-panel');
                 if (verifyPanel) {
@@ -529,34 +529,34 @@ async function initializeApp() {
         } else {
         }
     }
-    
+
     // Settings panel will be loaded after settingsIdMap is defined
 
     // --- Universal Font Size Management (Mobile + Desktop) ---
     function applyFontSize(fontSize) {
         const size = parseInt(fontSize);
-        
+
         // Apply font size to both mobile and desktop chat windows
         const mobileChat = document.getElementById('chat-window');
         const desktopChat = document.getElementById('desktop-chat-window');
-        
+
         if (mobileChat) {
             mobileChat.style.fontSize = size + 'px';
         }
-        
+
         if (desktopChat) {
             desktopChat.style.fontSize = size + 'px';
         }
-        
+
         // Apply to all existing messages in both interfaces
         const messages = document.querySelectorAll('.message');
         messages.forEach(message => {
             message.style.fontSize = size + 'px';
         });
-        
+
         // Set CSS custom property for future messages
         document.documentElement.style.setProperty('--chat-font-size', size + 'px');
-        
+
         console.log('🎨 Font size applied to all interfaces:', size + 'px');
     }
 
@@ -565,20 +565,20 @@ async function initializeApp() {
         // Update both mobile and desktop voice dropdowns
         const mobileVoiceDropdown = document.getElementById('select-tts-voice');
         const desktopVoiceDropdown = document.getElementById('desktop-tts-voice');
-        
+
         if (mobileVoiceDropdown) {
             mobileVoiceDropdown.value = selectedVoice;
             console.log(`Mobile voice dropdown updated to: ${selectedVoice}`);
         }
-        
+
         if (desktopVoiceDropdown) {
             desktopVoiceDropdown.value = selectedVoice;
             console.log(`Desktop voice dropdown updated to: ${selectedVoice}`);
         }
-        
+
         // Update the SETTINGS object to keep it in sync
         SETTINGS.ttsVoice = selectedVoice;
-        
+
         if (!mobileVoiceDropdown && !desktopVoiceDropdown) {
             console.warn('No voice dropdowns found, cannot update UI');
         }
@@ -605,10 +605,10 @@ async function initializeApp() {
                     // Use SSML for TTS, clean text for display
                     textToSpeak = message; // Full SSML for TTS
                     displayText = ssmlResult.cleanText; // Clean text for display
-                    
+
                     // Log SSML processing for debugging
                     ssmlProcessor.logSSMLForDebugging(ssmlResult.ssml, displayText, 'Main.js - addMessage');
-                    
+
                     // SSML detected and processed for TTS
                 } else {
                     // No SSML, use original text for both
@@ -623,7 +623,7 @@ async function initializeApp() {
 
             if (sender === 'llm' && window.marked && window.marked.parse) {
                 const cleanMessage = stripMarkdownCodeBlock(displayText);
-                
+
                 try {
                     const htmlContent = marked.parse(cleanMessage);
                     messageElement.innerHTML = htmlContent;
@@ -652,7 +652,7 @@ async function initializeApp() {
                 if (ssmlResult.hasSSML) {
                     textToSpeak = message.text; // Full SSML for TTS
                     displayText = ssmlResult.cleanText; // Clean text for display
-                    
+
                     ssmlProcessor.logSSMLForDebugging(ssmlResult.ssml, displayText, 'Main.js - addMessage (text object)');
                 } else {
                     textToSpeak = message.text;
@@ -665,7 +665,7 @@ async function initializeApp() {
 
             if (sender === 'llm' && window.marked && window.marked.parse) {
                 const cleanMessage = stripMarkdownCodeBlock(displayText);
-                
+
                 try {
                     const htmlContent = marked.parse(cleanMessage);
                     messageElement.innerHTML = htmlContent;
@@ -681,7 +681,7 @@ async function initializeApp() {
         // Add message to mobile chat window
         chatWindow.appendChild(messageElement);
         chatWindow.scrollTop = chatWindow.scrollHeight;
-        
+
         // Also add message to desktop chat window if it exists
         const desktopChatWindow = document.getElementById('desktop-chat-window');
         if (desktopChatWindow) {
@@ -696,7 +696,7 @@ async function initializeApp() {
             try {
                 console.log('🎤 Starting TTS for LLM message');
                 console.log(`🎤 Voice selection - Using: ${SETTINGS.ttsVoice}`);
-                
+
                 // Pass the original text (which may contain SSML) to voice service
                 // The voice service will handle SSML detection and processing
                 await voiceService.speak(textToSpeak, SETTINGS.ttsVoice);
@@ -727,7 +727,7 @@ async function initializeApp() {
 *Comprehensive research with web search and content extraction*
 - **"research [topic]"** - Full research workflow
 - **"investigate [topic]"** - Same as research
-- **"find out about [topic]"** - Same as research  
+- **"find out about [topic]"** - Same as research
 - **"look into [topic]"** - Same as research
 - **"gather information about [topic]"** - Same as research
 - **"what can you tell me about [topic]"** - Same as research
@@ -750,7 +750,7 @@ async function initializeApp() {
 ## 🔍 Basic Web Search
 *Quick search without comprehensive research*
 - **"search [query]"** - Basic web search
-- **"look up [query]"** - Basic web search  
+- **"look up [query]"** - Basic web search
 - **"find [query]"** - Basic web search
   - Example: "search for Python tutorials"
 
@@ -766,11 +766,11 @@ Type **"/list"** anytime to see this help again.`;
     // --- Search Functions ---
     function detectSearchKeywords(message) {
         const lowerMessage = message.toLowerCase();
-        
+
         // Agent workflow keywords that should NOT trigger basic search
         const agentKeywords = [
             'research',
-            'investigate', 
+            'investigate',
             'find out about',
             'look into',
             'gather information about',
@@ -778,13 +778,13 @@ Type **"/list"** anytime to see this help again.`;
             'learn about',
             'search for information about'
         ];
-        
+
         // If message contains agent keywords, don't use basic search
         const hasAgentKeyword = agentKeywords.some(keyword => lowerMessage.includes(keyword));
         if (hasAgentKeyword) {
             return false;
         }
-        
+
         // Specific basic search keywords (refined to avoid conflicts)
         const searchKeywords = [
             'search for',
@@ -794,13 +794,13 @@ Type **"/list"** anytime to see this help again.`;
             'find me',
             'web search'
         ];
-        
+
         return searchKeywords.some(keyword => lowerMessage.includes(keyword));
     }
 
     function extractSearchQuery(message) {
         const lowerMessage = message.toLowerCase();
-        
+
         // Patterns to extract search queries (matching refined detectSearchKeywords)
         const patterns = [
             /search for (.+)/i,
@@ -810,14 +810,14 @@ Type **"/list"** anytime to see this help again.`;
             /find me (.+)/i,
             /web search (.+)/i
         ];
-        
+
         for (const pattern of patterns) {
             const match = message.match(pattern);
             if (match && match[1]) {
                 return match[1].trim();
             }
         }
-        
+
         // Fallback: if no pattern matches, return the whole message
         return message.trim();
     }
@@ -830,7 +830,7 @@ Type **"/list"** anytime to see this help again.`;
 
         try {
             console.log('🔍 Performing web search for:', query);
-            
+
             const searchSettings = {
                 provider: SETTINGS.searchProvider,
                 apiKey: SETTINGS.searchApiKey,
@@ -858,12 +858,12 @@ Type **"/list"** anytime to see this help again.`;
             const transcript = voiceService.stopSTT();
             console.log('STT stopped by send button, final transcript:', transcript);
         }
-        
+
         // Clear voice service accumulated transcript when sending
         if (voiceService) {
             voiceService.accumulatedTranscript = "";
         }
-        
+
         const message = userInput.value.trim();
         if (!message) return;
 
@@ -876,36 +876,36 @@ Type **"/list"** anytime to see this help again.`;
                 violations: validation.violations,
                 riskLevel: validation.riskLevel
             });
-            
+
             addMessage('⚠️ Your message contains potentially unsafe content and was blocked for security reasons. Please rephrase your request.', 'system');
             return;
         }
-        
+
         // Use sanitized input for processing
         const sanitizedMessage = validation.sanitizedInput;
         console.log('🔒 Security: Input validated and sanitized');
-        
+
         // Update the display message to show sanitized version
         userInput.value = sanitizedMessage;
 
         // Check for /list command first
         if (sanitizedMessage.toLowerCase().startsWith('/list')) {
             userInput.value = '';
-            
+
             // Reset textarea height after clearing content
             const minHeight = 44;
             userInput.style.height = minHeight + 'px';
-            
+
             // Contract the input expansion after sending
             const inputArea = document.querySelector('.input-area');
             if (inputArea) {
                 inputArea.classList.remove('expanded');
                 userInput.classList.remove('expanded');
             }
-            
+
             // Add user message to show they asked for the list
             addMessage('/list', 'user');
-            
+
             // Display the keywords list
             addMessage(generateKeywordsList(), 'llm');
             return;
@@ -915,7 +915,7 @@ Type **"/list"** anytime to see this help again.`;
         if (sanitizedMessage.toLowerCase().startsWith('xx')) {
             // Extract image prompt (remove "xx" and trim) - validate the image prompt too
             const imagePrompt = sanitizedMessage.substring(2).trim();
-            
+
             // 🔒 SECURITY: Validate image prompt
             const imageValidation = window.securityValidator.validateUserInput(imagePrompt, 'imagePrompt');
             if (!imageValidation.isValid) {
@@ -923,28 +923,28 @@ Type **"/list"** anytime to see this help again.`;
                 addMessage('⚠️ Your image prompt contains potentially unsafe content. Please rephrase your request.', 'system');
                 return;
             }
-            
+
             if (!imagePrompt) {
                 addMessage('Please provide an image prompt after "xx"', 'system');
                 return;
             }
-            
+
             userInput.value = '';
-            
+
             // Reset textarea height after clearing content
             const minHeight = 44;
             userInput.style.height = minHeight + 'px';
-            
+
             // Contract the input expansion after sending
             const inputArea = document.querySelector('.input-area');
             if (inputArea) {
                 inputArea.classList.remove('expanded');
                 userInput.classList.remove('expanded');
             }
-            
+
             // Display user message in chat
             addMessage(sanitizedMessage, 'user');
-            
+
             // Generate image directly (async, no LLM involved)
             try {
                 addMessage('Generating image...', 'llm', false);
@@ -958,23 +958,23 @@ Type **"/list"** anytime to see this help again.`;
                 console.error('Direct image generation error:', error);
                 addMessage(`Image generation error: ${error.message}`, 'llm');
             }
-            
+
             return; // Exit early - don't process through LLM
         }
 
         userInput.value = '';
-        
+
         // Reset textarea height after clearing content
         const minHeight = 44;
         userInput.style.height = minHeight + 'px';
-        
+
         // Contract the input expansion after sending
         const inputArea = document.querySelector('.input-area');
         if (inputArea) {
             inputArea.classList.remove('expanded');
             userInput.classList.remove('expanded');
         }
-        
+
         // Check if this is a "show me" image request - if so, don't add to conversation history
         const isImageRequest = sanitizedMessage.toLowerCase().includes("show me");
         addMessage(sanitizedMessage, 'user'); // Always show user message in chat
@@ -989,7 +989,7 @@ Type **"/list"** anytime to see this help again.`;
         } else {
             console.log('📄 No document context available');
         }
-        
+
         // Prepare conversation context for MCP
         const conversationContext = llmService.conversationHistory
             .map(msg => {
@@ -997,14 +997,14 @@ Type **"/list"** anytime to see this help again.`;
                 return `${msg.role}: ${content}`;
             })
             .join('\n');
-        
+
         // Combine conversation and document context for MCP (only if MCP is connected)
         const fullContextForMCP = documentContext + '\n\n' + conversationContext;
 
         // Check for search keywords FIRST (basic search has priority)
         if (SETTINGS.searchEnabled && detectSearchKeywords(sanitizedMessage)) {
             console.log('🔍 Search keywords detected in message');
-            
+
             // Add user message to conversation history immediately for search
             if (llmService) {
                 llmService.conversationHistory.push({
@@ -1013,16 +1013,16 @@ Type **"/list"** anytime to see this help again.`;
                 });
                 console.log('📝 User message added to conversation history for search:', sanitizedMessage);
             }
-            
+
             const searchQuery = extractSearchQuery(sanitizedMessage);
             console.log('📝 Extracted search query:', searchQuery);
-            
+
             const searchResult = await performWebSearch(searchQuery);
-            
+
             if (searchResult && searchResult.content && searchResult.content[0]) {
                 console.log('✅ Search result received, displaying to user');
                 await addMessage(searchResult.content[0].text, 'llm', false); // Disable TTS for search results
-                
+
                 // Add search result to conversation history
                 if (llmService) {
                     llmService.conversationHistory.push({
@@ -1031,7 +1031,7 @@ Type **"/list"** anytime to see this help again.`;
                     });
                     llmService.saveConversationHistory();
                     console.log('🔍 Search result added to conversation history');
-                    
+
                     // Add subtle suggestion for deeper exploration (only if auto-summarize is disabled)
                     const autoSummarize = localStorage.getItem('search-auto-summarize') === 'true';
                     if (!autoSummarize && mcpClient && mcpClient.isConnected) {
@@ -1059,13 +1059,13 @@ Type **"/list"** anytime to see this help again.`;
                 const mcpResult = await mcpClient.integrateWithChat(sanitizedMessage, fullContextForMCP, llmService);
                 if (mcpResult && mcpResult.content && mcpResult.content[0]) {
                     console.log('✅ MCP handled the message');
-                    
+
                     // Handle different result types
                     if (mcpResult.isAgentResult) {
                         // Agent workflow result - display directly with TTS enabled for synthesized content
                         await addMessage(mcpResult.content[0].text, 'llm', true);
                         console.log('🤖 Agent workflow result displayed');
-                        
+
                         // Add to conversation history
                         if (llmService) {
                             llmService.conversationHistory.push({
@@ -1073,7 +1073,7 @@ Type **"/list"** anytime to see this help again.`;
                                 content: sanitizedMessage
                             });
                             llmService.conversationHistory.push({
-                                role: "assistant", 
+                                role: "assistant",
                                 content: mcpResult.content[0].text
                             });
                             llmService.saveConversationHistory();
@@ -1095,7 +1095,7 @@ Type **"/list"** anytime to see this help again.`;
                         // Regular MCP tool result (sequential thinking, etc.)
                         await addMessage(mcpResult.content[0].text, 'llm');
                         console.log('🔧 MCP tool result displayed');
-                        
+
                         // Add to conversation history
                         if (llmService) {
                             llmService.conversationHistory.push({
@@ -1120,12 +1120,12 @@ Type **"/list"** anytime to see this help again.`;
 
         console.log('🤖 Processing with normal LLM flow');
         // Processing with normal LLM flow
-        
+
         // Document context already retrieved above for MCP, reuse it
         // Skip adding user message for image requests, allow for normal messages
         const skipAddingUserMessage = isImageRequest;
         const response = await llmService.sendMessage(sanitizedMessage, documentContext, skipAddingUserMessage);
-        
+
         if (response.type === 'image_request') {
             console.log("Image request detected, generating image...");
             try {
@@ -1151,13 +1151,13 @@ Type **"/list"** anytime to see this help again.`;
     function clearConversation() {
         // Clear mobile chat window
         chatWindow.innerHTML = '';
-        
+
         // Also clear desktop chat window if it exists
         const desktopChatWindow = document.getElementById('desktop-chat-window');
         if (desktopChatWindow) {
             desktopChatWindow.innerHTML = '';
         }
-        
+
         if (llmService) {
             llmService.clearConversationHistory();
         }
@@ -1184,7 +1184,7 @@ Type **"/list"** anytime to see this help again.`;
         // by using passive: false to allow preventDefault when needed.
         element.addEventListener(eventType, handler, { passive: false });
     }
-    
+
     // Alias for backward compatibility
     const addMobileCompatibleEvent = addUniversalEvent;
 
@@ -1192,7 +1192,7 @@ Type **"/list"** anytime to see this help again.`;
     async function createPersona(customPrompt) {
         // Clear mobile chat window
         chatWindow.innerHTML = '';
-        
+
         // Also clear desktop chat window if it exists
         const desktopChatWindow = document.getElementById('desktop-chat-window');
         if (desktopChatWindow) {
@@ -1209,9 +1209,9 @@ Type **"/list"** anytime to see this help again.`;
         }
 
         llmService = new LLMService(
-            SETTINGS.customLlmApiUrl, 
-            SETTINGS.customLlmProvider, 
-            SETTINGS.customLlmModelIdentifier, 
+            SETTINGS.customLlmApiUrl,
+            SETTINGS.customLlmProvider,
+            SETTINGS.customLlmModelIdentifier,
             SETTINGS.customLlmApiKey,
             {
                 openaiModel: SETTINGS.openaiModelIdentifier,
@@ -1223,10 +1223,10 @@ Type **"/list"** anytime to see this help again.`;
             }
         );
         llmService.clearConversationHistory();
-        
+
         contextService.clearAllDocuments();
         updateAttachedDocsDisplay();
-        
+
         if (currentPersonaPrompt) {
             llmService.setCustomPersona(currentPersonaPrompt);
         }
@@ -1241,10 +1241,10 @@ Type **"/list"** anytime to see this help again.`;
         try {
             console.log("Generating character profile for new persona...");
             await llmService.generateCharacterProfile();
-            
+
             console.log("Generating initial persona image and greeting...");
             const result = await llmService.generateInitialPersonaContent();
-            
+
             if (result.imagePrompt) {
                 try {
                     const imageUrl = await imageService.generateImage(result.imagePrompt);
@@ -1255,30 +1255,30 @@ Type **"/list"** anytime to see this help again.`;
                     console.error('Error generating persona image:', imageError);
                 }
             }
-            
+
             if (result.greeting) {
                 console.log('Initial greeting generated and added to conversation history');
-                
+
                 // Check if mobile device for autoplay handling
-                const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) || 
+                const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ||
                                  window.innerWidth <= 768;
-                
+
                 if (isMobile) {
                     // Mobile: Add greeting without auto-TTS due to autoplay restrictions
                     console.log('Mobile: Adding greeting without auto-TTS due to autoplay restrictions');
                     addMessage(result.greeting, 'llm', false); // false = disable TTS
-                    
+
                     // Show prompt for user to enable audio
                     setTimeout(() => {
                         addMessage('(Tap anywhere to enable voice responses)', 'system', false);
                     }, 1000);
-                    
+
                     // Enable TTS on user interaction
                     const enableTTSOnTouch = () => {
                         console.log('Mobile: Enabling TTS after user interaction');
                         document.removeEventListener('touchstart', enableTTSOnTouch);
                         document.removeEventListener('click', enableTTSOnTouch);
-                        
+
                         // Remove the prompt message
                         const systemMessages = chatWindow.querySelectorAll('.message');
                         systemMessages.forEach(msg => {
@@ -1286,22 +1286,22 @@ Type **"/list"** anytime to see this help again.`;
                                 msg.remove();
                             }
                         });
-                        
+
                         // Re-speak the greeting now that audio is unlocked
                         if (voiceService && voiceService.isSynthesisSupported()) {
                             voiceService.speak(result.greeting, SETTINGS.ttsVoice);
                         }
                     };
-                    
+
                     document.addEventListener('touchstart', enableTTSOnTouch, { once: true });
                     document.addEventListener('click', enableTTSOnTouch, { once: true });
-                    
+
                 } else {
                     // Desktop: Normal TTS behavior
                     addMessage(result.greeting, 'llm');
                 }
             }
-            
+
         } catch (error) {
             console.error('Error generating initial persona content:', error);
         }
@@ -1310,28 +1310,28 @@ Type **"/list"** anytime to see this help again.`;
     function addWelcomeMessage() {
         const welcomeElement = document.createElement('div');
         welcomeElement.classList.add('message', 'welcome-message');
-        welcomeElement.innerHTML = "VeilChat".split('').map((char, i) => 
+        welcomeElement.innerHTML = "VeilChat".split('').map((char, i) =>
             `<span class="animated-letter" style="animation-delay: ${i * 0.1}s">${char}</span>`
         ).join('');
-        
+
         // Enhanced mobile event handling for welcome message
         const handleWelcomeInteraction = async (e) => {
             e.preventDefault();
             e.stopPropagation(); // PREVENTS the event from bubbling to the overlay
             console.log('Welcome message clicked/touched');
-            
+
             if (!personaPanelContainer.querySelector('.persona-panel')) {
                 await loadPersonaPanel();
             }
             showPersonaPanel();
         };
-        
+
         // Add multiple event types for better mobile compatibility
         addMobileCompatibleEvent(welcomeElement, 'click', handleWelcomeInteraction);
-        
+
         chatWindow.appendChild(welcomeElement);
         chatWindow.scrollTop = chatWindow.scrollHeight;
-        
+
         console.log('Welcome message added to chat window');
     }
 
@@ -1417,10 +1417,10 @@ Type **"/list"** anytime to see this help again.`;
     }
     function closeSettingsPanel() {
         console.trace("Call stack for closeSettingsPanel:"); // This will show what called the function.
-        
+
         // Apply all settings before closing panel to ensure everything is saved
         // Settings now save automatically - no manual save needed
-        
+
         const panel = document.querySelector('#settings-panel-container .settings-panel');
         if (!panel) {
             console.warn('closeSettingsPanel called, but no panel element found.');
@@ -1458,15 +1458,15 @@ Type **"/list"** anytime to see this help again.`;
     // --- Close panels on ESC key and clear input on double ESC ---
     let lastEscapeTime = 0;
     const doubleEscapeDelay = 500; // 500ms window for double ESC
-    
+
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape') {
             const currentTime = Date.now();
-            
+
             // Always close panels first
             closeSettingsPanel();
             closePersonaPanel();
-            
+
             // Check for double ESC to clear input
             if (currentTime - lastEscapeTime < doubleEscapeDelay) {
                 // Double ESC detected - clear input box
@@ -1532,18 +1532,18 @@ Type **"/list"** anytime to see this help again.`;
         searchTimeFilter: 'search-time-filter',
         fontSize: 'slider-font-size'
     };
-    
+
     // Desktop element mapping for dual sync
     const desktopSettingsIdMap = {
         // Font Settings
         fontSize: 'desktop-font-size',
-        
-        // LLM Provider Settings  
+
+        // LLM Provider Settings
         customLlmProvider: 'desktop-llm-provider',
         customLlmApiUrl: 'desktop-llm-api-url',
         customLlmModelIdentifier: 'desktop-llm-model',
         customLlmApiKey: 'desktop-llm-api-key',
-        
+
         // Direct API Provider Settings
         openaiModelIdentifier: 'desktop-openai-model-identifier',
         openaiApiKey: 'desktop-openai-api-key',
@@ -1551,18 +1551,18 @@ Type **"/list"** anytime to see this help again.`;
         anthropicApiKey: 'desktop-anthropic-api-key',
         googleModelIdentifier: 'desktop-google-model-identifier',
         googleApiKey: 'desktop-google-api-key',
-        
+
         // Voice Settings
         ttsVoice: 'desktop-tts-voice',
         voiceSpeed: 'desktop-voice-speed',
         voicePitch: 'desktop-voice-pitch',
         azureApiKey: 'azure-api-key-desktop',
         azureRegion: 'desktop-azure-region',
-        
+
         // MCP Settings
         mcpEnabled: 'desktop-mcp-enabled',
         mcpServerUrl: 'desktop-mcp-url',
-        
+
         // Web Search Settings
         searchEnabled: 'desktop-search-enabled',
         searchProvider: 'desktop-search-provider',
@@ -1570,10 +1570,10 @@ Type **"/list"** anytime to see this help again.`;
         searchResultsLimit: 'desktop-search-results-limit',
         searchAutoSummarize: 'desktop-search-auto-summarize',
         searchTimeFilter: 'desktop-search-time-filter',
-        
+
         // Image Generation Settings
         customImageProvider: 'desktop-image-provider',
-        
+
         // A1111 Settings
         customImageApiUrl: 'desktop-image-api-url',
         imageWidth: 'desktop-image-width',
@@ -1581,7 +1581,7 @@ Type **"/list"** anytime to see this help again.`;
         imageSteps: 'desktop-image-steps',
         imageCfgScale: 'desktop-image-cfg-scale',
         imageSampler: 'desktop-image-sampler',
-        
+
         // SwarmUI Settings
         swarmuiApiUrl: 'desktop-swarmui-api-url',
         swarmuiWidth: 'desktop-swarmui-width',
@@ -1590,7 +1590,7 @@ Type **"/list"** anytime to see this help again.`;
         swarmuiCfgScale: 'desktop-swarmui-cfg-scale',
         swarmuiModel: 'desktop-swarmui-model',
         swarmuiSampler: 'desktop-swarmui-sampler',
-        
+
         // OpenAI Image Settings
         imageSize: 'desktop-image-size',
         openaiQuality: 'desktop-openai-quality',
@@ -1603,7 +1603,7 @@ Type **"/list"** anytime to see this help again.`;
     async function initializeSettingsPanel() {
         await ensureSettingsPanelLoaded();
     }
-    
+
     // Execute immediately but don't block the rest of initialization
     initializeSettingsPanel().catch(error => {
         console.error('Settings panel initialization failed:', error);
@@ -1613,16 +1613,16 @@ Type **"/list"** anytime to see this help again.`;
         Object.keys(SETTINGS).forEach(key => {
             const mobileElementId = settingsIdMap[key];
             const desktopElementId = desktopSettingsIdMap[key];
-            
+
             let element = null;
             let sourceInterface = '';
-            
+
             // Try mobile element first
             if (mobileElementId && settingsPanelContainer) {
                 element = settingsPanelContainer.querySelector(`#${mobileElementId}`);
                 if (element) sourceInterface = 'mobile';
             }
-            
+
             // If not found in mobile, try desktop
             if (!element && desktopElementId) {
                 element = document.getElementById(desktopElementId);
@@ -1633,9 +1633,9 @@ Type **"/list"** anytime to see this help again.`;
                 const value = element.type === 'checkbox' ? element.checked : element.value;
                 localStorage.setItem(key, value);
                 SETTINGS[key] = value;
-                
+
                 console.log(`🔧 saveAllSettings (${sourceInterface}): ${key} = ${value ? (key.includes('ApiKey') ? 'PRESENT' : value) : 'EMPTY'}`);
-                
+
                 // Sync to the other interface if available
                 if (sourceInterface === 'mobile' && desktopElementId) {
                     const desktopElement = document.getElementById(desktopElementId);
@@ -1658,15 +1658,15 @@ Type **"/list"** anytime to see this help again.`;
                 }
             }
         });
-        
+
         // Apply font size to all interfaces
         if (SETTINGS.fontSize) {
             applyFontSize(SETTINGS.fontSize);
         }
-        
-        const llmSettingsChanged = SETTINGS.customLlmApiUrl !== llmService.apiBaseUrl || 
-                                   SETTINGS.customLlmModelIdentifier !== llmService.modelIdentifier || 
-                                   SETTINGS.customLlmApiKey !== llmService.apiKey || 
+
+        const llmSettingsChanged = SETTINGS.customLlmApiUrl !== llmService.apiBaseUrl ||
+                                   SETTINGS.customLlmModelIdentifier !== llmService.modelIdentifier ||
+                                   SETTINGS.customLlmApiKey !== llmService.apiKey ||
                                    SETTINGS.customLlmProvider !== llmService.providerType ||
                                    SETTINGS.openaiModelIdentifier !== (llmService.directProviders && llmService.directProviders.openaiModel) ||
                                    SETTINGS.openaiApiKey !== (llmService.directProviders && llmService.directProviders.openaiApiKey) ||
@@ -1674,11 +1674,11 @@ Type **"/list"** anytime to see this help again.`;
                                    SETTINGS.anthropicApiKey !== (llmService.directProviders && llmService.directProviders.anthropicApiKey) ||
                                    SETTINGS.googleModelIdentifier !== (llmService.directProviders && llmService.directProviders.googleModel) ||
                                    SETTINGS.googleApiKey !== (llmService.directProviders && llmService.directProviders.googleApiKey);
-        const imageSettingsChanged = SETTINGS.customImageApiUrl !== imageService.apiBaseUrl || 
-                                      SETTINGS.customImageProvider !== imageService.provider || 
+        const imageSettingsChanged = SETTINGS.customImageApiUrl !== imageService.apiBaseUrl ||
+                                      SETTINGS.customImageProvider !== imageService.provider ||
                                       SETTINGS.openaiApiKey !== imageService.openaiApiKey ||
                                       (SETTINGS.customImageProvider === 'swarmui' && SETTINGS.swarmuiApiUrl !== imageService.apiBaseUrl);
-        const mcpSettingsChanged = SETTINGS.mcpEnabled !== mcpEnabled || 
+        const mcpSettingsChanged = SETTINGS.mcpEnabled !== mcpEnabled ||
                                    (mcpClient && mcpClient.serverUrl !== SETTINGS.mcpServerUrl);
 
         if (llmSettingsChanged) {
@@ -1691,13 +1691,13 @@ Type **"/list"** anytime to see this help again.`;
                 googleModel: SETTINGS.googleModelIdentifier,
                 googleApiKey: SETTINGS.googleApiKey ? 'PRESENT' : 'MISSING'
             });
-            
+
             const oldHistory = llmService.conversationHistory;
             const oldInitialized = llmService.characterInitialized;
             llmService = new LLMService(
-                SETTINGS.customLlmApiUrl, 
-                SETTINGS.customLlmProvider, 
-                SETTINGS.customLlmModelIdentifier, 
+                SETTINGS.customLlmApiUrl,
+                SETTINGS.customLlmProvider,
+                SETTINGS.customLlmModelIdentifier,
                 SETTINGS.customLlmApiKey,
                 {
                     openaiModel: SETTINGS.openaiModelIdentifier,
@@ -1733,7 +1733,7 @@ Type **"/list"** anytime to see this help again.`;
                 SETTINGS.googleApiKey
             );
         }
-        
+
         // Handle MCP settings changes
         if (mcpSettingsChanged) {
             mcpEnabled = SETTINGS.mcpEnabled;
@@ -1748,7 +1748,7 @@ Type **"/list"** anytime to see this help again.`;
                 }
             }
         }
-        
+
         imageService.updateSettings({
             size: SETTINGS.imageSize,
             width: parseInt(SETTINGS.imageWidth),
@@ -1770,7 +1770,7 @@ Type **"/list"** anytime to see this help again.`;
         if (voiceService) {
             voiceService.setVoiceRate(SETTINGS.voiceSpeed);
             voiceService.setVoicePitch(SETTINGS.voicePitch);
-            
+
             // Initialize Azure TTS if API key is provided
             if (SETTINGS.azureApiKey && SETTINGS.azureApiKey.trim()) {
                 voiceService.setAzureConfig(SETTINGS.azureApiKey, SETTINGS.azureRegion);
@@ -1781,21 +1781,21 @@ Type **"/list"** anytime to see this help again.`;
     // --- Universal Settings Loading (Mobile + Desktop) ---
     function setupMobileSettingsHandlers() {
         if (!settingsPanelContainer) return;
-        
-        
+
+
         // Load settings from localStorage into mobile interface
         Object.keys(settingsIdMap).forEach(settingsKey => {
             const mobileId = settingsIdMap[settingsKey];
             const element = settingsPanelContainer.querySelector(`#${mobileId}`);
-            
+
             if (element) {
                 let value = localStorage.getItem(settingsKey);
-                
+
                 // Special handling for Azure API key fallback
                 if (settingsKey === 'azureApiKey' && (!value || value === '')) {
                     value = localStorage.getItem('azure-api-key') || '';
                 }
-                
+
                 // Load value into element
                 if (element.type === 'checkbox') {
                     element.checked = value === 'true' || value === true;
@@ -1804,7 +1804,7 @@ Type **"/list"** anytime to see this help again.`;
                 } else {
                     element.value = value || '';
                 }
-                
+
                 // Setup save handlers
                 const saveHandler = () => {
                     const currentValue = element.type === 'checkbox' ? element.checked : element.value;
@@ -1812,14 +1812,14 @@ Type **"/list"** anytime to see this help again.`;
                     if (window.SETTINGS) {
                         window.SETTINGS[settingsKey] = currentValue;
                     }
-                    
+
                     // Smart service reinitialization based on element type and setting importance
                     if (window.smartServiceReinit && typeof window.smartServiceReinit === 'function') {
                         window.smartServiceReinit(settingsKey, element.type);
                     }
-                    
+
                 };
-                
+
                 element.addEventListener('change', saveHandler);
                 element.addEventListener('input', saveHandler);
             }
@@ -1827,12 +1827,12 @@ Type **"/list"** anytime to see this help again.`;
     }
 
     function loadAllSettings() {
-        
+
         Object.keys(SETTINGS).forEach(key => {
             const mobileElementId = settingsIdMap[key];
             const desktopElementId = desktopSettingsIdMap[key];
             const storedValue = SETTINGS[key];
-            
+
             // Load into mobile interface
             if (mobileElementId && settingsPanelContainer) {
                 const mobileElement = settingsPanelContainer.querySelector(`#${mobileElementId}`);
@@ -1844,7 +1844,7 @@ Type **"/list"** anytime to see this help again.`;
                     }
                 }
             }
-            
+
             // Load into desktop interface
             if (desktopElementId) {
                 const desktopElement = document.getElementById(desktopElementId);
@@ -1854,7 +1854,7 @@ Type **"/list"** anytime to see this help again.`;
                     } else {
                         desktopElement.value = storedValue;
                     }
-                    
+
                     // Trigger any display updates for sliders
                     if (desktopElement.type === 'range') {
                         desktopElement.dispatchEvent(new Event('input'));
@@ -1862,10 +1862,10 @@ Type **"/list"** anytime to see this help again.`;
                 }
             }
         });
-        
+
         // Apply font size to all interfaces
         applyFontSize(SETTINGS.fontSize);
-        
+
         console.log('🔧 loadAllSettings: Settings loaded to all available interfaces');
     }
 
@@ -1916,7 +1916,7 @@ Type **"/list"** anytime to see this help again.`;
         const modelIdentifierItem = container.querySelector('#model-identifier-item');
         const apiKeyItem = container.querySelector('#api-key-item');
         const llmApiUrlItem = container.querySelector('#llm-api-url').parentElement;
-        
+
         // Direct provider settings
         const openaiDirectSettings = container.querySelector('.openai-direct-settings');
         const anthropicDirectSettings = container.querySelector('.anthropic-direct-settings');
@@ -1925,12 +1925,12 @@ Type **"/list"** anytime to see this help again.`;
         function toggleVisibility() {
             if (!llmProviderSelect) return;
             const provider = llmProviderSelect.value;
-            
+
             // Hide all direct provider settings first
             if (openaiDirectSettings) openaiDirectSettings.style.display = 'none';
             if (anthropicDirectSettings) anthropicDirectSettings.style.display = 'none';
             if (googleDirectSettings) googleDirectSettings.style.display = 'none';
-            
+
             // Handle traditional provider settings visibility
             if (provider === 'openai-direct') {
                 // Hide traditional settings, show OpenAI direct settings
@@ -1954,7 +1954,7 @@ Type **"/list"** anytime to see this help again.`;
                 // Traditional providers - show traditional settings
                 if (llmApiUrlItem) llmApiUrlItem.style.display = 'flex';
                 if (apiKeyItem) apiKeyItem.style.display = 'flex';
-                
+
                 // LMStudio uses a path, not a model identifier from a list
                 if (provider === 'lmstudio') {
                     if (modelIdentifierItem) modelIdentifierItem.style.display = 'none';
@@ -2027,21 +2027,21 @@ Type **"/list"** anytime to see this help again.`;
                         voicePitchValue.textContent = voicePitchSlider.value;
                     });
                 }
-                
+
                 // Font Size slider functionality
                 const fontSizeSlider = settingsPanelContainer.querySelector('#slider-font-size');
                 const fontSizeValue = settingsPanelContainer.querySelector('#font-size-value');
-                
+
                 if (fontSizeSlider && fontSizeValue) {
                     // Apply current font size on load
                     applyFontSize(fontSizeSlider.value);
                     fontSizeValue.textContent = fontSizeSlider.value + 'px';
-                    
+
                     fontSizeSlider.addEventListener('input', () => {
                         const fontSize = fontSizeSlider.value;
                         fontSizeValue.textContent = fontSize + 'px';
                         applyFontSize(fontSize);
-                        
+
                         // Save to localStorage immediately for font size changes
                         localStorage.setItem('fontSize', fontSize);
                         SETTINGS.fontSize = parseInt(fontSize);
@@ -2079,28 +2079,34 @@ Type **"/list"** anytime to see this help again.`;
             console.log('Desktop interface not available, skipping sync');
             return;
         }
-        
+
+        const redactSettingValue = (key, value) => /apiKey|api_key|authorization|token|secret|password/i.test(key)
+            ? (value ? 'PRESENT' : 'MISSING')
+            : value;
+
         console.log('=== Starting Desktop Settings Sync ===');
-        console.log('Current SETTINGS object:', SETTINGS);
-        
+        console.log('Current SETTINGS object:', Object.fromEntries(
+            Object.entries(SETTINGS || {}).map(([key, value]) => [key, redactSettingValue(key, value)])
+        ));
+
         // Debug localStorage keys for Azure
         console.log('Azure debugging:');
-        console.log('  localStorage.azureApiKey:', localStorage.getItem('azureApiKey'));
-        console.log('  localStorage.azureAPIKey:', localStorage.getItem('azureAPIKey'));
-        console.log('  localStorage["azure-api-key"]:', localStorage.getItem('azure-api-key'));
-        console.log('  SETTINGS.azureApiKey:', SETTINGS.azureApiKey);
-        
+        console.log('  localStorage.azureApiKey:', localStorage.getItem('azureApiKey') ? 'PRESENT' : 'MISSING');
+        console.log('  localStorage.azureAPIKey:', localStorage.getItem('azureAPIKey') ? 'PRESENT' : 'MISSING');
+        console.log('  localStorage["azure-api-key"]:', localStorage.getItem('azure-api-key') ? 'PRESENT' : 'MISSING');
+        console.log('  SETTINGS.azureApiKey:', SETTINGS.azureApiKey ? 'PRESENT' : 'MISSING');
+
         let syncCount = 0;
         let missingElements = 0;
-        
+
         // Sync each setting from localStorage to its corresponding desktop element
         Object.keys(desktopSettingsIdMap).forEach(settingKey => {
             const desktopElementId = desktopSettingsIdMap[settingKey];
             const desktopElement = document.getElementById(desktopElementId);
             const value = SETTINGS[settingKey];
-            
-            console.log(`Checking ${settingKey}: value="${value}", element=${!!desktopElement}`);
-            
+
+            console.log(`Checking ${settingKey}: value="${redactSettingValue(settingKey, value)}", element=${!!desktopElement}`);
+
             if (desktopElement && value !== undefined && value !== null && value !== '') {
                 if (desktopElement.type === 'checkbox') {
                     desktopElement.checked = (value === true || value === 'true');
@@ -2145,7 +2151,7 @@ Type **"/list"** anytime to see this help again.`;
             console.log(`Updating image provider sections for: ${imageProviderElement.value}`);
             window.desktopInterface.toggleImageProviderSections(imageProviderElement.value);
         }
-        
+
         console.log('=== Desktop Settings Sync Completed ===');
     }
 
@@ -2153,8 +2159,8 @@ Type **"/list"** anytime to see this help again.`;
     window.syncSettingsToDesktop = syncSettingsToDesktop;
 
     // --- Voice Service Handlers ---
-    function handleSttResult(text) { 
-        userInput.value = text; 
+    function handleSttResult(text) {
+        userInput.value = text;
         // Trigger auto-resize manually since direct value assignment doesn't fire 'input' event
         const autoResizeEvent = new Event('input');
         userInput.dispatchEvent(autoResizeEvent);
@@ -2165,7 +2171,7 @@ Type **"/list"** anytime to see this help again.`;
             micButton.textContent = isListening ? '🎤' : '🎤';
             micButton.classList.toggle('recording', isListening);
         }
-        
+
         // Expand/contract input area based on STT state
         const inputArea = document.querySelector('.input-area');
         if (inputArea && userInput) {
@@ -2197,7 +2203,7 @@ Type **"/list"** anytime to see this help again.`;
 
         try {
             const results = await contextService.processFiles(files);
-            
+
             let successCount = 0;
             let errorMessages = [];
 
@@ -2232,7 +2238,7 @@ Type **"/list"** anytime to see this help again.`;
 
     function updateAttachedDocsDisplay() {
         const docs = contextService.getAttachedDocuments();
-        
+
         if (docs.length === 0) {
             attachedDocsContainer.style.display = 'none';
             return;
@@ -2271,7 +2277,7 @@ Type **"/list"** anytime to see this help again.`;
 
     window.removeDocument = removeDocument;
     window.clearAllDocuments = clearAllDocuments;
-    
+
     // Add SSML style guide access for debugging
     window.printSSMLStyles = () => {
         if (typeof SSMLProcessor !== 'undefined') {
@@ -2284,11 +2290,11 @@ Type **"/list"** anytime to see this help again.`;
 
     // --- Enhanced Event Listeners for Mobile ---
     addMobileCompatibleEvent(sendButton, 'click', handleUserInput);
-    
+
     addMobileCompatibleEvent(fullScreenImageViewer, 'click', () => {
         fullScreenImageViewer.style.display = 'none';
     });
-    
+
     if (attachButton) {
         addMobileCompatibleEvent(attachButton, 'click', (e) => {
             e.preventDefault();
@@ -2300,12 +2306,12 @@ Type **"/list"** anytime to see this help again.`;
     if (fileInput) {
         fileInput.addEventListener('change', handleFileAttachment);
     }
-    
+
     addMobileCompatibleEvent(settingsButton, 'click', async (e) => {
         e.preventDefault();
         e.stopPropagation(); // PREVENTS the event from bubbling to the overlay
         console.log('Settings button clicked/touched');
-        
+
         const panelExists = settingsPanelContainer.querySelector('.settings-panel');
         console.log(`%c[DEBUG] Checking for panel... Panel exists? ${!!panelExists}`, 'color: purple;');
 
@@ -2336,20 +2342,20 @@ Type **"/list"** anytime to see this help again.`;
     function setupInputExpansion() {
         const inputArea = document.querySelector('.input-area');
         const userInput = document.getElementById('user-input');
-        
+
         if (!inputArea || !userInput) return;
-        
+
         // Expand on focus/click
         userInput.addEventListener('focus', () => {
             inputArea.classList.add('expanded');
             userInput.classList.add('expanded');
             console.log('Input expanded');
         });
-        
+
         userInput.addEventListener('click', () => {
             console.log('Click event fired! Input area expanded:', inputArea.classList.contains('expanded'));
             console.log('Body has pwa-mode class:', document.body.classList.contains('pwa-mode'));
-            
+
             if (!inputArea.classList.contains('expanded')) {
                 inputArea.classList.add('expanded');
                 userInput.classList.add('expanded');
@@ -2357,7 +2363,7 @@ Type **"/list"** anytime to see this help again.`;
                 console.log('Input expanded on click - classes added');
                 console.log('Input area classes:', inputArea.className);
                 console.log('User input classes:', userInput.className);
-                
+
                 // Force a style recalculation to ensure PWA styles apply
                 setTimeout(() => {
                     inputArea.style.display = 'flex'; // Trigger reflow
@@ -2367,27 +2373,27 @@ Type **"/list"** anytime to see this help again.`;
                 console.log('Input was already expanded');
             }
         });
-        
+
         // Contract when clicking outside or on specific conditions
         document.addEventListener('click', (e) => {
             // Don't contract if clicking on input, send button, or if input has content
-            if (e.target === userInput || 
+            if (e.target === userInput ||
                 e.target === document.getElementById('send-button') ||
                 userInput.value.trim() !== '') {
                 return;
             }
-            
+
             // Contract the input
             inputArea.classList.remove('expanded');
             userInput.classList.remove('expanded');
             console.log('Input contracted');
         });
-        
+
         // Also contract on blur, but only if input is empty
         userInput.addEventListener('blur', (e) => {
             // Small delay to allow for send button click
             setTimeout(() => {
-                if (userInput.value.trim() === '' && 
+                if (userInput.value.trim() === '' &&
                     document.activeElement !== userInput) {
                     inputArea.classList.remove('expanded');
                     userInput.classList.remove('expanded');
@@ -2410,9 +2416,9 @@ Type **"/list"** anytime to see this help again.`;
     function setupMobileInputExpansion() {
         const inputArea = document.querySelector('.input-area');
         const userInput = document.getElementById('user-input');
-        
+
         if (!inputArea || !userInput) return;
-        
+
         // Handle touch events for better mobile experience
         userInput.addEventListener('touchstart', (e) => {
             if (!inputArea.classList.contains('expanded')) {
@@ -2423,7 +2429,7 @@ Type **"/list"** anytime to see this help again.`;
                 console.log('Input expanded on touch');
             }
         }, { passive: false });
-        
+
         // Handle orientation changes
         window.addEventListener('orientationchange', () => {
             setTimeout(() => {
@@ -2440,47 +2446,47 @@ Type **"/list"** anytime to see this help again.`;
     // --- Auto-resize Textarea Functionality ---
     function setupTextareaAutoResize() {
         const userInput = document.getElementById('user-input');
-        
+
         if (!userInput) {
             console.error('User input element not found for auto-resize setup');
             return;
         }
-        
+
         console.log('Setting up textarea auto-resize for element:', userInput.tagName);
-        
+
         // Auto-resize function
         function autoResize() {
             // Reset height to calculate the true content height
             userInput.style.height = 'auto';
-            
+
             // Get the scroll height (the height needed to show all content)
             const scrollHeight = userInput.scrollHeight;
-            
+
             // Set minimum height based on screen size
             const minHeight = 44;
-            
+
             // Calculate new height
             const newHeight = Math.max(minHeight, scrollHeight);
-            
+
             // Apply the new height
             userInput.style.height = newHeight + 'px';
-            
+
             // Scroll chat window to bottom when input expands
             const chatWindow = document.getElementById('chat-window');
             if (chatWindow) {
                 chatWindow.scrollTop = chatWindow.scrollHeight;
             }
-            
+
             console.log('Textarea resized to:', newHeight + 'px');
         }
-        
+
         // Add event listeners for auto-resize
         userInput.addEventListener('input', (e) => {
             // Speech is already stopped by focus/touchstart events
             autoResize();
         });
-        
-        // Stop TTS on multiple interaction types with debugging  
+
+        // Stop TTS on multiple interaction types with debugging
         userInput.addEventListener('touchstart', (e) => {
             console.log('TouchStart: Event fired! voiceService available:', !!window.voiceService);
             if (window.voiceService && window.voiceService.stopSpeaking) {
@@ -2490,7 +2496,7 @@ Type **"/list"** anytime to see this help again.`;
                 console.log('TouchStart: voiceService.stopSpeaking not available');
             }
         }, { passive: true });
-        
+
         userInput.addEventListener('mousedown', (e) => {
             if (window.voiceService && window.voiceService.stopSpeaking) {
                 window.voiceService.stopSpeaking();
@@ -2498,7 +2504,7 @@ Type **"/list"** anytime to see this help again.`;
                 console.log('MouseDown: voiceService.stopSpeaking not available');
             }
         });
-        
+
         userInput.addEventListener('focus', (e) => {
             if (window.voiceService && window.voiceService.stopSpeaking) {
                 window.voiceService.stopSpeaking();
@@ -2509,7 +2515,7 @@ Type **"/list"** anytime to see this help again.`;
         userInput.addEventListener('paste', () => {
             setTimeout(autoResize, 50);
         });
-        
+
         // Handle Enter key behavior
         userInput.addEventListener('keydown', (e) => {
             // Speech is already stopped by focus/touchstart events
@@ -2521,19 +2527,19 @@ Type **"/list"** anytime to see this help again.`;
                 setTimeout(autoResize, 10);
             }
         });
-        
+
         // Reset height when input is cleared
         userInput.addEventListener('blur', () => {
             if (userInput.value.trim() === '') {
                 userInput.style.height = '44px';
             }
         });
-        
+
         // Handle window resize for responsive behavior
         window.addEventListener('resize', () => {
             setTimeout(autoResize, 100);
         });
-        
+
         // Initial resize call
         setTimeout(autoResize, 100);
     }
@@ -2542,18 +2548,18 @@ Type **"/list"** anytime to see this help again.`;
     currentPersonaPrompt = localStorage.getItem('currentPersonaPrompt');
     if (currentPersonaPrompt) {
         personaCreated = true;
-        
+
         if (!LLMService.hasSavedConversation()) {
             llmService.setCustomPersona(currentPersonaPrompt);
-            
+
             setTimeout(async () => {
                 try {
                     console.log("Generating character profile for restored persona...");
                     await llmService.generateCharacterProfile();
-                    
+
                     console.log("Generating initial content for restored persona...");
                     const personaContent = await llmService.generateInitialPersonaContent();
-                    
+
                     if (personaContent.imagePrompt) {
                         try {
                             const imageUrl = await imageService.generateImage(personaContent.imagePrompt);
@@ -2564,27 +2570,27 @@ Type **"/list"** anytime to see this help again.`;
                             console.error('Error generating persona image on startup:', imageError);
                         }
                     }
-                    
+
                     if (personaContent.greeting) {
                         // Check if mobile device for autoplay handling
-                        const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) || 
+                        const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ||
                                          window.innerWidth <= 768;
-                        
+
                         if (isMobile) {
                             // Mobile: Add greeting without auto-TTS due to autoplay restrictions
                             console.log('Mobile: Adding restored greeting without auto-TTS due to autoplay restrictions');
                             addMessage(personaContent.greeting, 'llm', false); // false = disable TTS
-                            
+
                             setTimeout(() => {
                                 addMessage('(Tap anywhere to enable voice responses)', 'system', false);
                             }, 1000);
-                            
+
                             // Enable TTS on user interaction
                             const enableTTSOnTouch = () => {
                                 console.log('Mobile: Enabling TTS after user interaction for restored persona');
                                 document.removeEventListener('touchstart', enableTTSOnTouch);
                                 document.removeEventListener('click', enableTTSOnTouch);
-                                
+
                                 // Remove the prompt
                                 const systemMessages = chatWindow.querySelectorAll('.message');
                                 systemMessages.forEach(msg => {
@@ -2592,22 +2598,22 @@ Type **"/list"** anytime to see this help again.`;
                                         msg.remove();
                                     }
                                 });
-                                
+
                                 // Re-speak the greeting
                                 if (voiceService && voiceService.isSynthesisSupported()) {
                                     voiceService.speak(personaContent.greeting, SETTINGS.ttsVoice);
                                 }
                             };
-                            
+
                             document.addEventListener('touchstart', enableTTSOnTouch, { once: true });
                             document.addEventListener('click', enableTTSOnTouch, { once: true });
-                            
+
                         } else {
                             // Desktop: Normal TTS behavior
                             addMessage(personaContent.greeting, 'llm');
                         }
                     }
-                    
+
                 } catch (error) {
                     console.error('Error generating initial content on startup:', error);
                 }
@@ -2667,15 +2673,15 @@ Type **"/list"** anytime to see this help again.`;
                 const originalHistory = loadedState.llmServiceState.conversationHistory;
                 const sanitizedHistory = [];
                 let blockedMessages = 0;
-                
+
                 for (const message of originalHistory) {
                     if (message && message.content) {
                         // Validate message content using SecurityValidator
                         const validation = window.securityValidator.validateUserInput(
-                            message.content, 
+                            message.content,
                             'userMessage'
                         );
-                        
+
                         if (!validation.isValid) {
                             console.warn('🔒 Security: Blocked malicious content in loaded conversation:', validation.violations);
                             window.securityValidator.logSecurityEvent('CONVERSATION_LOAD_BLOCKED', {
@@ -2684,7 +2690,7 @@ Type **"/list"** anytime to see this help again.`;
                                 riskLevel: validation.riskLevel
                             });
                             blockedMessages++;
-                            
+
                             // Replace with sanitized placeholder
                             sanitizedHistory.push({
                                 role: message.role,
@@ -2713,10 +2719,10 @@ Type **"/list"** anytime to see this help again.`;
                 let sanitizedPersonaPrompt = loadedState.personaPrompt || null;
                 if (sanitizedPersonaPrompt) {
                     const personaValidation = window.securityValidator.validateUserInput(
-                        sanitizedPersonaPrompt, 
+                        sanitizedPersonaPrompt,
                         'characterPrompt'
                     );
-                    
+
                     if (!personaValidation.isValid) {
                         console.warn('🔒 Security: Blocked malicious persona prompt in loaded conversation');
                         window.securityValidator.logSecurityEvent('PERSONA_LOAD_BLOCKED', {
@@ -2738,7 +2744,7 @@ Type **"/list"** anytime to see this help again.`;
                     const imported = contextService.importContext(loadedState.documentContext);
                     if (imported) {
                         updateAttachedDocsDisplay();
-                        
+
                         // Check if any documents were blocked and notify user
                         const blockedDocs = contextService.attachedDocuments.filter(doc => doc.originallyBlocked);
                         if (blockedDocs.length > 0) {
@@ -2757,7 +2763,7 @@ Type **"/list"** anytime to see this help again.`;
                 chatWindow.innerHTML = '';
                 addWelcomeMessage();
                 renderConversation(llmService.conversationHistory);
-                
+
                 closeSettingsPanel(); // Corrected from hideSettingsPanel, which is not defined
                 addMessage("(Conversation loaded successfully)", 'llm');
 
@@ -2775,9 +2781,9 @@ Type **"/list"** anytime to see this help again.`;
             if (message.role === 'system' || message.hidden) {
                 return;
             }
-            
+
             const sender = message.role === 'user' ? 'user' : 'llm';
-            
+
             if (typeof message.content === 'string' && message.content.startsWith('{')) {
                 try {
                     const contentObj = JSON.parse(message.content);
@@ -2787,7 +2793,7 @@ Type **"/list"** anytime to see this help again.`;
                     }
                 } catch (e) { /* Not a JSON object, treat as string */ }
             }
-            
+
             // Always render LLM messages as Markdown, but disable TTS for loaded conversations
             if (sender === 'llm' && window.marked) {
                 addMessage(message.content, 'llm', false); // Disable TTS for loaded conversations
@@ -2808,24 +2814,24 @@ Type **"/list"** anytime to see this help again.`;
     window.closeSettingsPanel = closeSettingsPanel;
     window.saveConversationToFile = saveConversationToFile;
     window.loadConversationFromFile = loadConversationFromFile;
-    
+
     console.log('App initialization complete');
 }
 
 // Add this helper function near the top or above addMessage
 function stripMarkdownCodeBlock(text) {
     text = text.trim();
-    
+
     // Remove SSML content first (everything between <speak> tags)
     text = text.replace(/<speak[^>]*>[\s\S]*?<\/speak>/gi, '').trim();
-    
+
     // Now extract markdown from code blocks
     const codeBlockRegex = /```(?:markdown)?\n?([\s\S]*?)\n?```/i;
     const match = text.match(codeBlockRegex);
     if (match) {
         return match[1].trim();
     }
-    
+
     // If no code block, return the cleaned text
     return text;
 }

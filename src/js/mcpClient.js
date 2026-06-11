@@ -13,12 +13,63 @@ if (typeof MCPClient === 'undefined') {
             return '';
         }
 
+        isLocalMCPServer() {
+            if (!this.serverUrl) return false;
+            try {
+                const url = new URL(this.serverUrl, window.location.href);
+                const hostname = url.hostname.toLowerCase();
+                return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1' || hostname === '[::1]' || hostname.endsWith('.localhost');
+            } catch (_) {
+                return false;
+            }
+        }
+
+        isSecretKey(key) {
+            return /apiKey|api_key|authorization|token|secret|password/i.test(key);
+        }
+
+        getSecret(key) {
+            return sessionStorage.getItem(key) || localStorage.getItem(key) || '';
+        }
+
+        redactSecrets(value) {
+            if (!value || typeof value !== 'object') return value;
+            if (Array.isArray(value)) return value.map((item) => this.redactSecrets(item));
+
+            return Object.fromEntries(Object.entries(value).map(([key, item]) => {
+                if (this.isSecretKey(key)) {
+                    return [key, item ? 'PRESENT' : 'MISSING'];
+                }
+                return [key, this.redactSecrets(item)];
+            }));
+        }
+
+        protectSecretsForMCP(value) {
+            if (this.isLocalMCPServer() || !value || typeof value !== 'object') return value;
+            if (Array.isArray(value)) return value.map((item) => this.protectSecretsForMCP(item));
+
+            let stripped = false;
+            const protectedValue = Object.fromEntries(Object.entries(value).map(([key, item]) => {
+                if (this.isSecretKey(key) && item) {
+                    stripped = true;
+                    return [key, ''];
+                }
+                return [key, this.protectSecretsForMCP(item)];
+            }));
+
+            if (stripped) {
+                console.warn('MCP Client: Secret values were withheld because the MCP server URL is not local.');
+            }
+
+            return protectedValue;
+        }
+
         async connect() {
             try {
                 // For browser-based usage, we'll use a WebSocket or HTTP approach
                 // since we can't directly spawn Node.js processes in the browser
                 console.log('MCP Client: Attempting to connect to server...');
-                
+
                 // Check if we're in a browser environment
                 if (typeof window !== 'undefined') {
                     // Browser environment - use HTTP API approach
@@ -27,7 +78,7 @@ if (typeof MCPClient === 'undefined') {
                     // Node.js environment - use direct process spawning
                     await this.connectViaProcess();
                 }
-                
+
                 this.isConnected = true;
                 console.log('MCP Client: Successfully connected');
                 return true;
@@ -59,7 +110,7 @@ if (typeof MCPClient === 'undefined') {
         async connectViaProcess() {
             // Node.js environment - spawn the MCP server process
             const { spawn } = require('child_process');
-            
+
             this.serverProcess = spawn('node', ['server/mcp-server.js'], {
                 stdio: ['pipe', 'pipe', 'pipe']
             });
@@ -106,8 +157,8 @@ if (typeof MCPClient === 'undefined') {
         }
 
         async callToolViaHTTP(toolName, args) {
-            console.log('🌐 MCP Client calling tool:', toolName, 'with args:', args);
-            
+            console.log('MCP Client calling tool:', toolName, 'with args:', this.redactSecrets(args));
+
             // 🔒 SECURITY: Validate MCP tool parameters
             if (window.securityValidator) {
                 const validation = window.securityValidator.validateMCPParameters(toolName, args);
@@ -115,7 +166,7 @@ if (typeof MCPClient === 'undefined') {
                     console.warn('🔒 Security: MCP tool parameters blocked:', validation.violations);
                     window.securityValidator.logSecurityEvent('MCP_PARAMS_BLOCKED', {
                         toolName: toolName,
-                        args: args,
+                        args: this.redactSecrets(args),
                         violations: validation.violations,
                         riskLevel: validation.riskLevel
                     });
@@ -125,23 +176,23 @@ if (typeof MCPClient === 'undefined') {
                 args = validation.sanitizedParams;
                 console.log('🔒 Security: MCP parameters validated and sanitized');
             }
-            
+
             // Get LLM settings from localStorage - support both traditional and direct providers
             const provider = localStorage.getItem('customLlmProvider') || 'litellm';
-            
+
             let llmSettings;
             if (provider === 'openai-direct') {
                 llmSettings = {
                     provider: 'openai-direct',
                     apiBaseUrl: 'https://api.openai.com/v1/chat/completions',
-                    apiKey: localStorage.getItem('openaiApiKey'),
+                    apiKey: this.getSecret('openaiApiKey'),
                     model: localStorage.getItem('openaiModelIdentifier') || 'gpt-4.1-mini'
                 };
             } else if (provider === 'anthropic-direct') {
                 llmSettings = {
                     provider: 'anthropic-direct',
                     apiBaseUrl: 'https://api.anthropic.com/v1/messages',
-                    apiKey: localStorage.getItem('anthropicApiKey'),
+                    apiKey: this.getSecret('anthropicApiKey'),
                     model: localStorage.getItem('anthropicModelIdentifier') || 'claude-sonnet-4'
                 };
             } else if (provider === 'google-direct') {
@@ -149,21 +200,36 @@ if (typeof MCPClient === 'undefined') {
                 llmSettings = {
                     provider: 'google-direct',
                     apiBaseUrl: `https://generativelanguage.googleapis.com/v1beta/models/${googleModel}:generateContent`,
-                    apiKey: localStorage.getItem('googleApiKey'),
+                    apiKey: this.getSecret('googleApiKey'),
                     model: googleModel
+                };
+            } else if (provider === 'kie-direct') {
+                const kieModel = localStorage.getItem('kieModelIdentifier') || 'gpt-5-2';
+                llmSettings = {
+                    provider: 'kie-direct',
+                    apiBaseUrl: 'https://api.kie.ai',
+                    apiKey: this.getSecret('kieApiKey'),
+                    model: kieModel,
+                    reasoningLevel: localStorage.getItem('kieReasoningLevel') || 'high'
                 };
             } else {
                 // Traditional providers (litellm, lmstudio, ollama)
                 llmSettings = {
                     provider: provider,
                     apiBaseUrl: localStorage.getItem('customLlmApiUrl') || '',
-                    apiKey: localStorage.getItem('customLlmApiKey') || '',
+                    apiKey: this.getSecret('customLlmApiKey'),
                     model: localStorage.getItem('customLlmModelIdentifier') || 'gemini2.5-flash'
                 };
             }
-            
-            console.log('🌐 MCP Client using LLM settings:', { ...llmSettings, apiKey: llmSettings.apiKey ? 'PRESENT' : 'MISSING' });
-            
+
+            const safeArgs = this.protectSecretsForMCP(args);
+
+
+            llmSettings = this.protectSecretsForMCP(llmSettings);
+
+
+            console.log('MCP Client using LLM settings:', this.redactSecrets(llmSettings));
+
             const response = await fetch(`${this.serverUrl}/api/mcp/call`, {
                 method: 'POST',
                 headers: {
@@ -171,7 +237,7 @@ if (typeof MCPClient === 'undefined') {
                 },
                 body: JSON.stringify({
                     tool: toolName,
-                    arguments: args,
+                    arguments: safeArgs,
                     llmSettings: llmSettings
                 })
             });
@@ -254,7 +320,7 @@ if (typeof MCPClient === 'undefined') {
         // Agent Workflow Methods
         async startAgentTask(goal, options = {}, context = '') {
             console.log('🤖 MCP Client: Starting agent task with goal:', goal);
-            
+
             try {
                 const requestBody = {
                     goal: goal,
@@ -264,19 +330,20 @@ if (typeof MCPClient === 'undefined') {
                         llmSettings: this.getLLMSettings()
                     }
                 };
-                
+
                 // Include context if provided
                 if (context && context.trim().length > 0) {
                     requestBody.context = context;
                     console.log('📄 Adding context to agent task:', context.length, 'characters');
                 }
-                
+
+                const safeRequestBody = this.protectSecretsForMCP(requestBody);
                 const response = await fetch(`${this.serverUrl}/api/agent/start-task`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify(requestBody)
+                    body: JSON.stringify(safeRequestBody)
                 });
 
                 if (!response.ok) {
@@ -294,21 +361,23 @@ if (typeof MCPClient === 'undefined') {
 
         async executeAgentWorkflow(taskId, options = {}) {
             console.log('🚀 MCP Client: Executing agent workflow for task:', taskId);
-            
+
             try {
+                const requestBody = {
+                    taskId: taskId,
+                    options: {
+                        ...options,
+                        searchSettings: this.getSearchSettings(),
+                        llmSettings: this.getLLMSettings()
+                    }
+                };
+                const safeRequestBody = this.protectSecretsForMCP(requestBody);
                 const response = await fetch(`${this.serverUrl}/api/agent/execute-workflow`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({
-                        taskId: taskId,
-                        options: {
-                            ...options,
-                            searchSettings: this.getSearchSettings(),
-                            llmSettings: this.getLLMSettings()
-                        }
-                    })
+                    body: JSON.stringify(safeRequestBody)
                 });
 
                 if (!response.ok) {
@@ -400,32 +469,33 @@ if (typeof MCPClient === 'undefined') {
         getSearchSettings() {
             const settings = {
                 provider: localStorage.getItem('searchProvider') || 'brave',
-                apiKey: localStorage.getItem('searchApiKey') || '',
+                apiKey: this.getSecret('searchApiKey'),
                 limit: parseInt(localStorage.getItem('searchLimit')) || 10,
                 timeFilter: localStorage.getItem('searchTimeFilter') || 'any',
                 autoSummarize: localStorage.getItem('searchAutoSummarize') !== 'false' // Used for basic search, overridden for research
             };
-            console.log('🔍 MCPClient: Search settings:', settings);
-            return settings;
+            const protectedSettings = this.protectSecretsForMCP(settings);
+            console.log('MCPClient: Search settings:', this.redactSecrets(protectedSettings));
+            return protectedSettings;
         }
 
         getLLMSettings() {
             // Get provider type from localStorage - support both traditional and direct providers
             const provider = localStorage.getItem('customLlmProvider') || 'litellm';
-            
+
             let llmSettings;
             if (provider === 'openai-direct') {
                 llmSettings = {
                     provider: 'openai-direct',
                     apiBaseUrl: 'https://api.openai.com/v1/chat/completions',
-                    apiKey: localStorage.getItem('openaiApiKey'),
+                    apiKey: this.getSecret('openaiApiKey'),
                     model: localStorage.getItem('openaiModelIdentifier') || 'gpt-4.1-mini'
                 };
             } else if (provider === 'anthropic-direct') {
                 llmSettings = {
                     provider: 'anthropic-direct',
                     apiBaseUrl: 'https://api.anthropic.com/v1/messages',
-                    apiKey: localStorage.getItem('anthropicApiKey'),
+                    apiKey: this.getSecret('anthropicApiKey'),
                     model: localStorage.getItem('anthropicModelIdentifier') || 'claude-sonnet-4'
                 };
             } else if (provider === 'google-direct') {
@@ -433,20 +503,28 @@ if (typeof MCPClient === 'undefined') {
                 llmSettings = {
                     provider: 'google-direct',
                     apiBaseUrl: `https://generativelanguage.googleapis.com/v1beta/models/${googleModel}:generateContent`,
-                    apiKey: localStorage.getItem('googleApiKey'),
+                    apiKey: this.getSecret('googleApiKey'),
                     model: googleModel
+                };
+            } else if (provider === 'kie-direct') {
+                const kieModel = localStorage.getItem('kieModelIdentifier') || 'gpt-5-2';
+                llmSettings = {
+                    provider: 'kie-direct',
+                    apiBaseUrl: 'https://api.kie.ai',
+                    apiKey: this.getSecret('kieApiKey'),
+                    model: kieModel,
+                    reasoningLevel: localStorage.getItem('kieReasoningLevel') || 'high'
                 };
             } else {
                 // Traditional providers (litellm, lmstudio, ollama)
                 llmSettings = {
                     provider: provider,
                     apiBaseUrl: localStorage.getItem('customLlmApiUrl') || '',
-                    apiKey: localStorage.getItem('customLlmApiKey') || '',
+                    apiKey: this.getSecret('customLlmApiKey'),
                     model: localStorage.getItem('customLlmModelIdentifier') || 'gemini2.5-flash'
                 };
             }
-            
-            return llmSettings;
+            return this.protectSecretsForMCP(llmSettings);
         }
 
         // Execute a complete research workflow
@@ -455,26 +533,26 @@ if (typeof MCPClient === 'undefined') {
             if (context && context.trim().length > 0) {
                 console.log('📄 Including document context in workflow:', context.length, 'characters');
             }
-            
+
             try {
                 // Step 1: Start the agent task with context
                 const taskResult = await this.startAgentTask(goal, options, context);
                 const taskId = taskResult.taskId;
-                
+
                 console.log('📋 Task created with ID:', taskId);
-                
+
                 // Step 2: Execute the workflow
                 const workflowResult = await this.executeAgentWorkflow(taskId, options);
-                
+
                 if (workflowResult.success) {
                     // Step 3: Get the final results
                     const finalResults = await this.readAgentMemory(taskId);
-                    
+
                     // Step 4: Clean up the task
                     await this.endAgentTask(taskId);
-                    
+
                     console.log('✅ Research workflow completed successfully');
-                    
+
                     return {
                         success: true,
                         goal: goal,
@@ -487,14 +565,14 @@ if (typeof MCPClient === 'undefined') {
                 } else {
                     console.error('❌ Workflow execution failed:', workflowResult.message);
                     await this.endAgentTask(taskId);
-                    
+
                     return {
                         success: false,
                         error: workflowResult.message,
                         taskId: taskId
                     };
                 }
-                
+
             } catch (error) {
                 console.error('❌ Research workflow failed:', error);
                 return {
@@ -515,14 +593,14 @@ if (typeof MCPClient === 'undefined') {
             const markdownLinkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
             const urls = [];
             let match;
-            
+
             while ((match = markdownLinkRegex.exec(markdownText)) !== null) {
                 urls.push({
                     text: match[1],
                     url: match[2]
                 });
             }
-            
+
             // Also extract plain URLs
             const plainUrls = this.extractUrlsFromText(markdownText);
             plainUrls.forEach(url => {
@@ -533,7 +611,7 @@ if (typeof MCPClient === 'undefined') {
                     });
                 }
             });
-            
+
             return urls;
         }
 
@@ -544,7 +622,7 @@ if (typeof MCPClient === 'undefined') {
 
             const urls = [];
             const recentMessages = llmService.conversationHistory.slice(-10); // Look at last 10 messages
-            
+
             for (const message of recentMessages) {
                 if (message.role === 'assistant') {
                     const extractedUrls = this.extractUrlsFromMarkdown(message.content);
@@ -558,14 +636,14 @@ if (typeof MCPClient === 'undefined') {
                     });
                 }
             }
-            
+
             return urls;
         }
 
         // Smart URL matching for user requests
         matchUrlToRequest(userMessage, availableUrls) {
             const lowerMessage = userMessage.toLowerCase();
-            
+
             // Look for ordinal references (first, second, #1, #2, etc.)
             const ordinalMatches = [
                 /(?:the\s+)?first|#1|1st/i,
@@ -574,18 +652,18 @@ if (typeof MCPClient === 'undefined') {
                 /(?:the\s+)?fourth|#4|4th/i,
                 /(?:the\s+)?fifth|#5|5th/i
             ];
-            
+
             for (let i = 0; i < ordinalMatches.length && i < availableUrls.length; i++) {
                 if (ordinalMatches[i].test(lowerMessage)) {
                     return availableUrls[i];
                 }
             }
-            
+
             // Look for keywords that match the URL text or domain
             for (const urlItem of availableUrls) {
                 const urlText = urlItem.text.toLowerCase();
                 const domain = urlItem.url.toLowerCase();
-                
+
                 // Check if message contains words from the URL text
                 const urlWords = urlText.split(/\s+/).filter(word => word.length > 3);
                 for (const word of urlWords) {
@@ -593,7 +671,7 @@ if (typeof MCPClient === 'undefined') {
                         return urlItem;
                     }
                 }
-                
+
                 // Check for domain mentions (e.g., "the BBC article", "Wikipedia page")
                 if (domain.includes('bbc') && lowerMessage.includes('bbc')) return urlItem;
                 if (domain.includes('wikipedia') && lowerMessage.includes('wikipedia')) return urlItem;
@@ -602,7 +680,7 @@ if (typeof MCPClient === 'undefined') {
                 if (domain.includes('github') && lowerMessage.includes('github')) return urlItem;
                 // Add more domain mappings as needed
             }
-            
+
             return null;
         }
 
@@ -631,35 +709,35 @@ if (typeof MCPClient === 'undefined') {
 
             console.log('🔍 MCP Client checking message for keywords:', message);
             const lowerMessage = message.toLowerCase();
-            
+
             // Check for agent workflow keywords first (research, investigate, find out about)
             const agentResult = await this.handleAgentWorkflowRequests(message, context);
             if (agentResult) {
                 return agentResult;
             }
-            
+
             // Check for web extraction keywords
             const webExtractionResult = await this.handleWebExtractionRequests(message, llmService);
             if (webExtractionResult) {
                 return webExtractionResult;
             }
-            
+
             // Check for sequential thinking keywords
             if (lowerMessage.includes('break down') || lowerMessage.includes('analyze step by step')) {
                 console.log('✅ Detected "break down" keyword, calling breakDownProblem');
                 return await this.breakDownProblem(message, context);
             }
-            
+
             if (lowerMessage.includes('reason through') || lowerMessage.includes('think step by step')) {
                 console.log('✅ Detected "reason through" keyword, calling sequentialReasoning');
                 return await this.sequentialReasoning(message, context);
             }
-            
+
             if (lowerMessage.includes('analyze') || lowerMessage.includes('examine')) {
                 console.log('✅ Detected "analyze" keyword, calling stepByStepAnalysis');
                 return await this.stepByStepAnalysis(message, context);
             }
-            
+
             if (lowerMessage.includes('logical chain') || lowerMessage.includes('reasoning chain')) {
                 console.log('✅ Detected "logical chain" keyword, calling logicalChain');
                 // Extract premise and conclusion from the message
@@ -676,7 +754,7 @@ if (typeof MCPClient === 'undefined') {
         // Handle agent workflow requests
         async handleAgentWorkflowRequests(message, context = '') {
             const lowerMessage = message.toLowerCase();
-            
+
             // Agent workflow trigger keywords
             const agentKeywords = [
                 'research',
@@ -690,11 +768,11 @@ if (typeof MCPClient === 'undefined') {
                 'find information about',
                 'search for information about'
             ];
-            
+
             const hasAgentKeyword = agentKeywords.some(keyword => lowerMessage.includes(keyword));
-            
+
             // Additional patterns that indicate comprehensive research needs
-            const needsResearch = 
+            const needsResearch =
                 lowerMessage.includes('latest') ||
                 lowerMessage.includes('current') ||
                 lowerMessage.includes('recent') ||
@@ -702,23 +780,23 @@ if (typeof MCPClient === 'undefined') {
                 lowerMessage.includes('detailed') ||
                 (lowerMessage.includes('what') && (lowerMessage.includes('happening') || lowerMessage.includes('new'))) ||
                 (lowerMessage.includes('tell me') && lowerMessage.length > 30); // Longer requests likely need research
-            
+
             if (hasAgentKeyword || needsResearch) {
                 console.log('🤖 Detected agent workflow request');
-                
+
                 try {
                     // Execute the research workflow - override autoSummarize to false for research
                     // Research should always extract full content, not just summarize search results
-                    const result = await this.executeResearchWorkflow(message, { 
+                    const result = await this.executeResearchWorkflow(message, {
                         searchSettings: {
                             ...this.getSearchSettings(),
                             autoSummarize: false // Always extract full content for research
                         }
                     }, context);
-                    
+
                     if (result.success) {
                         console.log('✅ Agent workflow completed successfully');
-                        
+
                         // Return the synthesis in a format the chat interface expects
                         return {
                             content: [{
@@ -735,7 +813,7 @@ if (typeof MCPClient === 'undefined') {
                         };
                     } else {
                         console.error('❌ Agent workflow failed:', result.error);
-                        
+
                         // Return a fallback message
                         return {
                             content: [{
@@ -746,28 +824,28 @@ if (typeof MCPClient === 'undefined') {
                             fallback: true
                         };
                     }
-                    
+
                 } catch (error) {
                     console.error('❌ Agent workflow exception:', error);
-                    
+
                     // Return null so the normal LLM processing continues
                     return null;
                 }
             }
-            
+
             return null;
         }
 
         // Handle web extraction requests intelligently
         async handleWebExtractionRequests(message, llmService) {
             const lowerMessage = message.toLowerCase();
-            
+
             // Check for direct URL in message - PRIORITY: always use direct URL if found
             const directUrls = this.extractUrlsFromText(message);
             if (directUrls.length > 0) {
                 console.log('✅ Found direct URL(s) in message:', directUrls);
                 console.log('🔍 Using direct URL, skipping conversation history matching');
-                
+
                 // Determine extraction type based on keywords
                 let result;
                 if (lowerMessage.includes('extract') || lowerMessage.includes('get content') || lowerMessage.includes('full details')) {
@@ -778,7 +856,7 @@ if (typeof MCPClient === 'undefined') {
                     console.log('✅ Using summary extraction for direct URL');
                     result = await this.extractForSummary(directUrls[0]);
                 }
-                
+
                 // Mark for LLM processing so main.js knows to send through LLM
                 if (result && result.content) {
                     result.needsLLMProcessing = true;
@@ -786,7 +864,7 @@ if (typeof MCPClient === 'undefined') {
                 }
                 return result;
             }
-            
+
             // Check for extraction keywords that might reference previous search results
             const extractionKeywords = [
                 'tell me more about',
@@ -801,23 +879,23 @@ if (typeof MCPClient === 'undefined') {
                 'full article',
                 'read more'
             ];
-            
+
             const hasExtractionKeyword = extractionKeywords.some(keyword => lowerMessage.includes(keyword));
-            
+
             if (hasExtractionKeyword) {
                 console.log('✅ Detected web extraction keywords');
-                
+
                 // Find URLs from recent conversation history
                 const availableUrls = this.findUrlsInConversationHistory(llmService);
                 console.log('📚 Found URLs in conversation history:', availableUrls.length);
-                
+
                 if (availableUrls.length > 0) {
                     // Try to match the user's request to a specific URL
                     const matchedUrl = this.matchUrlToRequest(message, availableUrls);
-                    
+
                     if (matchedUrl) {
                         console.log('✅ Matched user request to URL:', matchedUrl.url);
-                        
+
                         // Determine extraction type based on keywords
                         let result;
                         if (lowerMessage.includes('summarize') || lowerMessage.includes('summary') || lowerMessage.includes('tell me about')) {
@@ -825,7 +903,7 @@ if (typeof MCPClient === 'undefined') {
                         } else {
                             result = await this.extractWebContent(matchedUrl.url);
                         }
-                        
+
                         // Mark for LLM processing
                         if (result && result.content) {
                             result.needsLLMProcessing = true;
@@ -836,7 +914,7 @@ if (typeof MCPClient === 'undefined') {
                         // If there's only one URL in recent history, assume that's what they want
                         console.log('✅ Single URL in history, using that:', availableUrls[0].url);
                         const result = await this.extractForSummary(availableUrls[0].url);
-                        
+
                         // Mark for LLM processing
                         if (result && result.content) {
                             result.needsLLMProcessing = true;
@@ -850,7 +928,7 @@ if (typeof MCPClient === 'undefined') {
                     }
                 }
             }
-            
+
             // Check for batch extraction requests
             if (lowerMessage.includes('compare') && (lowerMessage.includes('article') || lowerMessage.includes('url') || lowerMessage.includes('link'))) {
                 const availableUrls = this.findUrlsInConversationHistory(llmService);
@@ -858,7 +936,7 @@ if (typeof MCPClient === 'undefined') {
                     console.log('✅ Detected compare request, using multiple URLs');
                     const urls = availableUrls.slice(0, 3).map(item => item.url); // Limit to 3 for performance
                     const result = await this.extractMultipleUrls(urls);
-                    
+
                     // Mark for LLM processing
                     if (result && result.content) {
                         result.needsLLMProcessing = true;
@@ -867,8 +945,8 @@ if (typeof MCPClient === 'undefined') {
                     return result;
                 }
             }
-            
+
             return null; // No web extraction needed
         }
     }
-} 
+}

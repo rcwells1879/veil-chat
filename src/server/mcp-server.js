@@ -45,7 +45,7 @@ class BraveSearchProvider {
         const data = await response.json();
         // console.log('🔍 Brave Search raw response:', JSON.stringify(data, null, 2));
         const results = this.formatResults(data);
-        
+
         // Return both results and summarizer key if available
         return {
             results,
@@ -94,19 +94,19 @@ class BraveSearchProvider {
 
     async searchWithSummarizer(query, options = {}) {
         console.log(`🔍 Brave Search: Searching with summarizer for "${query}"`);
-        
+
         // Step 1: Get search results with summarizer key
-        const searchResponse = await this.search(query, { 
-            ...options, 
-            enableSummarizer: true 
+        const searchResponse = await this.search(query, {
+            ...options,
+            enableSummarizer: true
         });
-        
+
         // Step 2: If summarizer key exists, get AI summary
         if (searchResponse.summarizer?.key) {
             console.log('📝 Brave Search: Summarizer key found, getting AI summary...');
             try {
                 const summaryData = await this.getSummary(searchResponse.summarizer.key);
-                
+
                 if (summaryData?.summary) {
                     return {
                         results: searchResponse.results,
@@ -119,7 +119,7 @@ class BraveSearchProvider {
                 console.warn('⚠️ Brave Search: Summarizer failed, falling back to regular results:', error.message);
             }
         }
-        
+
         // Fallback to regular search results
         console.log('📄 Brave Search: No summarizer available, returning regular results');
         return {
@@ -132,7 +132,7 @@ class BraveSearchProvider {
 
     formatResults(data) {
         if (!data.web || !data.web.results) return [];
-        
+
         return data.web.results.map(result => ({
             title: result.title,
             url: result.url,
@@ -160,7 +160,7 @@ class DuckDuckGoSearchProvider {
         });
 
         const response = await fetch(`${this.baseUrl}?${params}`);
-        
+
         if (!response.ok) {
             throw new Error(`DuckDuckGo API error: ${response.status} ${response.statusText}`);
         }
@@ -171,7 +171,7 @@ class DuckDuckGoSearchProvider {
 
     formatResults(data, limit) {
         const results = [];
-        
+
         // Add abstract if available
         if (data.Abstract && data.AbstractText) {
             results.push({
@@ -224,7 +224,7 @@ class GoogleSearchProvider {
         });
 
         const response = await fetch(`${this.baseUrl}?${params}`);
-        
+
         if (!response.ok) {
             throw new Error(`Google Search API error: ${response.status} ${response.statusText}`);
         }
@@ -244,7 +244,7 @@ class GoogleSearchProvider {
 
     formatResults(data) {
         if (!data.items) return [];
-        
+
         return data.items.map(item => ({
             title: item.title,
             url: item.link,
@@ -296,7 +296,7 @@ class BingSearchProvider {
 
     formatResults(data) {
         if (!data.webPages || !data.webPages.value) return [];
-        
+
         return data.webPages.value.map(result => ({
             title: result.name,
             url: result.url,
@@ -326,7 +326,7 @@ class SequentialThinkingMCPServer {
 
         // Initialize security manager
         this.securityManager = new SecurityManager();
-        
+
         // Block file system writes for security
         this.securityManager.blockFileSystemWrites();
 
@@ -344,19 +344,19 @@ class SequentialThinkingMCPServer {
     initializeMemorySystem() {
         // Store for active agent tasks
         this.agentTasks = new Map();
-        
+
         // 🔒 SECURITY: Enhanced memory limits to prevent abuse
         this.maxTasks = 100; // Maximum concurrent tasks
         this.taskTimeout = 30 * 60 * 1000; // 30 minutes
         this.maxMemoryPerTask = 1024 * 1024; // 1MB per task
         this.maxTotalMemory = 50 * 1024 * 1024; // 50MB total
-        
+
         // Start cleanup interval (every 5 minutes)
         this.cleanupInterval = setInterval(() => {
             this.cleanupExpiredTasks();
             this.enforceMemoryLimits();
         }, 5 * 60 * 1000);
-        
+
         console.log('🧠 Memory management system initialized with security limits');
     }
 
@@ -390,7 +390,7 @@ class SequentialThinkingMCPServer {
 
         this.agentTasks.set(taskId, task);
         console.log(`🧠 Started agent task: ${taskId}`);
-        
+
         return taskId;
     }
 
@@ -403,7 +403,7 @@ class SequentialThinkingMCPServer {
 
         task.memory[key] = value;
         task.lastAccessed = Date.now();
-        
+
         console.log(`🧠 Updated memory for task ${taskId}: ${key}`);
         return true;
     }
@@ -416,11 +416,11 @@ class SequentialThinkingMCPServer {
         }
 
         task.lastAccessed = Date.now();
-        
+
         if (key === null) {
             return task.memory;
         }
-        
+
         return task.memory[key];
     }
 
@@ -433,7 +433,7 @@ class SequentialThinkingMCPServer {
 
         this.agentTasks.delete(taskId);
         console.log(`🧠 Ended agent task: ${taskId}`);
-        
+
         return true;
     }
 
@@ -453,52 +453,52 @@ class SequentialThinkingMCPServer {
             console.log(`🧠 Cleaned up ${cleaned} expired agent tasks`);
         }
     }
-    
+
     // 🔒 SECURITY: Enforce memory limits
     enforceMemoryLimits() {
         // Calculate total memory usage
         let totalMemory = 0;
         const memoryPerTask = new Map();
-        
+
         for (const [taskId, task] of this.agentTasks.entries()) {
             const taskMemory = JSON.stringify(task.memory || {}).length;
             memoryPerTask.set(taskId, taskMemory);
             totalMemory += taskMemory;
         }
-        
+
         // If total memory exceeds limit, remove oldest tasks
         if (totalMemory > this.maxTotalMemory) {
             const sortedTasks = [...this.agentTasks.entries()]
                 .sort((a, b) => a[1].lastAccessed - b[1].lastAccessed);
-            
+
             for (const [taskId, task] of sortedTasks) {
                 if (totalMemory <= this.maxTotalMemory) break;
-                
+
                 const taskMemory = memoryPerTask.get(taskId);
                 this.agentTasks.delete(taskId);
                 totalMemory -= taskMemory;
-                
+
                 this.securityManager.logSecurityEvent('MEMORY_LIMIT_ENFORCED', {
                     taskId: taskId,
                     memoryFreed: taskMemory,
                     totalMemoryAfter: totalMemory
                 });
-                
+
                 console.warn(`🔒 Removed task ${taskId} due to memory limits`);
             }
         }
-        
+
         // Check individual task limits
         for (const [taskId, taskMemory] of memoryPerTask.entries()) {
             if (taskMemory > this.maxMemoryPerTask) {
                 this.agentTasks.delete(taskId);
-                
+
                 this.securityManager.logSecurityEvent('TASK_MEMORY_EXCEEDED', {
                     taskId: taskId,
                     memoryUsed: taskMemory,
                     limit: this.maxMemoryPerTask
                 });
-                
+
                 console.warn(`🔒 Removed task ${taskId} - exceeded individual memory limit`);
             }
         }
@@ -520,6 +520,109 @@ class SequentialThinkingMCPServer {
         };
     }
 
+    getKieChatModelConfig(model) {
+        const modelMap = {
+            'gpt-5-2': { family: 'chat-completions', endpoint: '/gpt-5-2/v1/chat/completions' },
+            'gpt-5-4': { family: 'responses', endpoint: '/codex/v1/responses', model: 'gpt-5-4' },
+            'gpt-5-5': { family: 'responses', endpoint: '/codex/v1/responses', model: 'gpt-5-5' },
+            'gpt-5-codex': { family: 'responses', endpoint: '/api/v1/responses', model: 'gpt-5-codex' },
+            'gpt-5.1-codex': { family: 'responses', endpoint: '/api/v1/responses', model: 'gpt-5.1-codex' },
+            'gpt-5.2-codex': { family: 'responses', endpoint: '/api/v1/responses', model: 'gpt-5.2-codex' },
+            'gpt-5.3-codex': { family: 'responses', endpoint: '/api/v1/responses', model: 'gpt-5.3-codex' },
+            'gpt-5.4-codex': { family: 'responses', endpoint: '/api/v1/responses', model: 'gpt-5.4-codex' },
+            'claude-opus-4-7': { family: 'claude', endpoint: '/claude/v1/messages', model: 'claude-opus-4-7' },
+            'claude-opus-4-8': { family: 'claude', endpoint: '/claude/v1/messages', model: 'claude-opus-4-8' },
+            'claude-fable-5': { family: 'claude', endpoint: '/claude/v1/messages', model: 'claude-fable-5' },
+            'claude-haiku-4-5': { family: 'claude', endpoint: '/claude/v1/messages', model: 'claude-haiku-4-5' },
+            'claude-opus-4-5': { family: 'claude', endpoint: '/claude/v1/messages', model: 'claude-opus-4-5' },
+            'claude-opus-4-6': { family: 'claude', endpoint: '/claude/v1/messages', model: 'claude-opus-4-6' },
+            'claude-sonnet-4-5': { family: 'claude', endpoint: '/claude/v1/messages', model: 'claude-sonnet-4-5' },
+            'claude-sonnet-4-6': { family: 'claude', endpoint: '/claude/v1/messages', model: 'claude-sonnet-4-6' },
+            'gemini-2.5-pro': { family: 'chat-completions', endpoint: '/gemini-2.5-pro/v1/chat/completions' },
+            'gemini-3-pro': { family: 'chat-completions', endpoint: '/gemini-3-pro/v1/chat/completions' },
+            'gemini-3.1-pro': { family: 'chat-completions', endpoint: '/gemini-3.1-pro/v1/chat/completions' },
+            'gemini-2.5-flash': { family: 'chat-completions', endpoint: '/gemini-2.5-flash/v1/chat/completions' },
+            'gemini-3-flash': { family: 'chat-completions', endpoint: '/gemini-3-flash/v1/chat/completions' },
+            'gemini-3-5-flash-openai': { family: 'chat-completions', endpoint: '/gemini-3-5-flash-openai/v1/chat/completions' },
+            'gemini-3-5-flash-native': { family: 'gemini-native', endpoint: '/gemini/v1/models/gemini-3-5-flash:streamGenerateContent' },
+            'gemini-3-flash-v1beta-native': { family: 'gemini-native', endpoint: '/gemini/v1/models/gemini-3-flash-v1betamodels:streamGenerateContent' }
+        };
+        return modelMap[model] || modelMap['gpt-5-2'];
+    }
+
+    createKieServerPayload(messages, model, temperature, maxTokens, reasoningLevel = 'high') {
+        const config = this.getKieChatModelConfig(model);
+        const effort = ['high', 'low', 'off'].includes(reasoningLevel) ? reasoningLevel : 'high';
+
+        if (config.family === 'responses') {
+            const payload = {
+                model: config.model,
+                stream: false,
+                input: messages.map((message) => ({
+                    role: message.role,
+                    content: [{ type: 'input_text', text: message.content }]
+                }))
+            };
+            if (effort !== 'off') payload.reasoning = { effort };
+            return { endpoint: `https://api.kie.ai${config.endpoint}`, payload, responseFamily: config.family };
+        }
+
+        if (config.family === 'claude') {
+            const system = messages.filter((message) => message.role === 'system').map((message) => message.content).join('\n\n');
+            const payload = {
+                model: config.model,
+                stream: false,
+                messages: messages.filter((message) => message.role !== 'system'),
+                max_tokens: maxTokens || 4096,
+                thinkingFlag: effort !== 'off'
+            };
+            if (system) payload.system = system;
+            if (temperature !== undefined) payload.temperature = temperature;
+            return { endpoint: `https://api.kie.ai${config.endpoint}`, payload, responseFamily: config.family };
+        }
+
+        if (config.family === 'gemini-native') {
+            const system = messages.filter((message) => message.role === 'system').map((message) => message.content).join('\n\n');
+            const payload = {
+                stream: false,
+                contents: messages
+                    .filter((message) => message.role !== 'system')
+                    .map((message) => ({ role: message.role === 'assistant' ? 'model' : 'user', parts: [{ text: message.content }] })),
+                generationConfig: {
+                    temperature,
+                    maxOutputTokens: maxTokens,
+                    thinkingConfig: effort === 'off' ? { includeThoughts: false } : { includeThoughts: false, thinkingLevel: effort }
+                }
+            };
+            if (system) payload.systemInstruction = { parts: [{ text: system }] };
+            return { endpoint: `https://api.kie.ai${config.endpoint}`, payload, responseFamily: config.family };
+        }
+
+        const payload = { messages, stream: false };
+        if (effort !== 'off') payload.reasoning_effort = effort;
+        return { endpoint: `https://api.kie.ai${config.endpoint}`, payload, responseFamily: config.family };
+    }
+
+    extractKieServerContent(data, family) {
+        if (family === 'chat-completions') {
+            return data.choices?.[0]?.message?.content?.trim() || null;
+        }
+        if (family === 'claude') {
+            return Array.isArray(data.content)
+                ? data.content.map((part) => part.text || '').filter(Boolean).join('\n').trim()
+                : null;
+        }
+        if (family === 'gemini-native') {
+            const parts = data.candidates?.[0]?.content?.parts;
+            return Array.isArray(parts) ? parts.map((part) => part.text || '').filter(Boolean).join('\n').trim() : null;
+        }
+        if (typeof data.output_text === 'string') return data.output_text.trim();
+        if (Array.isArray(data.output)) {
+            return data.output.flatMap((item) => item.content || []).map((part) => part.text || '').filter(Boolean).join('\n').trim();
+        }
+        return null;
+    }
+
     // Enhanced LLM Integration method with persona-aware prompting
     async callLLM(prompt, temperature = 0.7, maxTokens = 2000, llmSettings = null) {
         try {
@@ -536,16 +639,16 @@ class SequentialThinkingMCPServer {
             const apiBaseUrl = llmSettings?.apiBaseUrl || '';
             const apiKey = llmSettings?.apiKey || '';
             const model = llmSettings?.model || 'gemini2.5-flash';
-            
+
             // Set endpoint based on provider type
             let endpoint;
-            if (provider === 'openai-direct' || provider === 'anthropic-direct' || provider === 'google-direct') {
+            if (provider === 'openai-direct' || provider === 'anthropic-direct' || provider === 'google-direct' || provider === 'kie-direct') {
                 endpoint = apiBaseUrl; // Direct providers already have full endpoint URL
             } else {
                 // Traditional providers (litellm, lmstudio, ollama) use /v1/chat/completions
                 endpoint = `${apiBaseUrl}/v1/chat/completions`;
             }
-            
+
             // Log the endpoint, model, and key (mask the key for safety)
             console.log('🌐 MCP Server calling LLM:', { provider, endpoint, model, hasApiKey: !!apiKey });
 
@@ -563,7 +666,7 @@ class SequentialThinkingMCPServer {
                 }
             ];
 
-            let payload, headers;
+            let payload, headers, kieResponseFamily;
 
             // Create provider-specific payload and headers
             if (provider === 'openai-direct') {
@@ -574,17 +677,17 @@ class SequentialThinkingMCPServer {
                     max_tokens: maxTokens,
                     stream: false
                 };
-                
+
                 headers = {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${apiKey}`
                 };
-                
+
             } else if (provider === 'anthropic-direct') {
                 // Anthropic API format
                 const anthropicMessages = messages.filter(msg => msg.role !== 'system');
                 const systemPrompts = messages.filter(msg => msg.role === 'system').map(msg => msg.content).join('\n');
-                
+
                 payload = {
                     model: model,
                     max_tokens: maxTokens,
@@ -592,19 +695,19 @@ class SequentialThinkingMCPServer {
                     system: systemPrompts || undefined,
                     messages: anthropicMessages
                 };
-                
+
                 headers = {
                     'Content-Type': 'application/json',
                     'x-api-key': apiKey,
                     'anthropic-version': '2023-06-01'
                 };
-                
+
             } else if (provider === 'google-direct') {
                 // Google AI Studio API format
                 // Combine consecutive user messages to avoid API errors
                 const processedMessages = [];
                 let currentUserContent = [];
-                
+
                 for (const msg of messages.filter(msg => msg.role !== 'system')) {
                     if (msg.role === 'user') {
                         currentUserContent.push(msg.content);
@@ -624,7 +727,7 @@ class SequentialThinkingMCPServer {
                         });
                     }
                 }
-                
+
                 // Add any remaining user content
                 if (currentUserContent.length > 0) {
                     processedMessages.push({
@@ -632,10 +735,10 @@ class SequentialThinkingMCPServer {
                         parts: [{ text: currentUserContent.join('\n\n') }]
                     });
                 }
-                
+
                 // Combine all system messages for Google API
                 const systemMessages = messages.filter(msg => msg.role === 'system');
-                
+
                 payload = {
                     contents: processedMessages,
                     generationConfig: {
@@ -647,19 +750,35 @@ class SequentialThinkingMCPServer {
                         }
                     }
                 };
-                
+
                 if (systemMessages.length > 0) {
                     const combinedSystemContent = systemMessages.map(msg => msg.content).join('\n\n');
                     payload.systemInstruction = {
                         parts: [{ text: combinedSystemContent }]
                     };
                 }
-                
+
                 headers = {
                     'Content-Type': 'application/json',
                     'x-goog-api-key': apiKey
                 };
-                
+
+            } else if (provider === 'kie-direct') {
+                const built = this.createKieServerPayload(
+                    messages,
+                    model,
+                    temperature,
+                    maxTokens,
+                    llmSettings?.reasoningLevel || 'high'
+                );
+                endpoint = built.endpoint;
+                payload = built.payload;
+                kieResponseFamily = built.responseFamily;
+                headers = {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`
+                };
+
             } else {
                 // Traditional providers (litellm, lmstudio, ollama)
                 payload = {
@@ -705,10 +824,10 @@ class SequentialThinkingMCPServer {
 
             const data = await response.json();
             console.log('🌐 MCP Server LLM response:', JSON.stringify(data, null, 2));
-            
+
             // Handle different response structures based on provider
             let content = null;
-            
+
             if (provider === 'openai-direct') {
                 content = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content
                     ? data.choices[0].message.content.trim()
@@ -718,11 +837,13 @@ class SequentialThinkingMCPServer {
                     ? data.content[0].text.trim()
                     : null;
             } else if (provider === 'google-direct') {
-                content = data.candidates && data.candidates[0] && data.candidates[0].content && 
-                         data.candidates[0].content.parts && data.candidates[0].content.parts[0] && 
+                content = data.candidates && data.candidates[0] && data.candidates[0].content &&
+                         data.candidates[0].content.parts && data.candidates[0].content.parts[0] &&
                          data.candidates[0].content.parts[0].text
                     ? data.candidates[0].content.parts[0].text.trim()
                     : null;
+            } else if (provider === 'kie-direct') {
+                content = this.extractKieServerContent(data, kieResponseFamily);
             } else {
                 // Traditional providers (litellm, lmstudio, ollama)
                 if (data.choices && data.choices[0] && data.choices[0].message) {
@@ -735,7 +856,7 @@ class SequentialThinkingMCPServer {
                     content = data.response;
                 }
             }
-            
+
             // Check if content is null or empty
             if (!content) {
                 console.error('🌐 MCP Server LLM returned null/empty content:', data);
@@ -744,7 +865,7 @@ class SequentialThinkingMCPServer {
                 }
                 return "Unable to generate response - LLM returned empty content";
             }
-            
+
             if (typeof content === 'string') {
                 return content.trim();
             } else {
@@ -842,14 +963,14 @@ class SequentialThinkingMCPServer {
 
     async handleBreakDownProblem(args, llmSettings = null) {
         const { problem, context = '' } = args;
-        
+
         if (!problem) {
             throw new Error('Problem description is required');
         }
 
         const stepNames = [
             'Problem Analysis',
-            'Context Gathering', 
+            'Context Gathering',
             'Solution Planning',
             'Implementation Steps',
             'Verification'
@@ -870,7 +991,7 @@ Please provide:
 Be specific, actionable, and thorough. Keep your response focused and concise (2-3 sentences).`;
 
             const llmResponse = await this.callLLM(prompt, 0.7, 2000, llmSettings);
-            
+
             return {
                 heading: `${index + 1}. ${stepName}`,
                 text: llmResponse
@@ -888,7 +1009,7 @@ Be specific, actionable, and thorough. Keep your response focused and concise (2
 
     async handleSequentialReasoning(args, llmSettings = null) {
         const { question, steps = 3 } = args;
-        
+
         if (!question) {
             throw new Error('Question is required');
         }
@@ -896,7 +1017,7 @@ Be specific, actionable, and thorough. Keep your response focused and concise (2
         // Generate reasoning steps using LLM
         const sections = await Promise.all(Array.from({ length: steps }, async (_, i) => {
             const stepNumber = i + 1;
-            
+
             const prompt = `Apply step-by-step reasoning to answer this question: "${question}"
 
 This is step ${stepNumber} of ${steps} in the reasoning process.
@@ -910,7 +1031,7 @@ For this step, please:
 Be logical, clear, and focused. Keep your response concise (2-3 sentences).`;
 
             const llmResponse = await this.callLLM(prompt, 0.7, 2000, llmSettings);
-            
+
             return {
                 heading: `Step ${stepNumber}`,
                 text: llmResponse
@@ -928,7 +1049,7 @@ Be logical, clear, and focused. Keep your response concise (2-3 sentences).`;
 
     async handleStepByStepAnalysis(args, llmSettings = null) {
         const { topic, analysis_type = 'general' } = args;
-        
+
         if (!topic) {
             throw new Error('Topic is required');
         }
@@ -958,7 +1079,7 @@ Be logical, clear, and focused. Keep your response concise (2-3 sentences).`;
         };
 
         const steps = analysisSteps[analysis_type] || analysisSteps['general'];
-        
+
         // Generate analysis using LLM
         const sections = await Promise.all(steps.map(async (step, index) => {
             const prompt = `Perform a ${analysis_type} analysis of: "${topic}"
@@ -974,7 +1095,7 @@ Please provide:
 Be specific, thorough, and relevant to the topic. Keep your response focused and concise (2-3 sentences).`;
 
             const llmResponse = await this.callLLM(prompt, 0.7, 2000, llmSettings);
-            
+
             return {
                 heading: `${index + 1}. ${step}`,
                 text: llmResponse
@@ -992,7 +1113,7 @@ Be specific, thorough, and relevant to the topic. Keep your response focused and
 
     async handleLogicalChain(args, llmSettings = null) {
         const { premise, conclusion, steps = 4 } = args;
-        
+
         if (!premise || !conclusion) {
             throw new Error('Both premise and conclusion are required');
         }
@@ -1000,7 +1121,7 @@ Be specific, thorough, and relevant to the topic. Keep your response focused and
         // Generate logical chain using LLM
         const sections = await Promise.all(Array.from({ length: steps }, async (_, i) => {
             const stepNumber = i + 1;
-            
+
             const prompt = `Create a logical chain from premise to conclusion.
 
 Premise: "${premise}"
@@ -1017,7 +1138,7 @@ For this link, please:
 Be logical, clear, and focused. Keep your response concise (2-3 sentences).`;
 
             const llmResponse = await this.callLLM(prompt, 0.7, 2000, llmSettings);
-            
+
             return {
                 heading: `Link ${stepNumber}`,
                 text: llmResponse
@@ -1035,7 +1156,7 @@ Be logical, clear, and focused. Keep your response concise (2-3 sentences).`;
 
     async handleWebSearch(args) {
         const { query, searchSettings = {}, llmSettings = null } = args;
-        
+
         if (!query) {
             throw new Error('Search query is required');
         }
@@ -1075,7 +1196,7 @@ Be logical, clear, and focused. Keep your response concise (2-3 sentences).`;
             // For Brave Search with auto-summarize, use the enhanced summarizer
             if (provider === 'brave' && autoSummarize) {
                 console.log('🤖 Using Brave Search with enhanced summarizer...');
-                
+
                 const searchResponse = await searchProvider.searchWithSummarizer(query, {
                     limit,
                     timeFilter
@@ -1084,10 +1205,10 @@ Be logical, clear, and focused. Keep your response concise (2-3 sentences).`;
                 if (searchResponse.summary) {
                     // Use Brave's AI summary for persona-driven summarization
                     console.log('📝 Brave summarizer provided content, creating persona-driven summary...');
-                    return this.handlePersonaSearchSummarize({ 
-                        query, 
-                        searchSettings, 
-                        llmSettings 
+                    return this.handlePersonaSearchSummarize({
+                        query,
+                        searchSettings,
+                        llmSettings
                     }, searchResponse);
                 } else {
                     console.log('📄 No Brave summary available, falling back to regular summarization...');
@@ -1097,7 +1218,7 @@ Be logical, clear, and focused. Keep your response concise (2-3 sentences).`;
 
             // Perform regular search for other providers or non-summarized requests
             const results = await searchProvider.search(query, { limit, timeFilter });
-            
+
             // Handle the response based on provider type
             const searchResults = results.results || results;
 
@@ -1143,7 +1264,7 @@ Be logical, clear, and focused. Keep your response concise (2-3 sentences).`;
 
     async handleSearchRecent(args) {
         const { query, searchSettings = {}, llmSettings = null } = args;
-        
+
         // Force recent time filter
         const recentSettings = {
             ...searchSettings,
@@ -1159,15 +1280,15 @@ Be logical, clear, and focused. Keep your response concise (2-3 sentences).`;
 
     async handlePersonaSearchSummarize(args, searchResponse) {
         const { query, searchSettings = {}, llmSettings = null } = args;
-        
+
         try {
             console.log('🎭 Generating persona-driven summary from Brave summarizer content...');
-            
+
             // Use Brave's AI summary as the primary content
             const braveContent = searchResponse.summary;
             const entities = searchResponse.entities || [];
             const infobox = searchResponse.infobox || null;
-            
+
             // Prepare enhanced prompt for persona-driven summarization
             const summaryPrompt = `You are responding as your current persona in a natural conversation. The user asked: "${query}"
 
@@ -1183,7 +1304,7 @@ Please provide a natural, conversational response about this information. Stay i
 
             console.log('🤖 Generating persona-driven summary...');
             const summary = await this.callLLM(summaryPrompt, 0.7, 2000, llmSettings);
-            
+
             return {
                 content: [
                     { type: 'text', text: summary }
@@ -1192,7 +1313,7 @@ Please provide a natural, conversational response about this information. Stay i
 
         } catch (error) {
             console.error('🎭 Persona search summarize error:', error);
-            
+
             // Fallback to regular summarization if LLM fails
             return this.handleSearchSummarize(args, searchResponse.results);
         }
@@ -1200,14 +1321,14 @@ Please provide a natural, conversational response about this information. Stay i
 
     async handleSearchSummarize(args, providedResults = null) {
         const { query, searchSettings = {}, llmSettings = null } = args;
-        
+
         try {
             let searchText;
-            
+
             // If results are provided, use them directly
             if (providedResults) {
                 // Format provided results for summarization
-                searchText = providedResults.map((result, index) => 
+                searchText = providedResults.map((result, index) =>
                     `${index + 1}. ${result.title}\nURL: ${result.url}\n${result.description || result.snippet}\n`
                 ).join('\n');
             } else {
@@ -1221,7 +1342,7 @@ Please provide a natural, conversational response about this information. Stay i
                 // Extract search results text
                 searchText = searchResult.content[0].text;
             }
-            
+
             // Generate persona-driven summary using LLM
             const summaryPrompt = `You are responding as your current persona in a natural conversation. The user asked: "${query}"
 
@@ -1240,7 +1361,7 @@ Please provide a natural, conversational response about this information. Stay i
                 console.error('🔍 Search summarization failed, using fallback:', error.message);
                 summary = "I found some search results, but I'm having trouble processing them right now. Let me know if you'd like me to try a different search approach.";
             }
-            
+
             // Return persona-driven response directly
             return {
                 content: [
@@ -1267,11 +1388,11 @@ Please provide a natural, conversational response about this information. Stay i
             'Implementation Steps': `What specific actions need to be taken to address "${problem}"?`,
             'Verification': `How will we know the solution for "${problem}" is working?`
         };
-        
+
         // Extract the step name from the markdown format
         const stepMatch = step.match(/\*\*(.*?)\*\*/);
         const stepName = stepMatch ? stepMatch[1] : step.split(':')[0]?.trim();
-        
+
         return considerations[stepName] || `Consider the implications and requirements for "${problem}"`;
     }
 
@@ -1310,7 +1431,7 @@ Please provide a natural, conversational response about this information. Stay i
     // Web Content Extraction Handlers
     async handleExtractWebContent(args) {
         const { url, options = {} } = args;
-        
+
         if (!url) {
             throw new Error('URL is required for web content extraction');
         }
@@ -1325,7 +1446,7 @@ Please provide a natural, conversational response about this information. Stay i
             });
             throw new Error(`URL blocked for security: ${urlValidation.reason}`);
         }
-        
+
         const rateLimitCheck = this.securityManager.checkRateLimit(url);
         if (!rateLimitCheck.allowed) {
             this.securityManager.logSecurityEvent('RATE_LIMIT_EXCEEDED', {
@@ -1334,7 +1455,7 @@ Please provide a natural, conversational response about this information. Stay i
             });
             throw new Error(`Rate limit exceeded: ${rateLimitCheck.reason}`);
         }
-        
+
         const concurrentCheck = this.securityManager.checkConcurrentLimit();
         if (!concurrentCheck.allowed) {
             throw new Error(`Too many concurrent requests: ${concurrentCheck.reason}`);
@@ -1346,7 +1467,7 @@ Please provide a natural, conversational response about this information. Stay i
         try {
             console.log(`🔍 MCP Server: Extracting content from ${url} (Request ID: ${requestId})`);
             const extractedData = await this.webExtractor.extract(url, options);
-            
+
             return {
                 content: [
                     {
@@ -1365,7 +1486,7 @@ Please provide a natural, conversational response about this information. Stay i
 
     async handleExtractForSummary(args) {
         const { url, options = {} } = args;
-        
+
         if (!url) {
             throw new Error('URL is required for web content extraction');
         }
@@ -1380,7 +1501,7 @@ Please provide a natural, conversational response about this information. Stay i
             });
             throw new Error(`URL blocked for security: ${urlValidation.reason}`);
         }
-        
+
         const rateLimitCheck = this.securityManager.checkRateLimit(url);
         if (!rateLimitCheck.allowed) {
             this.securityManager.logSecurityEvent('RATE_LIMIT_EXCEEDED', {
@@ -1389,7 +1510,7 @@ Please provide a natural, conversational response about this information. Stay i
             });
             throw new Error(`Rate limit exceeded: ${rateLimitCheck.reason}`);
         }
-        
+
         const concurrentCheck = this.securityManager.checkConcurrentLimit();
         if (!concurrentCheck.allowed) {
             throw new Error(`Too many concurrent requests: ${concurrentCheck.reason}`);
@@ -1401,7 +1522,7 @@ Please provide a natural, conversational response about this information. Stay i
         try {
             console.log(`📝 MCP Server: Extracting content for summarization from ${url} (Request ID: ${requestId})`);
             const extractedData = await this.webExtractor.extractForSummarization(url, options);
-            
+
             return {
                 content: [
                     {
@@ -1421,7 +1542,7 @@ Please provide a natural, conversational response about this information. Stay i
 
     async handleExtractMultipleUrls(args) {
         const { urls, options = {} } = args;
-        
+
         if (!urls || !Array.isArray(urls) || urls.length === 0) {
             throw new Error('URLs array is required for batch extraction');
         }
@@ -1449,10 +1570,10 @@ Please provide a natural, conversational response about this information. Stay i
         try {
             console.log(`🔍 MCP Server: Batch extracting content from ${urls.length} URLs`);
             const results = await this.webExtractor.extractBatch(urls, options);
-            
+
             let combinedContent = '# Batch Web Content Extraction\n\n';
             let successCount = 0;
-            
+
             results.forEach((result, index) => {
                 if (result.success) {
                     successCount++;
@@ -1461,9 +1582,9 @@ Please provide a natural, conversational response about this information. Stay i
                     combinedContent += `## ❌ Failed: ${result.url}\n\n**Error:** ${result.error}\n\n---\n\n`;
                 }
             });
-            
+
             combinedContent += `\n**Summary:** Successfully extracted ${successCount}/${urls.length} URLs`;
-            
+
             return {
                 content: [
                     {
@@ -1494,39 +1615,39 @@ Please provide a natural, conversational response about this information. Stay i
     // Agent Workflow Engine with State Machine
     async executeAgentWorkflow(taskId, options = {}) {
         console.log(`🤖 Agent Workflow: Starting execution for task ${taskId}`);
-        
+
         const task = this.agentTasks.get(taskId);
         if (!task) {
             throw new Error(`Task ${taskId} not found`);
         }
-        
+
         try {
             // Update task status to running
             this.writeToMemory(taskId, 'current_step', 'running');
-            
+
             // Execute the workflow steps
             await this.executeSearchPhase(taskId, options);
             await this.executeAnalysisPhase(taskId, options);
             await this.executeExtractionPhase(taskId, options);
             await this.executeSynthesisPhase(taskId, options);
-            
+
             // Mark task as completed
             this.writeToMemory(taskId, 'current_step', 'completed');
-            
+
             console.log(`✅ Agent Workflow: Task ${taskId} completed successfully`);
-            
+
             return {
                 success: true,
                 message: 'Agent workflow completed successfully',
                 taskId: taskId,
                 results: this.readFromMemory(taskId)
             };
-            
+
         } catch (error) {
             console.error(`❌ Agent Workflow: Task ${taskId} failed:`, error);
             this.writeToMemory(taskId, 'current_step', 'failed');
             this.writeToMemory(taskId, 'error', error.message);
-            
+
             return {
                 success: false,
                 message: `Agent workflow failed: ${error.message}`,
@@ -1535,57 +1656,57 @@ Please provide a natural, conversational response about this information. Stay i
             };
         }
     }
-    
+
     // Phase 1: Search for relevant websites
     async executeSearchPhase(taskId, options = {}) {
         console.log(`🔍 Agent Workflow: Executing search phase for task ${taskId}`);
-        
+
         const task = this.agentTasks.get(taskId);
         const goal = task.memory.goal;
-        
+
         this.writeToMemory(taskId, 'current_step', 'searching');
-        
+
         // Create search query from goal
         const rawSearchQuery = await this.generateSearchQuery(goal, options.llmSettings);
         // Remove quotes that LLM might add despite instructions
         const searchQuery = rawSearchQuery.replace(/^["']|["']$/g, '');
         console.log(`🔍 Generated search query: ${searchQuery} (cleaned from: ${rawSearchQuery})`);
-        
+
         // Execute raw web search to get actual search results instead of formatted markdown
         const rawSearchResults = await this.executeRawWebSearch(searchQuery, options.searchSettings);
-        
+
         // Extract URLs directly from raw search results
         const urls = this.extractUrlsFromRawSearchResults(rawSearchResults);
         console.log(`🔍 Found ${urls.length} URLs to process:`, urls);
-        
+
         // Store URLs and search results in memory
         this.writeToMemory(taskId, 'search_query', searchQuery);
         this.writeToMemory(taskId, 'search_results', rawSearchResults);
         this.writeToMemory(taskId, 'urls_to_visit', urls);
-        
+
         return urls;
     }
-    
+
     // Phase 2: Analyze which URLs are most relevant
     async executeAnalysisPhase(taskId, options = {}) {
         console.log(`🧠 Agent Workflow: Executing analysis phase for task ${taskId}`);
-        
+
         const task = this.agentTasks.get(taskId);
         const goal = task.memory.goal;
         const urls = task.memory.urls_to_visit || [];
-        
+
         this.writeToMemory(taskId, 'current_step', 'analyzing');
-        
+
         if (urls.length === 0) {
             console.log('🧠 No URLs to analyze, skipping analysis phase');
             return [];
         }
-        
+
         // Use LLM to analyze and prioritize URLs
         const analysisPrompt = `I need to prioritize which websites to extract content from based on relevance to the user's goal.
 
 Goal: ${goal}
-        
+
 Available URLs to analyze:
 ${urls.map((url, i) => `${i + 1}. ${url}`).join('\n')}
 
@@ -1614,9 +1735,9 @@ Respond in JSON format:
 }
 
 Order by priority (1 = highest). Include all URLs but rank them by expected value.`;
-        
+
         const analysisResponse = await this.callLLM(analysisPrompt, 0.3, 1000, options.llmSettings);
-        
+
         let prioritizedUrls = [];
         try {
             const analysis = JSON.parse(analysisResponse);
@@ -1624,60 +1745,60 @@ Order by priority (1 = highest). Include all URLs but rank them by expected valu
             console.log(`🧠 Analysis complete. Prioritized ${prioritizedUrls.length} URLs`);
         } catch (error) {
             console.warn('🧠 Failed to parse analysis response, using original URL order');
-            prioritizedUrls = urls.map((url, i) => ({ 
-                url, 
-                priority: i + 1, 
-                relevance_score: 0.5, 
-                reasoning: 'Default ordering' 
+            prioritizedUrls = urls.map((url, i) => ({
+                url,
+                priority: i + 1,
+                relevance_score: 0.5,
+                reasoning: 'Default ordering'
             }));
         }
-        
+
         // Store analysis results
         this.writeToMemory(taskId, 'url_analysis', prioritizedUrls);
-        
+
         return prioritizedUrls;
     }
-    
+
     // Phase 3: Extract content from prioritized URLs
     async executeExtractionPhase(taskId, options = {}) {
         console.log(`📄 Agent Workflow: Executing extraction phase for task ${taskId}`);
-        
+
         const task = this.agentTasks.get(taskId);
         const prioritizedUrls = task.memory.url_analysis || [];
-        
+
         this.writeToMemory(taskId, 'current_step', 'extracting');
-        
+
         if (prioritizedUrls.length === 0) {
             console.log('📄 No URLs to extract, skipping extraction phase');
             return {};
         }
-        
+
         const extractedContent = {};
         const failedUrls = [];
         const processedUrls = new Set(); // Track processed URLs to prevent duplicates
-        
+
         // Extract content from URLs in priority order
         for (const urlInfo of prioritizedUrls) {
             const url = urlInfo.url;
-            
+
             // Skip if URL already processed
             if (processedUrls.has(url)) {
                 console.log(`⏭️ Skipping duplicate URL: ${url}`);
                 continue;
             }
-            
+
             // Mark URL as being processed
             processedUrls.add(url);
-            
+
             try {
                 console.log(`📄 Extracting content from: ${url}`);
-                
+
                 // Choose extraction method intelligently
                 const extractionResult = await this.extractWithIntelligentMethod(url, {
                     maxLength: 4000,
                     blockResources: true
                 });
-                
+
                 if (extractionResult && extractionResult.content) {
                     extractedContent[url] = {
                         ...extractionResult,
@@ -1685,7 +1806,7 @@ Order by priority (1 = highest). Include all URLs but rank them by expected valu
                         relevance_score: urlInfo.relevance_score,
                         reasoning: urlInfo.reasoning
                     };
-                    
+
                     // Calculate actual character count from content structure
                     let characterCount = 0;
                     if (Array.isArray(extractionResult.content) && extractionResult.content[0]?.text) {
@@ -1695,15 +1816,15 @@ Order by priority (1 = highest). Include all URLs but rank them by expected valu
                     } else {
                         characterCount = JSON.stringify(extractionResult.content).length;
                     }
-                    
+
                     console.log(`✅ [EXTRACT-${Date.now()}] Successfully extracted ${characterCount} characters from ${url}`);
                 } else {
                     console.warn(`⚠️ No content extracted from ${url}`);
                     failedUrls.push(url);
                 }
-                
+
             } catch (error) {
-                // Handle blocked sites differently from extraction failures  
+                // Handle blocked sites differently from extraction failures
                 if (error.message.includes('is blocked due to aggressive bot detection')) {
                     console.log(`🚫 Skipped blocked site: ${url}`);
                     failedUrls.push(`${url} (blocked)`);
@@ -1713,16 +1834,16 @@ Order by priority (1 = highest). Include all URLs but rank them by expected valu
                 }
             }
         }
-        
+
         // Store extraction results
         this.writeToMemory(taskId, 'extracted_content', extractedContent);
         this.writeToMemory(taskId, 'failed_urls', failedUrls);
-        
+
         console.log(`📄 Extraction complete. Success: ${Object.keys(extractedContent).length}, Failed: ${failedUrls.length}`);
-        
+
         return extractedContent;
     }
-    
+
     /**
      * Clean extracted content by removing website navigation and boilerplate
      */
@@ -1730,7 +1851,7 @@ Order by priority (1 = highest). Include all URLs but rank them by expected valu
         if (!content || typeof content !== 'string') {
             return '';
         }
-        
+
         // Remove common website navigation and boilerplate patterns
         const cleaningPatterns = [
             // Navigation and site structure
@@ -1739,87 +1860,87 @@ Order by priority (1 = highest). Include all URLs but rank them by expected valu
             /Quick\s*Links\s*Quick\s*Links/gi,
             /Home\s*Overall\s*Rankings\s*Rankings\s*Index/gi,
             /News\s*Sections?\s*U\.?S\.?\s*News/gi,
-            
+
             // Common footers and headers
             /About\s+Reuters.*?opens\s+new\s+tab/gi,
             /Advertise\s+with\s+Us.*?opens\s+new\s+tab/gi,
             /Careers.*?opens\s+new\s+tab/gi,
             /Download\s+the\s+App\s+\(iOS\).*?opens\s+new\s+tab/gi,
             /Download\s+the\s+App\s+\(Android\).*?opens\s+new\s+tab/gi,
-            
+
             // Cookie and privacy notices
             /By\s+continuing,?\s*I\s+agree\s+to\s+the\s+Privacy\s+Policy/gi,
             /By\s+accepting,?\s*you\s+agree\s+to\s+our\s+updated\s+Terms/gi,
-            
+
             // Market tickers and technical data (keep headlines but remove ticker symbols)
             /\*\d+[\d,]*\.\d+\s*Uptrend\s*[+\-]\d+/gi,
             /LAST\s*\|\s*\d+:\d+:\d+\s*[AP]M\s*[A-Z]+/gi,
-            
+
             // Ad and tracking content
             /#bfad-slot\s*\{[^}]+\}/gi,
             /@media[^}]+\{[^}]+\}/gi,
-            
+
             // Schema markup and JSON-LD
             /\[\{"@context".*?\}\]/gi,
-            
+
             // Excessive whitespace and line breaks
             /\s{3,}/g,
             /\n{3,}/g
         ];
-        
+
         let cleaned = content;
-        
+
         // Apply all cleaning patterns
         cleaningPatterns.forEach(pattern => {
             cleaned = cleaned.replace(pattern, ' ');
         });
-        
+
         // Additional cleanup for news content
         // Remove lines that are purely navigation (start with common nav terms)
         const lines = cleaned.split('\n');
         const filteredLines = lines.filter(line => {
             const trimmed = line.trim();
             if (trimmed.length < 5) return false; // Remove very short lines
-            
+
             // Remove pure navigation lines
             const navPatterns = [
                 /^(Home|About|Contact|Privacy|Terms|Login|Sign\s+[Ii]n|Register|Subscribe|Menu|Browse|Search)$/i,
                 /^(World|Business|Markets|Sports|Technology|Politics|Health)$/i,
                 /^[A-Z\s]{2,20}$/ // All caps short phrases (likely navigation)
             ];
-            
+
             return !navPatterns.some(pattern => pattern.test(trimmed));
         });
-        
+
         cleaned = filteredLines.join('\n');
-        
+
         // Final cleanup
         cleaned = cleaned
             .replace(/\s+/g, ' ') // Normalize spaces
             .replace(/\n\s*\n/g, '\n\n') // Normalize line breaks
             .trim();
-        
+
         return cleaned;
     }
 
     // Phase 4: Synthesize information into final response
     async executeSynthesisPhase(taskId, options = {}) {
         console.log(`🎯 Agent Workflow: Executing synthesis phase for task ${taskId}`);
-        
+
         const task = this.agentTasks.get(taskId);
         const goal = task.memory.goal;
         const extractedContent = task.memory.extracted_content || {};
-        
+
         this.writeToMemory(taskId, 'current_step', 'synthesizing');
-        
+
         if (Object.keys(extractedContent).length === 0) {
             console.log('🎯 No content to synthesize');
             const fallbackSynthesis = `I searched for information about "${goal}" but was unable to extract content from the websites found. Please try refining your search query or check if the topic requires more specific search terms.`;
-            
+
             this.writeToMemory(taskId, 'final_synthesis', fallbackSynthesis);
             return fallbackSynthesis;
         }
-        
+
         // Prepare content for synthesis - keep source attribution but clean content
         const contentSummary = Object.entries(extractedContent)
             .map(([url, data]) => {
@@ -1834,7 +1955,7 @@ Order by priority (1 = highest). Include all URLs but rank them by expected valu
                 } else {
                     contentText = 'No content available';
                 }
-                
+
                 // Check if content is paywalled before processing
                 if (this.isPaywalledContent(contentText)) {
                     return `
@@ -1843,28 +1964,28 @@ Title: ${data.title || 'Untitled'}
 Content: [PAYWALL] This article requires a subscription to read in full. Available preview: ${contentText.substring(0, 300)}${contentText.length > 300 ? '...' : ''}
 `;
                 }
-                
+
                 // Clean the content to remove website boilerplate and navigation
                 const cleanedContent = this.cleanContentForSynthesis(contentText);
-                
+
                 return `
 Source: ${url}
 Title: ${data.title || 'Untitled'}
 Content: ${cleanedContent.substring(0, 2000)}${cleanedContent.length > 2000 ? '...' : ''}
 `;
             }).join('\n---\n');
-        
+
         const synthesisPrompt = `You are responding as your current persona in a natural conversation. The user asked about: "${goal}"
 
 I've extracted actual content from ${Object.keys(extractedContent).length} sources to help answer their question:
 
 ${contentSummary}
 
-Please provide a natural, conversational response about this information. Stay in character as your persona, be engaging and helpful, and present the information in a way that feels like a natural conversation. 
+Please provide a natural, conversational response about this information. Stay in character as your persona, be engaging and helpful, and present the information in a way that feels like a natural conversation.
 
 Key guidelines:
 - Focus on the ACTUAL CONTENT AND INFORMATION extracted from the sources, not descriptions of what the websites are about
-- Don't start with phrases like "According to my research" or "Based on the information I found"  
+- Don't start with phrases like "According to my research" or "Based on the information I found"
 - Present the information as if you naturally know about this topic
 - Synthesize the most relevant details that directly answer the user's question
 - Be accurate to the source material but conversational in tone
@@ -1875,21 +1996,21 @@ Key guidelines:
 - Don't repeatedly mention paywalls - briefly acknowledge and move on to available content
 
 Focus on being genuinely helpful while maintaining your persona's voice and style. Extract and present the specific information the user is looking for, not meta-information about the websites themselves.`;
-        
+
         const synthesis = await this.callLLM(synthesisPrompt, 0.7, 2000, options.llmSettings);
-        
+
         console.log(`🎯 Synthesis complete. Generated ${synthesis.length} characters`);
-        
+
         // Store final synthesis
         this.writeToMemory(taskId, 'final_synthesis', synthesis);
-        
+
         return synthesis;
     }
-    
+
     // Helper method to generate search query from goal
     async generateSearchQuery(goal, llmSettings) {
         const prompt = `You're helping to search for information. Convert this goal into an effective web search query:
-        
+
 Goal: ${goal}
 
 Analyze the goal and create 1-3 search queries that would find the most relevant, current information. Consider:
@@ -1906,10 +2027,10 @@ Examples:
 Goal: "Tell me about electric vehicle charging infrastructure" → "electric vehicle charging stations infrastructure"
 Goal: "How do I start a small business?" → "small business startup guide requirements"
 Goal: "Latest developments in renewable energy" → "latest renewable energy developments"`;
-        
+
         return await this.callLLM(prompt, 0.3, 150, llmSettings);
     }
-    
+
     // Helper method to extract URLs from search results
     // Execute raw web search without markdown formatting
     async executeRawWebSearch(query, searchSettings = {}) {
@@ -1918,8 +2039,7 @@ Goal: "Latest developments in renewable energy" → "latest renewable energy dev
         const limit = parseInt(searchSettings.limit) || 20;
         const timeFilter = searchSettings.timeFilter || 'any';
 
-        console.log('🔍 Raw web search:', { query, provider, limit, timeFilter });
-        console.log('🔍 Raw web search - Full searchSettings:', searchSettings);
+        console.log('🔍 Raw web search:', { query, provider, limit, timeFilter, hasApiKey: !!apiKey });
 
         // Create search provider instance (same as handleWebSearch)
         let searchProvider;
@@ -1957,9 +2077,9 @@ Goal: "Latest developments in renewable energy" → "latest renewable energy dev
     extractUrlsFromRawSearchResults(rawSearchResults) {
         console.log('🔍 URL Extraction - Input rawSearchResults:', typeof rawSearchResults, Array.isArray(rawSearchResults), rawSearchResults?.length);
         console.log('🔍 URL Extraction - First result sample:', rawSearchResults?.[0]);
-        
+
         const urls = [];
-        
+
         if (rawSearchResults && Array.isArray(rawSearchResults)) {
             // Extract URLs directly from search result objects
             for (const result of rawSearchResults) {
@@ -1972,7 +2092,7 @@ Goal: "Latest developments in renewable energy" → "latest renewable energy dev
         } else {
             console.log('🔍 URL Extraction - rawSearchResults is not an array or is empty');
         }
-        
+
         // Remove duplicates, filter out blocked sites, then limit to top 5 URLs
         const uniqueUrls = [...new Set(urls)]
             .filter(url => url && url.startsWith('http'))
@@ -1984,7 +2104,7 @@ Goal: "Latest developments in renewable energy" → "latest renewable energy dev
                 return true;
             })
             .slice(0, 5); // Limit to top 5 URLs after filtering
-        
+
         console.log('🔍 URL Extraction - Final URLs extracted:', uniqueUrls);
         return uniqueUrls;
     }
@@ -1992,11 +2112,11 @@ Goal: "Latest developments in renewable energy" → "latest renewable energy dev
     // Legacy method kept for backwards compatibility
     extractUrlsFromSearchResults(searchResults) {
         const urls = [];
-        
+
         if (searchResults && searchResults.content) {
             // Parse markdown content to extract URLs
             const content = searchResults.content;
-            
+
             for (const item of content) {
                 if (item.type === 'text' && item.text) {
                     // Look for URL patterns in the text
@@ -2007,7 +2127,7 @@ Goal: "Latest developments in renewable energy" → "latest renewable energy dev
                 }
             }
         }
-        
+
         // Remove duplicates, filter out blocked sites, then limit to top 5 URLs
         const uniqueUrls = [...new Set(urls)]
             .filter(url => url && url.startsWith('http'))
@@ -2019,20 +2139,20 @@ Goal: "Latest developments in renewable energy" → "latest renewable energy dev
                 return true;
             })
             .slice(0, 5); // Limit to top 5 URLs after filtering
-        
+
         return uniqueUrls;
     }
-    
+
     // Helper method for intelligent extraction method selection
     async extractWithIntelligentMethod(url, options = {}) {
         const domain = new URL(url).hostname.toLowerCase();
-        
+
         // Check if site is blocked using security manager
         if (this.securityManager.isBlockedSite(url)) {
             console.log(`🚫 Skipping blocked site: ${domain}`);
             throw new Error(`Site ${domain} is blocked due to aggressive bot detection`);
         }
-        
+
         // Dynamic sites that typically need Puppeteer
         const dynamicSites = [
             'reddit.com',
@@ -2055,12 +2175,12 @@ Goal: "Latest developments in renewable energy" → "latest renewable energy dev
             'marketwatch.com',   // MarketWatch (dynamic charts)
             'nytimes.com'        // NY Times (paywall, dynamic content)
         ];
-        
+
         // Static news sites that work well with Cheerio
         const staticNewsSites = [
             'foxnews.com',       // Fox News (mostly static HTML)
             'cnn.com',           // CNN (good static content)
-            'bbc.com',           // BBC (excellent static structure) 
+            'bbc.com',           // BBC (excellent static structure)
             'reuters.com',       // Reuters (clean static content)
             'nbcnews.com',       // NBC News (static articles)
             'cbsnews.com',       // CBS News (static content)
@@ -2069,10 +2189,10 @@ Goal: "Latest developments in renewable energy" → "latest renewable energy dev
             'npr.org',           // NPR (excellent static content)
             'apnews.com'         // Associated Press (clean static)
         ];
-        
+
         let needsPuppeteer = dynamicSites.some(site => domain.includes(site));
         const isStaticNewsSite = staticNewsSites.some(site => domain.includes(site));
-        
+
         // Check for common restaurant website builders that need Puppeteer
         if (!needsPuppeteer) {
             const restaurantBuilderPatterns = [
@@ -2081,13 +2201,13 @@ Goal: "Latest developments in renewable energy" → "latest renewable energy dev
                 '.square.site',            // Square sites
                 '.wixsite.com'             // Wix sites
             ];
-            
+
             if (restaurantBuilderPatterns.some(pattern => domain.includes(pattern) || url.includes(pattern))) {
                 console.log(`🍽️ Restaurant website builder detected: ${domain}`);
                 needsPuppeteer = true;
             }
         }
-        
+
         // Log site classification for debugging
         if (needsPuppeteer) {
             console.log(`🔍 Site classification: ${domain} → Puppeteer (dynamic)`);
@@ -2096,10 +2216,10 @@ Goal: "Latest developments in renewable energy" → "latest renewable energy dev
         } else {
             console.log(`🔍 Site classification: ${domain} → Cheerio (default)`);
         }
-        
+
         try {
             let extractionResult;
-            
+
             if (needsPuppeteer) {
                 console.log(`🤖 Using Puppeteer for dynamic site: ${domain}`);
                 extractionResult = await this.handleExtractWebContent({ url, options });
@@ -2107,18 +2227,18 @@ Goal: "Latest developments in renewable energy" → "latest renewable energy dev
                 console.log(`⚡ Using Cheerio for static site: ${domain}`);
                 extractionResult = await this.handleExtractForSummary({ url, options });
             }
-            
+
             // Validate extraction result - only fallback if extraction actually failed
             if (this.isValidExtractionResult(extractionResult)) {
                 return extractionResult;
             } else {
                 throw new Error('Extraction returned invalid or insufficient content');
             }
-            
+
         } catch (error) {
             console.log(`⚠️ Primary extraction failed for ${url}: ${error.message}`);
             console.log(`🔄 Trying fallback extraction method...`);
-            
+
             // Fallback to the other method only on genuine failure
             try {
                 let fallbackResult;
@@ -2129,14 +2249,14 @@ Goal: "Latest developments in renewable energy" → "latest renewable energy dev
                     console.log(`🤖 Fallback: Using Puppeteer for ${domain}`);
                     fallbackResult = await this.handleExtractWebContent({ url, options });
                 }
-                
+
                 if (this.isValidExtractionResult(fallbackResult)) {
                     console.log(`✅ Fallback extraction succeeded for ${url}`);
                     return fallbackResult;
                 } else {
                     throw new Error('Fallback extraction also returned invalid content');
                 }
-                
+
             } catch (fallbackError) {
                 console.error(`❌ Both extraction methods failed for ${url}:`, fallbackError.message);
                 throw fallbackError;
@@ -2151,7 +2271,7 @@ Goal: "Latest developments in renewable energy" → "latest renewable energy dev
         if (!content || typeof content !== 'string') {
             return false;
         }
-        
+
         const lowerContent = content.toLowerCase();
         const paywallIndicators = [
             'subscribe to continue',
@@ -2171,7 +2291,7 @@ Goal: "Latest developments in renewable energy" → "latest renewable energy dev
             'create account to continue',
             'this article is for subscribers'
         ];
-        
+
         return paywallIndicators.some(indicator => lowerContent.includes(indicator));
     }
 
@@ -2182,7 +2302,7 @@ Goal: "Latest developments in renewable energy" → "latest renewable energy dev
         if (!result || typeof result !== 'object') {
             return false;
         }
-        
+
         // Check if result has content
         let content = '';
         if (typeof result.content === 'string') {
@@ -2192,34 +2312,34 @@ Goal: "Latest developments in renewable energy" → "latest renewable energy dev
         } else {
             return false; // No valid content found
         }
-        
+
         const trimmedContent = content.trim();
-        
+
         // Check for paywall content first - this is valid content, not a failure
         if (this.isPaywalledContent(trimmedContent)) {
             console.log(`🔒 Paywall detected - treating as valid content (no fallback needed)`);
             return true; // Paywall content is valid, don't trigger fallback
         }
-        
+
         // Content should be substantial (more than just navigation/boilerplate)
         if (trimmedContent.length < 100) {
             console.log(`⚠️ Extraction result too short: ${trimmedContent.length} characters`);
             return false;
         }
-        
+
         // Check if content is mostly navigation/boilerplate - only reject if extremely high percentage
         const words = trimmedContent.split(/\s+/);
-        const navWords = words.filter(word => 
+        const navWords = words.filter(word =>
             /^(Home|About|Contact|Login|Menu|Browse|Search|News|Sports|Business|World|Markets|Politics|Technology|Health|Sign|Subscribe|Follow|Share|More)$/i.test(word)
         );
-        
+
         // Only reject if more than 70% navigation words (was 30% - too strict)
         // Most real articles will have some navigation words mixed in with content
         if (navWords.length / words.length > 0.7) {
             console.log(`⚠️ Extraction result mostly navigation: ${Math.round(navWords.length / words.length * 100)}% nav words`);
             return false;
         }
-        
+
         return true;
     }
 
@@ -2575,4 +2695,4 @@ export { SequentialThinkingMCPServer, tools };
 if (import.meta.url === `file://${process.argv[1]}`) {
     const server = new SequentialThinkingMCPServer();
     server.run().catch(console.error);
-} 
+}

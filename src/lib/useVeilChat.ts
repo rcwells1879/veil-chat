@@ -10,7 +10,7 @@ import type {
   LegacyVoiceService,
 } from "../types/legacy";
 import { createImageMessage, createTextMessage, downloadJson, historyToMessages, keywordsHelp, type ChatMessage } from "./format";
-import { type AppSettings, persistSettings, readSettings, updateSetting } from "./settings";
+import { exposeSettings, type AppSettings, persistSettings, readSettings, updateSetting } from "./settings";
 
 type BusyMode = "idle" | "thinking" | "image" | "persona" | "search";
 type View = "chat" | "persona" | "settings" | "history";
@@ -34,6 +34,9 @@ const directProviders = (settings: AppSettings) => ({
   anthropicApiKey: settings.anthropicApiKey,
   googleModel: settings.googleModelIdentifier,
   googleApiKey: settings.googleApiKey,
+  kieModel: settings.kieModelIdentifier,
+  kieApiKey: settings.kieApiKey,
+  kieReasoningLevel: settings.kieReasoningLevel,
 });
 
 const imageApiUrl = (settings: AppSettings) =>
@@ -78,6 +81,12 @@ function makeImageService(settings: AppSettings) {
     imagen4_aspect_ratio: settings.imagen4AspectRatio,
     imagen4_output_format: settings.imagen4OutputFormat,
     imagen4_person_generation: settings.imagen4PersonGeneration,
+    kieApiKey: settings.kieApiKey,
+    kie_image_model: settings.kieImageModelIdentifier,
+    kie_aspect_ratio: settings.kieImageAspectRatio,
+    kie_quality: settings.kieImageQuality,
+    kie_resolution: settings.kieImageResolution,
+    kie_output_format: settings.kieImageOutputFormat,
     provider: settings.customImageProvider,
     openaiApiKey: settings.openaiApiKey,
     googleApiKey: settings.googleApiKey,
@@ -126,6 +135,7 @@ export function useVeilChat() {
   const [settings, setSettings] = useState<AppSettings>(() => readSettings());
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [documents, setDocuments] = useState<AttachedDocument[]>([]);
+  const [imageReferencesCount, setImageReferencesCount] = useState(0);
   const [busy, setBusy] = useState<BusyMode>("idle");
   const [activeView, setActiveView] = useState<View>("chat");
   const [input, setInput] = useState("");
@@ -152,6 +162,7 @@ export function useVeilChat() {
 
   const refreshDocs = useCallback(() => {
     setDocuments(contextRef.current?.getAttachedDocuments() ?? []);
+    setImageReferencesCount(imageRef.current?.getReferenceImageCount?.() ?? 0);
   }, []);
 
   const initializeMcp = useCallback(async (nextSettings: AppSettings) => {
@@ -182,7 +193,7 @@ export function useVeilChat() {
     async (nextSettings: AppSettings, preserveHistory = true) => {
       ensureLegacyGlobals();
       settingsRef.current = nextSettings;
-      window.SETTINGS = { ...nextSettings };
+      exposeSettings(nextSettings);
 
       const previousHistory = llmRef.current?.conversationHistory;
       const previousInitialized = llmRef.current?.characterInitialized;
@@ -398,7 +409,30 @@ export function useVeilChat() {
     async (files: FileList | File[]) => {
       const fileArray = Array.from(files);
       if (!fileArray.length || !contextRef.current) return;
-      const results = await contextRef.current.processFiles(fileArray);
+
+      const imageFiles = fileArray.filter((file) => file.type.startsWith("image/"));
+      const documentFiles = fileArray.filter((file) => !file.type.startsWith("image/"));
+
+      if (imageFiles.length) {
+        try {
+          if (!imageRef.current?.attachReferenceImages) {
+            addMessage(createTextMessage("system", "Image references are not ready yet. Try again in a moment."), false);
+          } else {
+            const references = await imageRef.current.attachReferenceImages(imageFiles);
+            setImageReferencesCount(imageRef.current.getReferenceImageCount?.() ?? references.length);
+            addMessage(createTextMessage("system", `Attached ${references.length} image reference${references.length === 1 ? "" : "s"} for Kie image editing.`), false);
+          }
+        } catch (error) {
+          addMessage(createTextMessage("system", `Image reference upload failed: ${error instanceof Error ? error.message : String(error)}`), false);
+        }
+      }
+
+      if (!documentFiles.length) {
+        refreshDocs();
+        return;
+      }
+
+      const results = await contextRef.current.processFiles(documentFiles);
       refreshDocs();
 
       const successes = results.filter((result) => result.success).length;
@@ -423,6 +457,8 @@ export function useVeilChat() {
 
   const clearDocuments = useCallback(() => {
     contextRef.current?.clearAllDocuments();
+    imageRef.current?.clearReferenceImages?.();
+    setImageReferencesCount(0);
     refreshDocs();
   }, [refreshDocs]);
 
@@ -437,10 +473,12 @@ export function useVeilChat() {
   const newConversation = useCallback(() => {
     llmRef.current?.clearConversationHistory();
     contextRef.current?.clearAllDocuments();
+    imageRef.current?.clearReferenceImages?.();
     localStorage.removeItem("currentPersonaPrompt");
     setPersonaPrompt("");
     setMessages([]);
     setInput("");
+    setImageReferencesCount(0);
     refreshDocs();
     setActiveView("chat");
   }, [refreshDocs]);
@@ -462,6 +500,8 @@ export function useVeilChat() {
         llmRef.current = makeLLM(settingsRef.current);
         llmRef.current.clearConversationHistory();
         contextRef.current?.clearAllDocuments();
+        imageRef.current?.clearReferenceImages?.();
+        setImageReferencesCount(0);
         refreshDocs();
 
         if (validation.sanitizedInput) {
@@ -559,6 +599,7 @@ export function useVeilChat() {
       activeView,
       busy,
       documents,
+      imageReferencesCount,
       input,
       isListening,
       lastSavedAt,
@@ -568,7 +609,7 @@ export function useVeilChat() {
       settings,
       voiceAvailable: Boolean(voiceRef.current?.isRecognitionSupported()),
     }),
-    [activeView, busy, documents, input, isListening, lastSavedAt, messages, notice, personaPrompt, settings]
+    [activeView, busy, documents, imageReferencesCount, input, isListening, lastSavedAt, messages, notice, personaPrompt, settings]
   );
 
   return {

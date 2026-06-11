@@ -98,6 +98,9 @@ export interface LegacyImageService {
   googleApiKey?: string | null;
   updateSettings: (settings: Record<string, unknown>) => void;
   generateImage: (prompt: string) => Promise<string | null>;
+  attachReferenceImages?: (files: File[]) => Promise<string[]>;
+  clearReferenceImages?: () => void;
+  getReferenceImageCount?: () => number;
 }
 
 export interface LegacyVoiceService {
