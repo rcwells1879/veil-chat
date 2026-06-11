@@ -187,7 +187,7 @@ VeilChat is a modern web-based chat interface with AI capabilities, built with v
 
 #### Security Patterns Detected
 - System instruction overrides and prompt manipulation
-- SSML/XML injection attempts for TTS exploitation
+- Markup/XML injection attempts
 - URL encoding and Unicode escape sequence abuse
 - Developer mode and unrestricted access requests
 
@@ -217,7 +217,6 @@ VeilChat is a modern web-based chat interface with AI capabilities, built with v
    - `securityValidator.js` - Input validation and sanitization
    - `azureTTSService.js` / `azureSTTService.js` - Azure speech services
    - `offlineManager.js` - Offline data persistence and sync
-   - `ssmlProcessor.js` - Speech Synthesis Markup Language processing
    - `desktopInterface.js` - Desktop-specific UI and settings management
 
 #### Function Reuse Guidelines

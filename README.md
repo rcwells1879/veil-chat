@@ -179,7 +179,6 @@ veilchat/
 │   │   ├── imageService.js       # Image generation services
 │   │   ├── contextservice.js     # Document processing
 │   │   ├── securityValidator.js  # Input validation & sanitization
-│   │   ├── ssmlProcessor.js      # SSML processing for TTS
 │   │   └── mcpClient.js          # HTTP REST API client
 │   ├── pages/
 │   │   ├── user-settings.html # Settings configuration
@@ -212,7 +211,7 @@ VeilChat implements **defense-in-depth security** with multiple layers of protec
 - **50+ Prompt Injection Patterns**: Detection of latest 2025 attack techniques
 - **Unicode/Emoji Protection**: Blocks hidden characters and suspicious sequences
 - **File Content Scanning**: All uploaded documents validated for malicious content
-- **SSML Injection Prevention**: Blocks markup injection in text-to-speech
+- **Markup Injection Prevention**: Blocks unsafe markup in user-controlled text
 
 #### Roleplay-Friendly Design
 
@@ -264,7 +263,7 @@ VeilChat implements **defense-in-depth security** with multiple layers of protec
 | **Data Exfiltration**                  | Chrome sandbox prevents downloads              | ✅ Protected  |
 | **Unicode/Emoji Attacks**              | Hidden character detection and removal         | ✅ Protected  |
 | **File Upload Malware**                | Content scanning, type validation              | ✅ Protected  |
-| **SSML Injection**                     | Markup validation, safe rendering              | ✅ Protected  |
+| **Markup Injection**                   | Markup validation, safe rendering              | ✅ Protected  |
 | **Role Manipulation**                  | ❌ Intentionally allowed for creative roleplay  | ⚠️ Permitted |
 
 ### 🔐 Security Features

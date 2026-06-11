@@ -613,6 +613,7 @@ function SettingsView({ settings, onChange }: { settings: AppSettings; onChange:
             </Field>
             <Field label="Quality">
               <select value={settings.kieImageQuality} onChange={(event) => onChange("kieImageQuality", event.target.value)}>
+                <option value="basic">Basic</option>
                 <option value="medium">Medium</option>
                 <option value="high">High</option>
               </select>

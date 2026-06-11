@@ -26,7 +26,6 @@ const SECONDARY_ASSETS = [
   'js/mcpClient.js',
   'js/desktopInterface.js',
   'js/securityValidator.js',
-  'js/ssmlProcessor.js',
   'js/offlineManager.js',
   'pages/user-settings.html',
   'pages/persona.html'

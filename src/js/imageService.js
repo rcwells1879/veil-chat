@@ -153,10 +153,10 @@ if (typeof ImageService === 'undefined') {
             'bytedance/seedream': { fields: ['prompt', 'image_size', 'guidance_scale', 'seed'], imageSizeDefault: 'regular' },
             'bytedance/seedream-v4-text-to-image': { fields: ['prompt', 'image_size', 'image_resolution', 'max_images', 'seed', 'nsfw_checker'], imageSizeDefault: 'regular' },
             'bytedance/seedream-v4-edit': { fields: ['prompt', 'image_urls', 'image_size', 'image_resolution', 'max_images', 'seed', 'nsfw_checker'], imageField: 'image_urls', imageSizeDefault: 'regular' },
-            'seedream/4.5-text-to-image': { fields: ['prompt', 'aspect_ratio', 'quality', 'nsfw_checker'] },
-            'seedream/4.5-edit': { fields: ['prompt', 'image_urls', 'aspect_ratio', 'quality', 'nsfw_checker'], imageField: 'image_urls' },
-            'seedream/5-lite-text-to-image': { fields: ['prompt', 'aspect_ratio', 'quality', 'nsfw_checker'] },
-            'seedream/5-lite-image-to-image': { fields: ['prompt', 'image_urls', 'aspect_ratio', 'quality', 'nsfw_checker'], imageField: 'image_urls' },
+            'seedream/4.5-text-to-image': { fields: ['prompt', 'aspect_ratio', 'quality', 'nsfw_checker'], qualityDefault: 'basic', qualityValues: ['basic'] },
+            'seedream/4.5-edit': { fields: ['prompt', 'image_urls', 'aspect_ratio', 'quality', 'nsfw_checker'], imageField: 'image_urls', qualityDefault: 'basic', qualityValues: ['basic'] },
+            'seedream/5-lite-text-to-image': { fields: ['prompt', 'aspect_ratio', 'quality', 'nsfw_checker'], qualityDefault: 'basic', qualityValues: ['basic'] },
+            'seedream/5-lite-image-to-image': { fields: ['prompt', 'image_urls', 'aspect_ratio', 'quality', 'nsfw_checker'], imageField: 'image_urls', qualityDefault: 'basic', qualityValues: ['basic'] },
             'nano-banana-2': { fields: ['prompt', 'image_input', 'aspect_ratio', 'resolution', 'output_format'], imageField: 'image_input', optionalImage: true },
             'google/imagen4-fast': { fields: ['prompt', 'negative_prompt', 'aspect_ratio', 'seed'] },
             'google/imagen4': { fields: ['prompt', 'negative_prompt', 'aspect_ratio', 'seed'] },
@@ -170,8 +170,8 @@ if (typeof ImageService === 'undefined') {
             'flux-2/flex-image-to-image': { fields: ['input_urls', 'prompt', 'aspect_ratio', 'resolution', 'nsfw_checker'], imageField: 'input_urls' },
             'grok-imagine/text-to-image': { fields: ['prompt', 'aspect_ratio', 'nsfw_checker', 'enable_pro'] },
             'grok-imagine/image-to-image': { fields: ['prompt', 'image_urls', 'nsfw_checker'], imageField: 'image_urls' },
-            'gpt-image/1.5-text-to-image': { fields: ['prompt', 'aspect_ratio', 'quality'] },
-            'gpt-image/1.5-image-to-image': { fields: ['input_urls', 'prompt', 'aspect_ratio', 'quality'], imageField: 'input_urls' },
+            'gpt-image/1.5-text-to-image': { fields: ['prompt', 'aspect_ratio', 'quality'], qualityDefault: 'medium', qualityValues: ['medium'] },
+            'gpt-image/1.5-image-to-image': { fields: ['input_urls', 'prompt', 'aspect_ratio', 'quality'], imageField: 'input_urls', qualityDefault: 'medium', qualityValues: ['medium'] },
             'gpt-image-2-text-to-image': { fields: ['prompt', 'aspect_ratio', 'resolution'] },
             'gpt-image-2-image-to-image': { fields: ['prompt', 'input_urls', 'aspect_ratio', 'resolution'], imageField: 'input_urls' },
             'ideogram/v3-text-to-image': { fields: ['prompt', 'rendering_speed', 'expand_prompt', 'image_size', 'negative_prompt'], imageSizeDefault: 'square_hd' },
@@ -283,7 +283,16 @@ if (typeof ImageService === 'undefined') {
         this.applyKieImageSources(input, config);
 
         if (fields.has('aspect_ratio')) input.aspect_ratio = this.kie_aspect_ratio || '1:1';
-        if (fields.has('quality')) input.quality = this.kie_quality || 'medium';
+        if (fields.has('quality')) {
+            const requestedQuality = this.kie_quality || config.qualityDefault;
+            if (config.qualityValues && config.qualityValues.length) {
+                input.quality = config.qualityValues.includes(requestedQuality)
+                    ? requestedQuality
+                    : config.qualityDefault;
+            } else if (requestedQuality) {
+                input.quality = requestedQuality;
+            }
+        }
         if (fields.has('resolution')) input.resolution = this.kie_resolution || '1K';
         if (fields.has('image_resolution')) input.image_resolution = this.kie_resolution || '1K';
         if (fields.has('output_format')) input.output_format = this.kie_output_format || 'png';

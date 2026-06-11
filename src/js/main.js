@@ -591,35 +591,9 @@ async function initializeApp() {
         let textToSpeak = null;
         let displayText = null;
 
-        // Initialize SSML processor if available
-        let ssmlProcessor = null;
-        if (typeof SSMLProcessor !== 'undefined') {
-            ssmlProcessor = new SSMLProcessor();
-        }
-
         if (typeof message === 'string') {
-            // Handle SSML processing for LLM messages
-            if (sender === 'llm' && ssmlProcessor) {
-                const ssmlResult = ssmlProcessor.extractSSML(message);
-                if (ssmlResult.hasSSML) {
-                    // Use SSML for TTS, clean text for display
-                    textToSpeak = message; // Full SSML for TTS
-                    displayText = ssmlResult.cleanText; // Clean text for display
-
-                    // Log SSML processing for debugging
-                    ssmlProcessor.logSSMLForDebugging(ssmlResult.ssml, displayText, 'Main.js - addMessage');
-
-                    // SSML detected and processed for TTS
-                } else {
-                    // No SSML, use original text for both
-                    textToSpeak = message;
-                    displayText = message;
-                }
-            } else {
-                // Non-LLM message or no SSML processor
-                textToSpeak = message;
-                displayText = message;
-            }
+            textToSpeak = message;
+            displayText = message;
 
             if (sender === 'llm' && window.marked && window.marked.parse) {
                 const cleanMessage = stripMarkdownCodeBlock(displayText);
@@ -646,22 +620,8 @@ async function initializeApp() {
             });
             messageElement.appendChild(img);
         } else if (message.text) {
-            // Handle SSML processing for text objects from LLM
-            if (sender === 'llm' && ssmlProcessor) {
-                const ssmlResult = ssmlProcessor.extractSSML(message.text);
-                if (ssmlResult.hasSSML) {
-                    textToSpeak = message.text; // Full SSML for TTS
-                    displayText = ssmlResult.cleanText; // Clean text for display
-
-                    ssmlProcessor.logSSMLForDebugging(ssmlResult.ssml, displayText, 'Main.js - addMessage (text object)');
-                } else {
-                    textToSpeak = message.text;
-                    displayText = message.text;
-                }
-            } else {
-                textToSpeak = message.text;
-                displayText = message.text;
-            }
+            textToSpeak = message.text;
+            displayText = message.text;
 
             if (sender === 'llm' && window.marked && window.marked.parse) {
                 const cleanMessage = stripMarkdownCodeBlock(displayText);
@@ -697,8 +657,6 @@ async function initializeApp() {
                 console.log('🎤 Starting TTS for LLM message');
                 console.log(`🎤 Voice selection - Using: ${SETTINGS.ttsVoice}`);
 
-                // Pass the original text (which may contain SSML) to voice service
-                // The voice service will handle SSML detection and processing
                 await voiceService.speak(textToSpeak, SETTINGS.ttsVoice);
                 // TTS completed
             } catch (error) {
@@ -2278,16 +2236,6 @@ Type **"/list"** anytime to see this help again.`;
     window.removeDocument = removeDocument;
     window.clearAllDocuments = clearAllDocuments;
 
-    // Add SSML style guide access for debugging
-    window.printSSMLStyles = () => {
-        if (typeof SSMLProcessor !== 'undefined') {
-            const processor = new SSMLProcessor();
-            processor.printStyleGuide();
-        } else {
-            console.error('SSML Processor not available');
-        }
-    };
-
     // --- Enhanced Event Listeners for Mobile ---
     addMobileCompatibleEvent(sendButton, 'click', handleUserInput);
 
@@ -2822,10 +2770,6 @@ Type **"/list"** anytime to see this help again.`;
 function stripMarkdownCodeBlock(text) {
     text = text.trim();
 
-    // Remove SSML content first (everything between <speak> tags)
-    text = text.replace(/<speak[^>]*>[\s\S]*?<\/speak>/gi, '').trim();
-
-    // Now extract markdown from code blocks
     const codeBlockRegex = /```(?:markdown)?\n?([\s\S]*?)\n?```/i;
     const match = text.match(codeBlockRegex);
     if (match) {

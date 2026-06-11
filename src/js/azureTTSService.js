@@ -119,47 +119,18 @@ if (typeof AzureTTSService === 'undefined') {
                 }
 
                 try {
-                    // Initialize SSML processor if not already done
-                    if (typeof SSMLProcessor !== 'undefined' && !this.ssmlProcessor) {
-                        this.ssmlProcessor = new SSMLProcessor();
-                    }
-
-                    // Check if input is SSML or plain text
-                    let isSSML = false;
-                    let ssmlToSend = '';
                     let cleanedText = textToSpeak.trim();
-
-                    if (this.ssmlProcessor) {
-                        const ssmlResult = this.ssmlProcessor.extractSSML(textToSpeak);
-                        if (ssmlResult.hasSSML) {
-                            isSSML = true;
-                            ssmlToSend = ssmlResult.ssml;
-                            cleanedText = ssmlResult.cleanText;
-                            
-                            // Skip local validation - let Azure TTS handle SSML validation
-                            // Our local validator has issues with complex nested SSML
-                            // Using SSML synthesis with Azure validation
-                        }
-                    }
-                    
-                    // Final safety check: if falling back to plain text, ensure we strip any SSML tags
-                    if (!isSSML && this.ssmlProcessor && textToSpeak.includes('<')) {
-                        cleanedText = this.ssmlProcessor.stripSSML(textToSpeak);
-                        console.log('AzureTTSService: Final safety strip - ensuring no SSML tags in plain text fallback');
-                    }
                     
                     // Starting TTS synthesis
                     // Using TTS synthesis
                     
-                    // Map voice keyword to Azure voice (only needed for plain text)
+                    // Map voice keyword to Azure voice.
                     const azureVoice = preferredVoiceKeyword ? 
                         this.mapVoiceKeywordToAzure(preferredVoiceKeyword) : 
                         this.currentVoice;
 
                     // Get audio buffer from Azure
-                    const audioBuffer = isSSML ? 
-                        await this.synthesizeSSML(ssmlToSend, preferredVoiceKeyword) : 
-                        await this.synthesize(cleanedText, azureVoice);
+                    const audioBuffer = await this.synthesize(cleanedText, azureVoice);
                     
                     // Play audio using HTML Audio Element
                     await this.playAudio(audioBuffer);
@@ -176,10 +147,10 @@ if (typeof AzureTTSService === 'undefined') {
 
         // Synthesize text to audio using Azure Speech Services (plain text)
         async synthesize(text, voice = 'en-US-JennyNeural') {
-            // Create SSML with voice settings
-            const ssml = `<speak version="1.0" xml:lang="en-US">
+            // Create the Azure speech request body
+            const requestBody = `<speak version="1.0" xml:lang="en-US">
                 <voice name="${voice}">
-                    <prosody rate="${this.voiceRate}" pitch="${this.getPitchForSSML(this.voicePitch)}">${this.escapeXML(text)}</prosody>
+                    <prosody rate="${this.voiceRate}" pitch="${this.getAzurePitchAdjustment(this.voicePitch)}">${this.escapeXML(text)}</prosody>
                 </voice>
             </speak>`;
 
@@ -193,7 +164,7 @@ if (typeof AzureTTSService === 'undefined') {
                     'X-Microsoft-OutputFormat': 'audio-16khz-128kbitrate-mono-mp3',
                     'User-Agent': 'VeilChat-TTS/1.0'
                 },
-                body: ssml
+                body: requestBody
             });
 
             if (!response.ok) {
@@ -202,70 +173,6 @@ if (typeof AzureTTSService === 'undefined') {
             }
 
             return response.arrayBuffer();
-        }
-
-        // Synthesize SSML directly to audio using Azure Speech Services
-        async synthesizeSSML(ssml, voiceKeyword = null) {
-            // Processing SSML for Azure format
-
-            // Fix SSML format for Azure requirements
-            const processedSSML = this.processSSMLForAzure(ssml, voiceKeyword);
-            console.log('🎵 Processed SSML:', processedSSML);
-
-            const response = await fetch(this.endpoint, {
-                method: 'POST',
-                headers: {
-                    'Ocp-Apim-Subscription-Key': this.apiKey,
-                    'Content-Type': 'application/ssml+xml',
-                    'X-Microsoft-OutputFormat': 'audio-16khz-128kbitrate-mono-mp3',
-                    'User-Agent': 'VeilChat-TTS/1.0'
-                },
-                body: processedSSML
-            });
-
-            if (!response.ok) {
-                const errorText = await response.text().catch(() => 'Unknown error');
-                console.error('🎵 AzureTTSService: SSML synthesis failed:', errorText);
-                throw new Error(`Azure TTS SSML API failed: ${response.status} ${response.statusText} - ${errorText}`);
-            }
-
-            // SSML synthesis successful
-            return response.arrayBuffer();
-        }
-
-        // Process SSML to ensure it meets Azure requirements
-        processSSMLForAzure(ssml, voiceKeyword = null) {
-            // Determine the voice to use
-            const azureVoice = voiceKeyword ? 
-                this.mapVoiceKeywordToAzure(voiceKeyword) : 
-                this.currentVoice;
-
-            // Check if SSML already has proper Azure format
-            if (ssml.includes('xmlns="http://www.w3.org/2001/10/synthesis"') && ssml.includes('<voice name=')) {
-                // Already properly formatted, just ensure the voice name is correct
-                return ssml.replace(/name="[^"]*"/g, `name="${azureVoice}"`);
-            }
-
-            // Extract content from basic SSML
-            let content = ssml;
-            
-            // Remove outer <speak> tags if present
-            content = content.replace(/<speak[^>]*>/gi, '').replace(/<\/speak>/gi, '');
-            
-            // If there's no voice element, the content is what we want to wrap
-            if (!content.includes('<voice')) {
-                // Wrap content in proper Azure SSML format with Microsoft namespace for styles
-                return `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="https://www.w3.org/2001/mstts" xml:lang="en-US">
-                    <voice name="${azureVoice}">
-                        ${content.trim()}
-                    </voice>
-                </speak>`;
-            } else {
-                // Has voice element but missing proper speak wrapper
-                return `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="https://www.w3.org/2001/mstts" xml:lang="en-US">
-                    ${content.trim()}
-                </speak>`;
-            }
         }
 
         // Play audio using HTML Audio Element
@@ -353,9 +260,9 @@ if (typeof AzureTTSService === 'undefined') {
             console.log(`AzureTTSService: Stopped ${stoppedCount} active audio elements`);
         }
 
-        // Helper method to convert pitch value to SSML format
-        getPitchForSSML(pitchValue) {
-            // Convert 0.5-2.0 range to percentage for SSML
+        // Helper method to convert pitch value to Azure percentage format
+        getAzurePitchAdjustment(pitchValue) {
+            // Convert 0.5-2.0 range to percentage
             // 1.0 = 0%, 0.5 = -50%, 2.0 = +100%
             const percentage = Math.round((pitchValue - 1.0) * 100);
             return percentage >= 0 ? `+${percentage}%` : `${percentage}%`;

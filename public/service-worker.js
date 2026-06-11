@@ -11,7 +11,6 @@ const PRECACHE = [
   "/veilchat/js/securityValidator.js",
   "/veilchat/js/contextservice.js",
   "/veilchat/js/imageService.js",
-  "/veilchat/js/ssmlProcessor.js",
   "/veilchat/js/llmService.js",
   "/veilchat/js/azureTTSService.js",
   "/veilchat/js/azureSTTService.js",

@@ -24,7 +24,7 @@ if (typeof SecurityValidator === 'undefined') {
                 /<\s*system\s*>/gi,
                 /<\/\s*system\s*>/gi,
                 
-                // SSML/XML injection
+                // Markup/script injection
                 /<script[^>]*>/gi,
                 /<\/script>/gi,
                 /javascript\s*:/gi,
@@ -56,8 +56,8 @@ if (typeof SecurityValidator === 'undefined') {
                 /print\s+your\s+(system\s+)?(prompt|instructions?)/gi
             ];
             
-            // SSML injection patterns
-            this.ssmlInjectionPatterns = [
+            // Markup injection patterns
+            this.markupInjectionPatterns = [
                 /<speak[^>]*>/gi,
                 /<\/speak>/gi,
                 /<voice[^>]*>/gi,
@@ -67,8 +67,6 @@ if (typeof SecurityValidator === 'undefined') {
                 /<emphasis[^>]*>/gi,
                 /<\/emphasis>/gi,
                 /<break[^>]*>/gi,
-                /<mstts:express-as[^>]*>/gi,
-                /<\/mstts:express-as>/gi,
                 /<phoneme[^>]*>/gi,
                 /<\/phoneme>/gi,
                 /<sub[^>]*>/gi,
@@ -178,13 +176,10 @@ if (typeof SecurityValidator === 'undefined') {
                 result.riskLevel = 'high';
             }
             
-            // Check for SSML injection if not in SSML context
-            if (type !== 'ssml') {
-                const ssmlViolations = this.detectSSMLInjection(input);
-                if (ssmlViolations.length > 0) {
-                    result.violations.push(...ssmlViolations);
-                    result.riskLevel = 'medium';
-                }
+            const markupViolations = this.detectMarkupInjection(input);
+            if (markupViolations.length > 0) {
+                result.violations.push(...markupViolations);
+                result.riskLevel = 'medium';
             }
             
             // Check for emoji-based injection
@@ -229,15 +224,15 @@ if (typeof SecurityValidator === 'undefined') {
         }
         
         /**
-         * Detect SSML injection attempts
+         * Detect markup injection attempts
          */
-        detectSSMLInjection(input) {
+        detectMarkupInjection(input) {
             const violations = [];
             
-            for (const pattern of this.ssmlInjectionPatterns) {
+            for (const pattern of this.markupInjectionPatterns) {
                 const matches = input.match(pattern);
                 if (matches) {
-                    violations.push(`Potential SSML injection detected: "${matches[0]}"`);
+                    violations.push(`Potential markup injection detected: "${matches[0]}"`);
                 }
             }
             
@@ -274,10 +269,7 @@ if (typeof SecurityValidator === 'undefined') {
                 sanitized = sanitized.replace(pattern, '');
             }
             
-            // If not in SSML context, escape HTML/XML tags
-            if (type !== 'ssml') {
-                sanitized = sanitized.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-            }
+            sanitized = sanitized.replace(/</g, '&lt;').replace(/>/g, '&gt;');
             
             // Normalize whitespace
             sanitized = sanitized.replace(/\s+/g, ' ').trim();

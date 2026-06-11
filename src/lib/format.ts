@@ -39,19 +39,7 @@ export function createImageMessage(role: MessageRole, imageUrl: string, alt = "G
 export function cleanAssistantText(text: string) {
   const source = text.trim();
   if (!source) return source;
-
-  if (window.SSMLProcessor) {
-    try {
-      const processor = new window.SSMLProcessor();
-      const result = processor.extractSSML(source);
-      if (result.hasSSML) return stripMarkdownFence(result.cleanText);
-    } catch {
-      // Fall through to regex cleanup.
-    }
-  }
-
-  const withoutSpeak = source.replace(/<speak[^>]*>[\s\S]*?<\/speak>/gi, "").trim();
-  return stripMarkdownFence(withoutSpeak || source);
+  return stripMarkdownFence(source);
 }
 
 export function stripMarkdownFence(text: string) {

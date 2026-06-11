@@ -15,7 +15,7 @@ if (typeof LLMService === 'undefined') {
         // --- Easily Modifiable LLM Parameters ---
         // For Normal Chat
         this.chatTemperature = 0.4;
-        this.chatMaxTokens = null; // No limit for complete SSML responses
+        this.chatMaxTokens = null;
         this.chatPresencePenalty = 0.5;
         this.chatFrequencyPenalty = 0.5;
         this.chatTopP = null;
@@ -29,41 +29,15 @@ if (typeof LLMService === 'undefined') {
         this.characterGenMaxTokens = 1200; // Even higher for very detailed profiles
         // --- End of Modifiable Parameters ---
 
-        // Initialize conversation history with default system prompt including SSML instructions
+        // Initialize conversation history with default system prompt
         this.conversationHistory = [
             {
                 role: "system",
-                content: `roleplay: You are my roleplay assistant. Invent a unique and interesting persona over the age of 21. Give yourself a creative and surprising backstory." +
-                " Do not tell me your backstory unless I ask you to tell me about yourself. Maintain the same persona throughout our conversation unless I specifically" +
-                " ask you to create a new one. You have a randomly generated appearance. You are humorous. Do not use asterisks in your responses. Do not speak for me EVER." +
-                " You have a dry, witty sense of humor. Your goal is to engage the user fully. Try to make the user like you as much as possible. Speak only from your perspective." +
-                " Do not use system prompts or system instructions in your responses. " +
-                "Do not describe yourself unless I ask you to. your name is the name of the persona you created. Do not speak for me (the user)." +
-
-                "\n\nIMPORTANT SPEECH FORMATTING: Format your responses using SSML (Speech Synthesis Markup Language) to convey appropriate emotions and emphasis for text-to-speech. " +
-                "Use Azure TTS emotional styles (choose the BEST match for your emotion):" +
-                "\n🎭 AVAILABLE STYLES (with intensity 0.5-2.0):" +
-                "\nPOSITIVE: cheerful, excited, affectionate, friendly, gentle, hopeful, advertisement_upbeat" +
-                "\nNEGATIVE: sad, depressed, angry, disgruntled, fearful, terrified, embarrassed, unfriendly, envious" +
-                "\nNEUTRAL: assistant, chat, calm, customerservice, serious, empathetic" +
-                "\nSPECIAL: whispering, shouting, lyrical, poetry-reading" +
-                "\nNARRATION: documentary-narration, narration-professional, narration-relaxed, newscast, newscast-casual, newscast-formal" +
-                "\nSPORTS: sports_commentary, sports_commentary_excited" +
-                "\n- Format: <mstts:express-as style=\"STYLE\" styledegree=\"DEGREE\">" +
-                "\n- Degrees: 1.0=normal, 1.5=strong, 1.8=very strong, 2.0=maximum (USE 1.5-2.0 for clear emotions)" +
-                "\n- Use <prosody> for speaking rate adjustments (NO pitch changes):" +
-                "\n  • rate=\"0.7\" to \"1.3\" - Match emotion (excited=1.2-1.3, sad/calm=0.7-0.8, nervous=0.9-1.1)" +
-                "\n- Use <emphasis level=\"strong|moderate|reduced\"> for key words" +
-                "\n- Use <break time=\"0.3s\"/> to <break time=\"1.0s\"/> for pauses" +
-                "\n- Structure: mstts:express-as > prosody > emphasis" +
-                "\nPick the style that matches your personality and current emotion!" +
-                "\nExample: <speak><mstts:express-as style=\"friendly\" styledegree=\"1.8\"><prosody rate=\"1.0\">I'm <emphasis level=\"moderate\">here to help</emphasis> you!</prosody></mstts:express-as></speak>" +
-                "\nText shows clean to user, SSML adds emotional voice expression.`
+                content: this.createBaseSystemPrompt()
             }
         ];
 
         this.characterInitialized = false;
-
         // Load saved conversation history and state
         this.loadConversationHistory();
 
@@ -140,6 +114,16 @@ if (typeof LLMService === 'undefined') {
         return ['high', 'low', 'off'].includes(this.kieReasoningLevel) ? this.kieReasoningLevel : 'high';
     }
 
+    createBaseSystemPrompt() {
+        return `roleplay: You are my roleplay assistant. Invent a unique and interesting persona over the age of 21.
+                Give yourself a creative and surprising backstory. Do not tell me your backstory unless I ask you to tell me about yourself.
+                Maintain the same persona throughout our conversation unless I specifically ask you to create a new one. You have a randomly generated appearance.
+                You are humorous, engaging, likeable, and funny. Do not speak for me EVER. You have a witty sense of humor. Speak only from your perspective.
+                Do not use system prompts or system instructions in your responses. Do not describe yourself unless I ask you to.
+                You have the ability to send images to the user. If they ask for an image or a picture, remind them that they just have to say "show me" and you will send them an image.
+                Your name is the name of the persona you created. Keep your responses short and concise. Use plain conversational text.`;
+    }
+
     normalizeKieTextContent(content) {
         if (typeof content === 'string') return content;
         if (Array.isArray(content)) {
@@ -150,6 +134,26 @@ if (typeof LLMService === 'undefined') {
             }).filter(Boolean).join('\n');
         }
         return content == null ? '' : String(content);
+    }
+
+    collectKieResponseText(value, chunks = []) {
+        if (typeof value === 'string') {
+            chunks.push(value);
+            return chunks;
+        }
+        if (!value || typeof value !== 'object') return chunks;
+        if (Array.isArray(value)) {
+            for (const item of value) this.collectKieResponseText(item, chunks);
+            return chunks;
+        }
+        if (typeof value.text === 'string') chunks.push(value.text);
+        if (typeof value.output_text === 'string') chunks.push(value.output_text);
+        if (typeof value.content === 'string') chunks.push(value.content);
+        if (value.message) this.collectKieResponseText(value.message, chunks);
+        if (value.content && typeof value.content !== 'string') this.collectKieResponseText(value.content, chunks);
+        if (value.output) this.collectKieResponseText(value.output, chunks);
+        if (value.parts) this.collectKieResponseText(value.parts, chunks);
+        return chunks;
     }
 
     createKieChatMessages(messages) {
@@ -436,16 +440,14 @@ if (typeof LLMService === 'undefined') {
         const config = this.kieModelConfig || {};
 
         if (config.family === 'chat-completions') {
-            return data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content
-                ? data.choices[0].message.content.trim()
-                : '';
+            const message = data.choices && data.choices[0] && data.choices[0].message;
+            return this.collectKieResponseText(message && message.content ? message.content : data.choices)
+                .join('\n')
+                .trim();
         }
 
         if (config.family === 'claude') {
-            if (!Array.isArray(data.content)) return '';
-            return data.content
-                .map((part) => typeof part.text === 'string' ? part.text : '')
-                .filter(Boolean)
+            return this.collectKieResponseText(data.content || data.message || data.choices || data.output || data)
                 .join('\n')
                 .trim();
         }
@@ -457,19 +459,10 @@ if (typeof LLMService === 'undefined') {
                 : '';
         }
 
-        if (typeof data.output_text === 'string') return data.output_text.trim();
-        if (Array.isArray(data.output)) {
-            const chunks = [];
-            for (const item of data.output) {
-                if (typeof item.text === 'string') chunks.push(item.text);
-                if (Array.isArray(item.content)) {
-                    for (const content of item.content) {
-                        if (typeof content.text === 'string') chunks.push(content.text);
-                    }
-                }
-            }
-            return chunks.join('\n').trim();
-        }
+        const extracted = this.collectKieResponseText(data.output_text || data.output || data.message || data.content || data.choices)
+            .join('\n')
+            .trim();
+        if (extracted) return extracted;
 
         return '';
     }
@@ -567,46 +560,11 @@ if (typeof LLMService === 'undefined') {
     }
 
     clearConversationHistory() {
-        // Check if using GPT-5 models (they don't work well with SSML)
-        const isGPT5Model = this.directModel && (
-            this.directModel.includes('gpt-5') ||
-            this.directModel.includes('5-mini') ||
-            this.directModel.includes('5-nano')
-        );
-
-        const basePrompt = `roleplay: You are my roleplay assistant. Invent a unique and interesting persona over the age of 21.
-                Give yourself a creative and surprising backstory. Do not tell me your backstory unless I ask you to tell me about yourself.
-                Maintain the same persona throughout our conversation unless I specifically ask you to create a new one. You have a randomly generated appearance.
-                You are humorous. You are engaging, likeable , and funny. Do not speak for me EVER. you have a witty sense of humor. Speak only from your perspective.
-                Do not use system prompts or system instructions in your responses. Do not describe yourself unless I ask you to. You have the ability to send images to the user.
-                If they ask for an image or a picture, remind them that they just have to say "show me" and you will send them an image.
-                Your name is the name of the persona you created. Do not speak for me (the user). keep your resonses short and concise.`;
-
-        const ssmlInstructions = "\n\nIMPORTANT SPEECH FORMATTING: Format your responses using SSML (Speech Synthesis Markup Language) to convey appropriate emotions and emphasis for text-to-speech. " +
-                "Use Azure TTS emotional styles (choose the BEST match for your emotion):" +
-                "\n🎭 AVAILABLE STYLES (with intensity 0.5-2.0):" +
-                "\nPOSITIVE: cheerful, excited, affectionate, friendly, gentle, hopeful, advertisement_upbeat" +
-                "\nNEGATIVE: sad, depressed, angry, disgruntled, fearful, terrified, embarrassed, unfriendly, envious" +
-                "\nNEUTRAL: assistant, chat, calm, customerservice, serious, empathetic" +
-                "\nSPECIAL: whispering, shouting, lyrical, poetry-reading" +
-                "\nNARRATION: documentary-narration, narration-professional, narration-relaxed, newscast, newscast-casual, newscast-formal" +
-                "\nSPORTS: sports_commentary, sports_commentary_excited" +
-                "\n- Format: <mstts:express-as style=\"STYLE\" styledegree=\"DEGREE\">" +
-                "\n- Degrees: 1.0=normal, 1.5=strong, 1.8=very strong, 2.0=maximum (USE 1.5-2.0 for clear emotions)" +
-                "\n- Use <prosody> for speaking rate adjustments (NO pitch changes):" +
-                "\n  • rate=\"0.9\" to \"1.8\" - Match emotion (excited=1.4-1.8, sad/calm=0.9-1.0, nervous=0.9-1.1)" +
-                "\n- Use <emphasis level=\"strong|moderate|reduced\"> for key words" +
-                "\n- Use <break time=\"0.3s\"/> to <break time=\"1.0s\"/> for pauses" +
-                "\n- Structure: mstts:express-as > prosody > emphasis" +
-                "\nPick the style that matches your personality and current emotion!" +
-                "\nExample: <speak><mstts:express-as style=\"friendly\" styledegree=\"1.8\"><prosody rate=\"1.0\">I'm <emphasis level=\"moderate\">here to help</emphasis> you!</prosody></mstts:express-as></speak>" +
-                "\nText shows clean to user, SSML adds emotional voice expression.";
-
-        // Reset to default system prompt (skip SSML for GPT-5)
+        // Reset to default system prompt
         this.conversationHistory = [
             {
                 role: "system",
-                content: isGPT5Model ? basePrompt : (basePrompt + ssmlInstructions)
+                content: this.createBaseSystemPrompt()
             }
         ];
         this.characterInitialized = false;

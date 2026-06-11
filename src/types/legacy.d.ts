@@ -25,7 +25,6 @@ declare global {
     voiceService?: LegacyVoiceService | null;
     ContextService?: new () => LegacyContextService;
     MCPClient?: new (serverUrl?: string | null) => LegacyMCPClient;
-    SSMLProcessor?: new () => LegacySSMLProcessor;
     SETTINGS?: Record<string, unknown>;
     pdfjsLib?: unknown;
     mammoth?: unknown;
@@ -162,8 +161,4 @@ export interface LegacyMCPResult {
   needsLLMProcessing?: boolean;
   fallback?: boolean;
   [key: string]: unknown;
-}
-
-export interface LegacySSMLProcessor {
-  extractSSML: (text: string) => { hasSSML: boolean; cleanText: string; ssml?: string };
 }
