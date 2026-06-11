@@ -52,7 +52,7 @@ export class LLMService {
   private readonly chatFrequencyPenalty = 0.5;
   private readonly chatTopP: number | null = null;
   private readonly imagePromptTemperature = 0.5;
-  private readonly imagePromptMaxTokens = 200;
+  private readonly imagePromptMaxTokens = 450;
   private readonly characterGenTemperature = 0.8;
   private readonly characterGenMaxTokens = 1200;
 
@@ -195,10 +195,14 @@ Your name is the name of the persona you created. Keep your responses short and 
       if (characterDescription && !/sorry|couldn't understand/i.test(characterDescription)) {
         imagePrompt = await this.sendUniversalLLMRequest(
           [
-            { role: "system", content: "You are an image keyword generator. Create comma-separated keywords for image generation." },
+            {
+              role: "system",
+              content:
+                "You write rich image-generation prompts for character portraits. Preserve the character's identity, age, appearance, mood, clothing style, and setting. Respond with one detailed prompt only.",
+            },
             {
               role: "user",
-              content: `Create image keywords from this character description:\n\n${characterDescription}\n\nFormat: 1woman, hair-color, eye-color, clothing, setting, pose, lighting\n\nRespond with ONLY keywords.`,
+              content: `Create a detailed image prompt for the assistant persona described below. The image should show this adult character clearly, as a portrait or scene-setting introduction.\n\nCharacter profile:\n${characterDescription}\n\nInclude visible age, gender presentation, face, hair, eyes, build, clothing style, expression, pose, setting, lighting, camera framing, and mood. Do not use placeholders like "hair-color" or tiny stubs like "1woman". Respond with only the final image prompt.`,
             },
           ],
           this.imagePromptTemperature,
@@ -253,28 +257,95 @@ Your name is the name of the persona you created. Keep your responses short and 
   }
 
   private async createImagePromptResponse(message: string): Promise<LLMResponse> {
-    const recentMessages = this.conversationHistory.filter((item) => item.role !== "system" && !item.content.includes("[INTERNAL")).slice(-5);
-    const characterProfile = this.getCharacterProfile() || "person";
+    const recentMessages = this.conversationHistory.filter((item) => item.role !== "system" && !item.hidden && !item.content.includes("[INTERNAL")).slice(-8);
+    const characterProfile = this.cleanInternalProfile(this.getCharacterProfile() || "An adult assistant persona from the current chat.");
     const conversationContext = recentMessages.map((item) => `${item.role}: ${item.content}`).join("\n");
+    const sceneRequest = this.extractImageSceneRequest(message);
     const rawReply = await this.sendUniversalLLMRequest(
       [
         {
           role: "system",
-          content: "You are an image keyword generator. Create detailed comma-separated keywords for image generation. Include at least 20 descriptive keywords focusing on visual elements that can be depicted in an image.",
+          content:
+            "You write production-ready prompts for AI image generation. The image must depict the assistant persona the user is currently chatting with, not a generic person. Use the current chat as scene context. Respond with one detailed visual prompt only, no markdown and no explanation.",
         },
         {
           role: "user",
-          content: `Create image keywords for: "${message}"\n\nCharacter appearance: ${characterProfile}\n\nRecent conversation context: ${conversationContext}\n\nOutput format: 1woman, hair-color, hair-style, eye-color, build, clothing-style, setting, mood, lighting, pose, expression, background-details, weather, time-of-day, camera-angle, art-style, quality-tags, additional-descriptors\n\nProvide at least 20 comma-separated keywords. Respond with ONLY the keywords.`,
+          content: `The user asked: "${message}"
+
+Create an image prompt that shows the assistant persona in the context of the current chat.
+
+Assistant persona profile:
+${characterProfile}
+
+Current conversation context:
+${conversationContext || "The user is chatting directly with the assistant persona."}
+
+Scene requested by the user:
+${sceneRequest || "Show the assistant persona in a natural moment from the current conversation."}
+
+Requirements:
+- The main subject is the assistant persona from the profile above.
+- Preserve the persona's described age, gender presentation, face, hair, eyes, build, style, mood, and setting.
+- Include a coherent background and camera framing that fit the current conversation.
+- Do not depict the user unless the user explicitly asks for that.
+- Do not return short labels like "1woman" or "1woman, 34".
+- Write 2-4 vivid sentences or a detailed comma-separated prompt with at least 35 visual words.
+
+Respond with only the final image prompt.`,
         },
       ],
       this.imagePromptTemperature,
       this.imagePromptMaxTokens,
       true
     );
+    const prompt = this.ensurePersonaImagePrompt(rawReply, message, characterProfile, conversationContext, sceneRequest);
 
-    return rawReply
-      ? { type: "image_request", prompt: rawReply }
+    return prompt
+      ? { type: "image_request", prompt }
       : { type: "text", content: "Sorry, I couldn't generate the image details. The LLM returned an empty response." };
+  }
+
+  private cleanInternalProfile(profile: string) {
+    return profile
+      .replace(/\[INTERNAL CHARACTER PROFILE - NOT FOR DISPLAY\]\s*/gi, "")
+      .replace(/\[CUSTOM PERSONA - INTERNAL REFERENCE\]\s*/gi, "")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  private extractImageSceneRequest(message: string) {
+    return message
+      .replace(/\bshow me\b/gi, "")
+      .replace(/\b(?:a|an|the)?\s*(?:picture|image|photo|portrait|drawing)\s+of\b/gi, "")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  private ensurePersonaImagePrompt(rawPrompt: string, message: string, characterProfile: string, conversationContext: string, sceneRequest: string) {
+    const cleaned = this.stripSpeechMarkup(rawPrompt || "").trim();
+    if (this.isDetailedImagePrompt(cleaned)) return cleaned;
+
+    const profileSummary = characterProfile.slice(0, 900);
+    const contextSummary = conversationContext ? conversationContext.slice(-700) : "A direct conversation between the user and the assistant persona.";
+    const scene = sceneRequest || this.extractImageSceneRequest(message) || "a natural moment from the current conversation";
+
+    return [
+      "Create a detailed image of the assistant persona the user is currently talking to.",
+      `Persona: ${profileSummary}`,
+      `Scene: ${scene}.`,
+      `Conversation context: ${contextSummary}`,
+      "Show the assistant persona as the clear main subject, preserving their described adult age, gender presentation, face, hair, eyes, build, clothing style, expression, personality, and current setting.",
+      "Use coherent background details, natural pose, cinematic lighting, realistic camera framing, high detail, and avoid depicting the user unless explicitly requested.",
+    ].join(" ");
+  }
+
+  private isDetailedImagePrompt(prompt: string) {
+    if (!prompt) return false;
+    const words = prompt.split(/\s+/).filter(Boolean);
+    const commaParts = prompt.split(",").map((part) => part.trim()).filter(Boolean);
+    const placeholderPattern = /\b(?:hair-color|hair-style|eye-color|clothing-style|background-details|additional-descriptors)\b/i;
+    const tinySubjectPattern = /^1(?:woman|man|girl|boy|person)(?:\s*,\s*\d{1,3})?[\s,.]*$/i;
+    return words.length >= 35 && commaParts.length >= 6 && !placeholderPattern.test(prompt) && !tinySubjectPattern.test(prompt);
   }
 
   private createCustomPersonaMessages(customPersonaMessage: LLMMessage): LLMMessage[] {
