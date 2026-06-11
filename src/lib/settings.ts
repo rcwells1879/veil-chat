@@ -141,9 +141,12 @@ const SECRET_SETTING_KEYS = new Set([
 const get = (key: string, fallback = "") => localStorage.getItem(key) ?? fallback;
 const getSecret = (key: string, fallback = "") => sessionStorage.getItem(key) ?? localStorage.getItem(key) ?? fallback;
 const getNumber = (key: string, fallback: number) => {
-  const value = Number(localStorage.getItem(key));
+  const raw = localStorage.getItem(key);
+  if (raw === null || raw.trim() === "") return fallback;
+  const value = Number(raw);
   return Number.isFinite(value) ? value : fallback;
 };
+const clampNumber = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 const getBool = (key: string, fallback = false) => {
   const value = localStorage.getItem(key);
   return value === null ? fallback : value === "true";
@@ -195,7 +198,7 @@ export function readSettings(): AppSettings {
     voicePitch: getNumber("voicePitch", 1),
     azureApiKey: getSecret("azureApiKey") || getSecret("azure-api-key"),
     azureRegion: get("azureRegion", "eastus"),
-    fontSize: getNumber("fontSize", 16),
+    fontSize: clampNumber(getNumber("fontSize", 16), 12, 22),
     mcpEnabled: getBool("mcpEnabled"),
     mcpServerUrl: get("mcpServerUrl"),
     searchEnabled: getBool("searchEnabled"),
@@ -232,7 +235,9 @@ export function exposeSettings(settings: AppSettings) {
 }
 
 export function updateSetting<K extends keyof AppSettings>(settings: AppSettings, key: K, value: AppSettings[K]): AppSettings {
-  const next = { ...settings, [key]: value };
+  const next = key === "fontSize"
+    ? { ...settings, fontSize: clampNumber(Number(value), 12, 22) }
+    : { ...settings, [key]: value };
   persistSettings(next);
   return next;
 }

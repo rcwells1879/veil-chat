@@ -885,7 +885,13 @@ Make sure the character you create embodies and follows the persona instructions
             });
 
             if (!fetchResponse.ok) {
-                const errorData = await fetchResponse.json().catch(() => fetchResponse.text());
+                const errorText = await fetchResponse.text();
+                let errorData = errorText;
+                try {
+                    errorData = JSON.parse(errorText);
+                } catch (_) {
+                    // Keep the raw text response.
+                }
                 console.error(`LLM API Error (${isImagePrompt ? 'Image' : 'Chat'}):`, errorData);
                 console.error('Request payload that failed:', JSON.stringify(payload, null, 2));
                 throw new Error(`LLM API request failed with status ${fetchResponse.status}: ${JSON.stringify(errorData)}`);
