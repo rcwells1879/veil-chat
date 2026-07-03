@@ -270,7 +270,7 @@ export interface AppSettings {
   chatBackdropEnabled: boolean;
 }
 
-const SECRET_SETTING_KEYS = new Set([
+const API_KEY_SETTING_KEYS = new Set([
   "customLlmApiKey",
   "openaiApiKey",
   "anthropicApiKey",
@@ -295,7 +295,7 @@ const LEGACY_SETTING_KEYS = [
 ];
 
 const get = (key: string, fallback = "") => localStorage.getItem(key) ?? fallback;
-const getSecret = (key: string, fallback = "") => sessionStorage.getItem(key) ?? localStorage.getItem(key) ?? fallback;
+const getApiKey = (key: string, fallback = "") => localStorage.getItem(key) ?? sessionStorage.getItem(key) ?? fallback;
 const getNumber = (key: string, fallback: number) => {
   const raw = localStorage.getItem(key);
   if (raw === null || raw.trim() === "") return fallback;
@@ -313,6 +313,14 @@ const getSearchProvider = () => {
 };
 
 function migrateLegacySettings() {
+  for (const key of API_KEY_SETTING_KEYS) {
+    const sessionValue = sessionStorage.getItem(key);
+    if (sessionValue && !localStorage.getItem(key)) {
+      localStorage.setItem(key, sessionValue);
+    }
+    sessionStorage.removeItem(key);
+  }
+
   const oldImageProvider = localStorage.getItem("customImageProvider");
   if (oldImageProvider === "imagen4") {
     localStorage.setItem("customImageProvider", "kie");
@@ -325,7 +333,7 @@ function migrateLegacySettings() {
   if (legacySearchKey) {
     const targetKey = getSearchProvider() === "google" ? "googleSearchApiKey" : "braveSearchApiKey";
     if (!sessionStorage.getItem(targetKey) && !localStorage.getItem(targetKey)) {
-      sessionStorage.setItem(targetKey, legacySearchKey);
+      localStorage.setItem(targetKey, legacySearchKey);
     }
   }
 
@@ -342,15 +350,15 @@ export function readSettings(): AppSettings {
     customLlmProvider: get("customLlmProvider", "litellm") as LlmProvider,
     customLlmApiUrl: get("customLlmApiUrl").replace(/\/$/, ""),
     customLlmModelIdentifier: get("customLlmModelIdentifier", "gemini2.5-flash"),
-    customLlmApiKey: getSecret("customLlmApiKey"),
+    customLlmApiKey: getApiKey("customLlmApiKey"),
     openaiModelIdentifier: get("openaiModelIdentifier", "gpt-4.1-mini"),
-    openaiApiKey: getSecret("openaiApiKey"),
+    openaiApiKey: getApiKey("openaiApiKey"),
     anthropicModelIdentifier: get("anthropicModelIdentifier", "claude-sonnet-4"),
-    anthropicApiKey: getSecret("anthropicApiKey"),
+    anthropicApiKey: getApiKey("anthropicApiKey"),
     googleModelIdentifier: get("googleModelIdentifier", "gemini-2.5-flash"),
-    googleApiKey: getSecret("googleApiKey"),
+    googleApiKey: getApiKey("googleApiKey"),
     kieModelIdentifier: get("kieModelIdentifier", "gpt-5-2"),
-    kieApiKey: getSecret("kieApiKey"),
+    kieApiKey: getApiKey("kieApiKey"),
     kieReasoningLevel: get("kieReasoningLevel", "high") as KieReasoningLevel,
     customImageProvider: get("customImageProvider", "openai") as ImageProvider,
     customImageApiUrl: get("customImageApiUrl").replace(/\/$/, ""),
@@ -382,8 +390,8 @@ export function readSettings(): AppSettings {
     fontSize: clampNumber(getNumber("fontSize", 16), 12, 22),
     searchEnabled: getBool("searchEnabled"),
     searchProvider: getSearchProvider(),
-    braveSearchApiKey: getSecret("braveSearchApiKey"),
-    googleSearchApiKey: getSecret("googleSearchApiKey"),
+    braveSearchApiKey: getApiKey("braveSearchApiKey"),
+    googleSearchApiKey: getApiKey("googleSearchApiKey"),
     googleSearchEngineId: get("googleSearchEngineId"),
     searchResultsLimit: get("searchResultsLimit", "10"),
     chatBackdropEnabled: getBool("chatBackdropEnabled", true),
@@ -392,10 +400,10 @@ export function readSettings(): AppSettings {
 
 export function persistSettings(settings: AppSettings) {
   Object.entries(settings).forEach(([key, value]) => {
-    if (SECRET_SETTING_KEYS.has(key)) {
-      if (value) sessionStorage.setItem(key, String(value));
-      else sessionStorage.removeItem(key);
-      localStorage.removeItem(key);
+    if (API_KEY_SETTING_KEYS.has(key)) {
+      if (value) localStorage.setItem(key, String(value));
+      else localStorage.removeItem(key);
+      sessionStorage.removeItem(key);
       return;
     }
     localStorage.setItem(key, String(value));
