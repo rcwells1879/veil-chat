@@ -68,10 +68,17 @@ export const KIE_IMAGE_MODELS = [
   { group: "Qwen", value: "qwen2/image-edit", label: "Qwen2 Edit" },
   { group: "Wan", value: "wan/2-7-image", label: "Wan 2.7 Image (Gen/Edit)" },
   { group: "Wan", value: "wan/2-7-image-pro", label: "Wan 2.7 Image Pro (Gen/Edit)" },
-  { group: "Z", value: "z-image", label: "Z-Image" },
+  { group: "Z", value: "z-image", label: "Z-Image Turbo" },
 ] as const;
 
+export const KIE_IMAGE_TEXT_FALLBACK_MODEL = "z-image";
+
 const KIE_IMAGE_MODEL_ALIASES: Record<string, string> = {
+  "alibaba/z-image-turbo": "z-image",
+  "z-image-turbo": "z-image",
+  "z-image/turbo": "z-image",
+  "zimage-turbo": "z-image",
+  "zimageturbo": "z-image",
   "wan-2-7-image": "wan/2-7-image",
   "wan/2.7-image": "wan/2-7-image",
   "wan-2.7-image": "wan/2-7-image",

@@ -390,7 +390,7 @@ Make sure the character you create embodies and follows the persona instructions
       const data = await this.sendDirectProviderRequest(payload);
       responseText = this.extractDirectProviderResponse(data);
     } else {
-      const endpoint = `${this.settings.customLlmApiUrl.replace(/\/$/, "")}/v1/chat/completions`;
+      const endpoint = this.createCompatibleEndpoint();
       const payload = this.createCompatiblePayload(messages, temperature, maxTokens, !isImagePrompt);
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (this.settings.customLlmApiKey) headers.Authorization = `Bearer ${this.settings.customLlmApiKey}`;
@@ -410,6 +410,19 @@ Make sure the character you create embodies and follows the persona instructions
     }
 
     return this.stripSpeechMarkup(responseText || (isImagePrompt ? "" : "Sorry, I couldn't understand that."));
+  }
+
+  private createCompatibleEndpoint() {
+    const baseUrl = this.settings.customLlmApiUrl.trim().replace(/\/$/, "");
+    if (!baseUrl) {
+      throw new Error("LLM API URL is missing. Add a compatible API URL in Settings, or switch to OpenAI, Anthropic, Google, or Kie Direct.");
+    }
+    try {
+      new URL(baseUrl);
+    } catch {
+      throw new Error(`LLM API URL must be an absolute URL, received "${this.settings.customLlmApiUrl}".`);
+    }
+    return `${baseUrl}/v1/chat/completions`;
   }
 
   private setupDirectProviderConfig() {

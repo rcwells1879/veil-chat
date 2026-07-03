@@ -1,4 +1,4 @@
-import { normalizeKieImageModelIdentifier, type AppSettings, type ImageProvider } from "../settings";
+import { KIE_IMAGE_TEXT_FALLBACK_MODEL, normalizeKieImageModelIdentifier, type AppSettings, type ImageProvider } from "../settings";
 
 type KieConfig = {
   fields: string[];
@@ -270,9 +270,17 @@ export class ImageService {
       throw new Error("Kie API key is required for Kie image generation.");
     }
 
-    const model = normalizeKieImageModelIdentifier(this.settings.kieImageModelIdentifier || "gpt-image/1.5-text-to-image");
-    const config = KIE_IMAGE_CONFIGS[model] ?? KIE_IMAGE_CONFIGS["gpt-image/1.5-text-to-image"];
-    const input = await this.createKieImageInput(prompt, config);
+    let model = normalizeKieImageModelIdentifier(this.settings.kieImageModelIdentifier || "gpt-image/1.5-text-to-image");
+    let config = KIE_IMAGE_CONFIGS[model] ?? KIE_IMAGE_CONFIGS["gpt-image/1.5-text-to-image"];
+    let sourceUrls = config.imageField ? await this.getKieImageSourceUrls() : [];
+
+    if (this.requiresKieImageSource(config) && !sourceUrls.length) {
+      model = KIE_IMAGE_TEXT_FALLBACK_MODEL;
+      config = KIE_IMAGE_CONFIGS[model] ?? KIE_IMAGE_CONFIGS["gpt-image/1.5-text-to-image"];
+      sourceUrls = [];
+    }
+
+    const input = await this.createKieImageInput(prompt, config, sourceUrls);
     const response = await fetch("https://api.kie.ai/api/v1/jobs/createTask", {
       method: "POST",
       headers: {
@@ -298,10 +306,14 @@ export class ImageService {
     return imageUrl;
   }
 
-  private async createKieImageInput(prompt: string, config: KieConfig) {
+  private requiresKieImageSource(config: KieConfig) {
+    return Boolean(config.imageField && !config.optionalImage);
+  }
+
+  private async createKieImageInput(prompt: string, config: KieConfig, sourceUrls?: string[]) {
     const fields = new Set(config.fields);
     const input: Record<string, unknown> = { prompt: prompt.trim() };
-    await this.applyKieImageSources(input, config);
+    await this.applyKieImageSources(input, config, sourceUrls);
 
     if (fields.has("aspect_ratio")) input.aspect_ratio = this.pickAllowedSetting(this.settings.kieImageAspectRatio, config.aspectRatioValues, config.aspectRatioDefault ?? "1:1");
     if (fields.has("quality")) {
@@ -336,22 +348,22 @@ export class ImageService {
     return allowedValues.includes(normalized) ? normalized : fallback;
   }
 
-  private async applyKieImageSources(input: Record<string, unknown>, config: KieConfig) {
+  private async applyKieImageSources(input: Record<string, unknown>, config: KieConfig, sourceUrls?: string[]) {
     if (!config.imageField) return;
 
-    const sourceUrls = await this.getKieImageSourceUrls();
-    if (!sourceUrls.length) {
+    const urls = sourceUrls ?? (await this.getKieImageSourceUrls());
+    if (!urls.length) {
       if (!config.optionalImage) {
         throw new Error("Generate an image first or attach an image before using this Kie image-editing model.");
       }
       return;
     }
 
-    if (config.imageField === "image_url") input.image_url = sourceUrls[0];
-    else input[config.imageField] = sourceUrls;
+    if (config.imageField === "image_url") input.image_url = urls[0];
+    else input[config.imageField] = urls;
 
-    if (config.extraImageField && sourceUrls.length > 1) {
-      input[config.extraImageField] = sourceUrls.slice(1);
+    if (config.extraImageField && urls.length > 1) {
+      input[config.extraImageField] = urls.slice(1);
     }
   }
 
