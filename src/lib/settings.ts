@@ -277,6 +277,61 @@ export interface AppSettings {
   chatBackdropEnabled: boolean;
 }
 
+const SETTING_KEYS = [
+  "customLlmProvider",
+  "customLlmApiUrl",
+  "customLlmModelIdentifier",
+  "customLlmApiKey",
+  "openaiModelIdentifier",
+  "openaiApiKey",
+  "anthropicModelIdentifier",
+  "anthropicApiKey",
+  "googleModelIdentifier",
+  "googleApiKey",
+  "kieModelIdentifier",
+  "kieApiKey",
+  "kieReasoningLevel",
+  "customImageProvider",
+  "customImageApiUrl",
+  "imageSize",
+  "imageWidth",
+  "imageHeight",
+  "imageSteps",
+  "imageCfgScale",
+  "imageSampler",
+  "openaiQuality",
+  "openaiOutputFormat",
+  "openaiBackground",
+  "swarmuiApiUrl",
+  "swarmuiWidth",
+  "swarmuiHeight",
+  "swarmuiSteps",
+  "swarmuiCfgScale",
+  "swarmuiModel",
+  "swarmuiSampler",
+  "kieImageModelIdentifier",
+  "kieImageAspectRatio",
+  "kieImageQuality",
+  "kieImageResolution",
+  "kieImageOutputFormat",
+  "veilChatAfterDark",
+  "ttsVoice",
+  "voiceSpeed",
+  "voicePitch",
+  "fontSize",
+  "searchEnabled",
+  "searchProvider",
+  "braveSearchApiKey",
+  "googleSearchApiKey",
+  "googleSearchEngineId",
+  "searchResultsLimit",
+  "chatBackdropEnabled",
+] as const satisfies readonly (keyof AppSettings)[];
+
+type MissingPersistedSettingKey = Exclude<keyof AppSettings, (typeof SETTING_KEYS)[number]>;
+const settingKeysCoverAppSettings: Record<MissingPersistedSettingKey, never> = {};
+void settingKeysCoverAppSettings;
+
 const API_KEY_SETTING_KEYS = new Set([
   "customLlmApiKey",
   "openaiApiKey",
@@ -320,9 +375,9 @@ const getSearchProvider = () => {
 };
 
 function migrateLegacySettings() {
-  for (const key of API_KEY_SETTING_KEYS) {
+  for (const key of SETTING_KEYS) {
     const sessionValue = sessionStorage.getItem(key);
-    if (sessionValue && !localStorage.getItem(key)) {
+    if (sessionValue !== null && localStorage.getItem(key) === null) {
       localStorage.setItem(key, sessionValue);
     }
     sessionStorage.removeItem(key);
