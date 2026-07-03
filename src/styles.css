@@ -688,6 +688,7 @@ button {
   gap: 20px;
   padding: 30px 34px 24px;
   border-radius: 48px;
+  border-width: 0.5px;
   border-color: rgba(239, 244, 236, 0.14);
   background:
     linear-gradient(180deg, rgba(28, 30, 29, 0.92), rgba(19, 22, 20, 0.96)),
