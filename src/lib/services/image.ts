@@ -14,7 +14,6 @@ type KieConfig = {
   resolutionDefault?: string;
   resolutionValues?: string[];
   forceNsfwChecker?: boolean;
-  randomSeed?: boolean;
   seedDefault?: number;
 };
 
@@ -64,8 +63,8 @@ const KIE_IMAGE_CONFIGS: Record<string, KieConfig> = {
   "qwen/image-edit": { fields: ["prompt", "image_url", "acceleration", "image_size", "num_inference_steps", "seed", "guidance_scale", "sync_mode", "num_images", "enable_safety_checker", "output_format", "negative_prompt"], imageField: "image_url", imageSizeDefault: "square_hd" },
   "qwen2/text-to-image": { fields: ["prompt", "image_size", "seed", "output_format", "nsfw_checker"], imageSizeDefault: "square_hd" },
   "qwen2/image-edit": { fields: ["prompt", "image_url", "image_size", "seed", "output_format", "nsfw_checker"], imageField: "image_url", imageSizeDefault: "square_hd" },
-  "wan/2-7-image": { fields: ["prompt", "input_urls", "aspect_ratio", "enable_sequential", "n", "resolution", "thinking_mode", "watermark", "seed", "nsfw_checker", "bbox_list", "color_palette"], imageField: "input_urls", latestGeneratedOnly: true, optionalImage: true, aspectRatioDefault: "1:1", aspectRatioValues: ["1:1", "3:4", "4:3", "1:8", "8:1", "9:16", "16:9", "21:9"], resolutionDefault: "2K", resolutionValues: ["1K", "2K"], forceNsfwChecker: true, randomSeed: true },
-  "wan/2-7-image-pro": { fields: ["prompt", "input_urls", "aspect_ratio", "enable_sequential", "n", "resolution", "thinking_mode", "watermark", "seed", "nsfw_checker", "bbox_list", "color_palette"], imageField: "input_urls", latestGeneratedOnly: true, optionalImage: true, aspectRatioDefault: "1:1", aspectRatioValues: ["1:1", "3:4", "4:3", "1:8", "8:1", "9:16", "16:9", "21:9"], resolutionDefault: "2K", resolutionValues: ["1K", "2K", "4K"], forceNsfwChecker: true, randomSeed: true },
+  "wan/2-7-image": { fields: ["prompt", "input_urls", "aspect_ratio", "enable_sequential", "n", "resolution", "thinking_mode", "watermark", "nsfw_checker", "bbox_list", "color_palette"], imageField: "input_urls", latestGeneratedOnly: true, optionalImage: true, aspectRatioDefault: "1:1", aspectRatioValues: ["1:1", "3:4", "4:3", "1:8", "8:1", "9:16", "16:9", "21:9"], resolutionDefault: "2K", resolutionValues: ["1K", "2K"], forceNsfwChecker: true },
+  "wan/2-7-image-pro": { fields: ["prompt", "input_urls", "aspect_ratio", "enable_sequential", "n", "resolution", "thinking_mode", "watermark", "nsfw_checker", "bbox_list", "color_palette"], imageField: "input_urls", latestGeneratedOnly: true, optionalImage: true, aspectRatioDefault: "1:1", aspectRatioValues: ["1:1", "3:4", "4:3", "1:8", "8:1", "9:16", "16:9", "21:9"], resolutionDefault: "2K", resolutionValues: ["1K", "2K", "4K"], forceNsfwChecker: true },
   "z-image": { fields: ["prompt", "aspect_ratio", "nsfw_checker"] },
 };
 
@@ -340,18 +339,8 @@ export class ImageService {
     if (fields.has("watermark")) input.watermark = false;
     if (fields.has("strength")) input.strength = 0.8;
     if (fields.has("negative_prompt")) input.negative_prompt = this.createNegativePrompt();
-    if (fields.has("seed")) input.seed = config.randomSeed ? this.createRandomSeed() : config.seedDefault ?? -1;
+    if (fields.has("seed")) input.seed = config.seedDefault ?? -1;
     return input;
-  }
-
-  private createRandomSeed() {
-    const maxSeed = 2147483647;
-    if (globalThis.crypto?.getRandomValues) {
-      const seed = new Uint32Array(1);
-      globalThis.crypto.getRandomValues(seed);
-      return seed[0] % (maxSeed + 1);
-    }
-    return Math.floor(Math.random() * (maxSeed + 1));
   }
 
   private pickAllowedSetting(value: string, allowedValues: string[] | undefined, fallback: string) {
