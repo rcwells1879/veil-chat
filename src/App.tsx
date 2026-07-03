@@ -14,7 +14,6 @@ import {
   Plus,
   Save,
   Search,
-  Send,
   Settings,
   SlidersHorizontal,
   Sparkles,
@@ -26,7 +25,7 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { type ChangeEvent, type FormEvent, type ReactNode, useLayoutEffect, useRef, useState } from "react";
+import { type ChangeEvent, type FormEvent, type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { cleanAssistantText, markdownToHtml, type ChatMessage } from "./lib/format";
 import { getKieImageModelControls, KIE_CHAT_MODELS, KIE_IMAGE_MODELS, type AppSettings, type SelectOption } from "./lib/settings";
@@ -189,6 +188,7 @@ export default function App() {
                 onAttach={() => fileInputRef.current?.click()}
                 onImagePreview={setPreviewImage}
                 onInput={actions.setInput}
+                onOpenSettings={() => actions.setActiveView("settings")}
                 onSend={actions.sendMessage}
                 onToggleBackdrop={() => actions.updateAppSetting("chatBackdropEnabled", !state.settings.chatBackdropEnabled)}
                 onToggleVoice={actions.toggleVoice}
@@ -260,6 +260,7 @@ function ChatView(props: {
   onAttach: () => void;
   onImagePreview: (url: string) => void;
   onInput: (value: string) => void;
+  onOpenSettings: () => void;
   onSend: (message?: string) => void;
   onToggleBackdrop: () => void;
   onToggleVoice: () => void;
@@ -278,6 +279,7 @@ function ChatView(props: {
       voiceAvailable={props.voiceAvailable}
       onAttach={props.onAttach}
       onInput={props.onInput}
+      onOpenSettings={props.onOpenSettings}
       onSend={props.onSend}
       onToggleBackdrop={props.onToggleBackdrop}
       onToggleVoice={props.onToggleVoice}
@@ -345,11 +347,14 @@ function Composer(props: {
   voiceAvailable: boolean;
   onAttach: () => void;
   onInput: (value: string) => void;
+  onOpenSettings: () => void;
   onSend: (message?: string) => void;
   onToggleBackdrop: () => void;
   onToggleVoice: () => void;
 }) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useLayoutEffect(() => {
     const textarea = textareaRef.current;
@@ -359,6 +364,27 @@ function Composer(props: {
     textarea.style.height = `${textarea.scrollHeight}px`;
   }, [props.input]);
 
+  useEffect(() => {
+    if (!menuOpen) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMenuOpen(false);
+    };
+
+    window.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [menuOpen]);
+
   const submit = (event: FormEvent) => {
     event.preventDefault();
     props.onSend();
@@ -367,6 +393,7 @@ function Composer(props: {
   const modelLabel = getComposerModelLabel(props.settings);
   const stateLabel = getComposerStateLabel(props);
   const statusTitle = [modelLabel, stateLabel, getComposerAttachmentLabel(props.documentsCount, props.imageReferencesCount)].filter(Boolean).join(" - ");
+  const hasInput = Boolean(props.input.trim());
 
   if (props.initial) {
     return (
@@ -415,21 +442,64 @@ function Composer(props: {
   }
 
   return (
-    <form className="composer" onSubmit={submit}>
-      <div className="composer-meta">
-        <span>{props.busy === "idle" ? "Ready" : props.busy}</span>
-        {props.documentsCount > 0 && <span>{props.documentsCount} file{props.documentsCount === 1 ? "" : "s"} attached</span>}
-        {props.imageReferencesCount > 0 && <span>{props.imageReferencesCount} image ref{props.imageReferencesCount === 1 ? "" : "s"}</span>}
-      </div>
-      <div className="composer-box">
-        <button className="icon-button" type="button" aria-label="Attach documents" title="Attach documents" onClick={props.onAttach}>
-          <Paperclip size={19} />
-        </button>
+    <form className="composer composer-bottom" onSubmit={submit}>
+      <div className="composer-box" title={statusTitle}>
+        <div className="composer-menu" ref={menuRef}>
+          <button
+            className={cx("icon-button composer-plus-button", menuOpen && "is-active")}
+            type="button"
+            aria-label="Open composer options"
+            aria-expanded={menuOpen}
+            aria-controls="composer-options-menu"
+            title="Composer options"
+            onClick={() => setMenuOpen((open) => !open)}
+          >
+            <Plus size={32} />
+          </button>
+          {menuOpen && (
+            <div className="composer-menu-panel" id="composer-options-menu" role="menu" aria-label="Composer options">
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setMenuOpen(false);
+                  props.onAttach();
+                }}
+              >
+                <Paperclip size={17} />
+                <span>Attach files</span>
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setMenuOpen(false);
+                  props.onOpenSettings();
+                }}
+              >
+                <Settings size={17} />
+                <span>Settings</span>
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setMenuOpen(false);
+                  props.onToggleBackdrop();
+                }}
+              >
+                <ImageIcon size={17} />
+                <span>Background</span>
+                <small>{props.showBackdrop ? "On" : "Off"}</small>
+              </button>
+            </div>
+          )}
+        </div>
         <textarea
           ref={textareaRef}
           id="user-input"
           value={props.input}
-          placeholder="Ask anything, or just say Hi"
+          placeholder="Ask VeilChat"
           rows={1}
           onChange={(event) => props.onInput(event.target.value)}
           onKeyDown={(event) => {
@@ -440,15 +510,15 @@ function Composer(props: {
           }}
         />
         <div className="composer-actions">
-          <button className={cx("icon-button", props.isListening && "is-live")} type="button" aria-label="Voice input" title="Voice input" onClick={props.onToggleVoice} disabled={!props.voiceAvailable}>
-            <Mic size={19} />
-          </button>
-          <button className={cx("icon-button", props.showBackdrop && "is-active")} type="button" aria-label="Toggle chat background" title="Toggle chat background" onClick={props.onToggleBackdrop}>
-            <ImageIcon size={19} />
-          </button>
-          <button className="send-button" type="submit" disabled={!props.input.trim() || props.busy !== "idle"} aria-label="Send message" title="Send message">
-            <Send size={18} />
-          </button>
+          {hasInput ? (
+            <button className="send-button" type="submit" disabled={props.busy !== "idle"} aria-label="Send message" title="Send message">
+              <ArrowUp size={25} />
+            </button>
+          ) : (
+            <button className={cx("icon-button", props.isListening && "is-live")} type="button" aria-label="Voice input" title="Voice input" onClick={props.onToggleVoice} disabled={!props.voiceAvailable}>
+              <Mic size={32} />
+            </button>
+          )}
         </div>
       </div>
     </form>
