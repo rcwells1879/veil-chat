@@ -1371,6 +1371,10 @@ button {
     grid-template-columns: 1fr;
   }
 
+  .app-shell.sidebar-collapsed {
+    grid-template-columns: 1fr;
+  }
+
   .app-shell.backdrop-on {
     background:
       linear-gradient(180deg, rgba(9, 14, 12, 0.48), rgba(9, 14, 12, 0.76)),
