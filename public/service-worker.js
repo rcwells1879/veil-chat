@@ -17,7 +17,7 @@ self.addEventListener("install", (event) => {
       .then((cache) =>
         Promise.all(
           PRECACHE.map((asset) =>
-            fetch(asset)
+            fetch(asset, { cache: "reload" })
               .then((response) => (response.ok ? cache.put(asset, response) : undefined))
               .catch(() => undefined)
           )
@@ -25,6 +25,12 @@ self.addEventListener("install", (event) => {
       )
       .then(() => self.skipWaiting())
   );
+});
+
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "SKIP_WAITING") {
+    event.waitUntil(self.skipWaiting());
+  }
 });
 
 self.addEventListener("activate", (event) => {
@@ -58,5 +64,5 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  event.respondWith(fetch(request).catch(() => caches.match("/veilchat/index.html")));
+  event.respondWith(fetch(request, { cache: "no-store" }).catch(() => caches.match("/veilchat/index.html")));
 });

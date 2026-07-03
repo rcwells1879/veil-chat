@@ -83,6 +83,8 @@ export default function App() {
 
   const activeView = state.activeView as ViewId;
   const hasMessages = state.messages.length > 0;
+  const activeNavLabel = navItems.find((item) => item.id === activeView)?.label ?? "VeilChat";
+  const panelOpen = activeView !== "chat";
 
   const handleFileAttach = (event: ChangeEvent<HTMLInputElement>) => {
     if (event.target.files) actions.attachFiles(event.target.files);
@@ -158,16 +160,24 @@ export default function App() {
           <button
             className="icon-button"
             type="button"
-            aria-label="Open navigation"
-            title="Open navigation"
+            aria-label={mobileNavOpen ? "Close navigation" : panelOpen ? "Close panel" : "Open navigation"}
+            title={mobileNavOpen ? "Close navigation" : panelOpen ? "Close panel" : "Open navigation"}
             onClick={() => {
+              if (mobileNavOpen) {
+                setMobileNavOpen(false);
+                return;
+              }
+              if (panelOpen) {
+                actions.setActiveView("chat");
+                return;
+              }
               setSidebarCollapsed(false);
-              setMobileNavOpen((open) => !open);
+              setMobileNavOpen(true);
             }}
           >
-            {mobileNavOpen ? <X size={20} /> : <Menu size={20} />}
+            {mobileNavOpen || panelOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
-          <span>VeilChat</span>
+          <span>{activeView === "chat" ? "VeilChat" : activeNavLabel}</span>
           <button className="icon-button" type="button" aria-label="New chat" title="New chat" onClick={actions.newConversation}>
             <Plus size={20} />
           </button>

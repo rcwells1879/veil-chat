@@ -122,14 +122,48 @@ export function useVeilChat() {
       refreshDocs();
     }
 
-    if ("serviceWorker" in navigator) {
-      window.addEventListener("load", () => {
-        navigator.serviceWorker.register("/veilchat/service-worker.js").catch((error) => console.warn("Service worker registration failed:", error));
-      });
+    let refreshing = false;
+    const handleControllerChange = () => {
+      if (refreshing) return;
+      refreshing = true;
+      window.location.reload();
+    };
+
+    const registerServiceWorker = () => {
+      if (!("serviceWorker" in navigator)) return;
+
+      navigator.serviceWorker.addEventListener("controllerchange", handleControllerChange);
+      navigator.serviceWorker
+        .register("/veilchat/service-worker.js", { updateViaCache: "none" })
+        .then((registration) => {
+          registration.update().catch((error) => console.warn("Service worker update check failed:", error));
+          if (registration.waiting) registration.waiting.postMessage({ type: "SKIP_WAITING" });
+
+          registration.addEventListener("updatefound", () => {
+            const nextWorker = registration.installing;
+            if (!nextWorker) return;
+            nextWorker.addEventListener("statechange", () => {
+              if (nextWorker.state === "installed" && navigator.serviceWorker.controller) {
+                nextWorker.postMessage({ type: "SKIP_WAITING" });
+              }
+            });
+          });
+        })
+        .catch((error) => console.warn("Service worker registration failed:", error));
+    };
+
+    if (document.readyState === "complete") {
+      registerServiceWorker();
+    } else {
+      window.addEventListener("load", registerServiceWorker);
     }
 
     return () => {
       cancelled = true;
+      window.removeEventListener("load", registerServiceWorker);
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.removeEventListener("controllerchange", handleControllerChange);
+      }
     };
   }, []);
 
