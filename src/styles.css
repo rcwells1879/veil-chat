@@ -553,12 +553,12 @@ button {
 }
 
 .composer-bottom .composer-box {
-  min-height: 86px;
+  min-height: 64px;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 18px;
-  padding: 12px 16px 12px 24px;
+  gap: 12px;
+  padding: 8px 12px 8px 18px;
   border-radius: 999px;
   border-color: rgba(239, 244, 236, 0.13);
   background:
@@ -577,10 +577,10 @@ button {
 }
 
 .composer-bottom .composer-box textarea {
-  min-height: 52px;
-  max-height: 156px;
-  padding: 10px 0 8px;
-  font-size: 28px;
+  min-height: 40px;
+  max-height: 126px;
+  padding: 8px 0 6px;
+  font-size: 21px;
   font-weight: 760;
   line-height: 1.22;
   color: var(--text);
@@ -598,8 +598,8 @@ button {
 
 .composer-bottom .icon-button,
 .composer-bottom .send-button {
-  width: 58px;
-  height: 58px;
+  width: 46px;
+  height: 46px;
   border-radius: 999px;
   color: rgba(239, 244, 236, 0.96);
 }
@@ -677,17 +677,17 @@ button {
 }
 
 .chat-layout.is-empty .composer.composer-initial {
-  width: min(980px, 100%);
+  width: min(760px, 100%);
 }
 
 .composer-initial .composer-box {
-  min-height: 208px;
+  min-height: 136px;
   display: grid;
-  grid-template-rows: minmax(92px, auto) auto;
+  grid-template-rows: minmax(48px, auto) auto;
   align-items: stretch;
-  gap: 20px;
-  padding: 30px 34px 24px;
-  border-radius: 48px;
+  gap: 10px;
+  padding: 16px 20px 14px;
+  border-radius: 34px;
   border-width: 0.5px;
   border-color: rgba(239, 244, 236, 0.14);
   background:
@@ -708,10 +708,10 @@ button {
 
 .composer-initial .composer-box textarea {
   width: 100%;
-  min-height: 92px;
-  max-height: 210px;
-  padding: 6px 12px 0;
-  font-size: 36px;
+  min-height: 48px;
+  max-height: 128px;
+  padding: 4px 8px 0;
+  font-size: 24px;
   font-weight: 760;
   line-height: 1.18;
   color: var(--text);
@@ -735,7 +735,7 @@ button {
   display: flex;
   align-items: center;
   min-width: 0;
-  gap: 14px;
+  gap: 10px;
 }
 
 .initial-composer-actions {
@@ -744,8 +744,8 @@ button {
 
 .initial-composer-tool,
 .initial-send-button {
-  width: 62px;
-  height: 62px;
+  width: 42px;
+  height: 42px;
   border: 0.5px solid transparent;
   border-radius: 999px;
   display: grid;
@@ -791,8 +791,8 @@ button {
 }
 
 .initial-send-button {
-  width: 74px;
-  height: 74px;
+  width: 48px;
+  height: 48px;
   background: rgba(239, 244, 236, 0.18);
   color: rgba(8, 13, 11, 0.9);
 }
@@ -811,9 +811,9 @@ button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 9px;
   color: rgba(239, 244, 236, 0.92);
-  font-size: 22px;
+  font-size: 15px;
   font-weight: 740;
   line-height: 1;
   white-space: nowrap;
@@ -827,6 +827,28 @@ button {
 
 .initial-composer-status span:last-child {
   color: rgba(239, 244, 236, 0.56);
+}
+
+.initial-composer-tool svg,
+.composer-bottom .icon-button svg {
+  width: 22px;
+  height: 22px;
+}
+
+.initial-send-button svg {
+  width: 22px;
+  height: 22px;
+}
+
+.composer-bottom .send-button svg {
+  width: 20px;
+  height: 20px;
+}
+
+.initial-composer-status svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
 }
 
 .message-item {
@@ -1726,16 +1748,16 @@ button {
 @media (max-width: 980px) {
   .composer-initial .composer-box {
     grid-template-columns: none;
-    grid-template-rows: minmax(76px, auto) auto;
-    min-height: 176px;
-    padding: 24px 24px 20px;
-    border-radius: 38px;
-    gap: 16px;
+    grid-template-rows: minmax(46px, auto) auto;
+    min-height: 130px;
+    padding: 14px 18px 13px;
+    border-radius: 30px;
+    gap: 10px;
   }
 
   .composer-initial .composer-box textarea {
-    min-height: 76px;
-    font-size: 30px;
+    min-height: 46px;
+    font-size: 22px;
   }
 
   .initial-composer-toolbar {
@@ -1744,35 +1766,35 @@ button {
 
   .initial-composer-status {
     max-width: 330px;
-    font-size: 18px;
-    gap: 9px;
+    font-size: 14px;
+    gap: 8px;
   }
 
   .initial-composer-tool {
-    width: 52px;
-    height: 52px;
+    width: 42px;
+    height: 42px;
   }
 
   .initial-send-button {
-    width: 62px;
-    height: 62px;
+    width: 48px;
+    height: 48px;
   }
 }
 
 @media (max-width: 560px) {
   .composer-initial .composer-box {
-    min-height: 138px;
-    grid-template-rows: minmax(52px, auto) auto;
-    padding: 16px;
-    border-radius: 28px;
-    gap: 12px;
+    min-height: 120px;
+    grid-template-rows: minmax(44px, auto) auto;
+    padding: 14px;
+    border-radius: 26px;
+    gap: 10px;
   }
 
   .composer-initial .composer-box textarea {
-    min-height: 52px;
-    max-height: 130px;
+    min-height: 44px;
+    max-height: 112px;
     padding: 2px 6px 0;
-    font-size: 22px;
+    font-size: 19px;
   }
 
   .initial-composer-toolbar {
@@ -1807,20 +1829,20 @@ button {
   }
 
   .composer-bottom .composer-box {
-    min-height: 78px;
-    padding: 10px 14px 10px 20px;
-    gap: 12px;
+    min-height: 62px;
+    padding: 8px 12px 8px 18px;
+    gap: 10px;
   }
 
   .composer-bottom .composer-box textarea {
-    min-height: 48px;
-    font-size: 23px;
+    min-height: 38px;
+    font-size: 19px;
   }
 
   .composer-bottom .icon-button,
   .composer-bottom .send-button {
-    width: 52px;
-    height: 52px;
+    width: 46px;
+    height: 46px;
   }
 }
 
@@ -1830,33 +1852,33 @@ button {
   }
 
   .composer-bottom .composer-box {
-    min-height: 64px;
-    padding: 8px 10px 8px 14px;
-    gap: 8px;
+    min-height: 58px;
+    padding: 7px 9px 7px 13px;
+    gap: 7px;
   }
 
   .composer-bottom .composer-box textarea {
-    min-height: 42px;
-    max-height: 112px;
-    padding: 8px 0 6px;
-    font-size: 18px;
+    min-height: 38px;
+    max-height: 104px;
+    padding: 7px 0 5px;
+    font-size: 16px;
   }
 
   .composer-bottom .icon-button,
   .composer-bottom .send-button {
-    width: 44px;
-    height: 44px;
+    width: 42px;
+    height: 42px;
   }
 
   .composer-bottom .composer-plus-button svg,
   .composer-bottom .icon-button svg {
-    width: 25px;
-    height: 25px;
+    width: 22px;
+    height: 22px;
   }
 
   .composer-bottom .send-button svg {
-    width: 21px;
-    height: 21px;
+    width: 19px;
+    height: 19px;
   }
 
   .composer-menu-panel {
