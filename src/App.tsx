@@ -29,7 +29,7 @@ import { type ChangeEvent, type FormEvent, type ReactNode, useEffect, useLayoutE
 
 import { cleanAssistantText, markdownToHtml, type ChatMessage } from "./lib/format";
 import { getKieImageModelControls, KIE_CHAT_MODELS, KIE_IMAGE_MODELS, type AppSettings, type SelectOption } from "./lib/settings";
-import { useVeilChat } from "./lib/useVeilChat";
+import { useVeilChat, type RecentConversationSummary } from "./lib/useVeilChat";
 import "@fontsource/cormorant-garamond/500-italic.css";
 import "./styles.css";
 
@@ -132,18 +132,29 @@ export default function App() {
           {navItems.map((item) => {
             const Icon = item.icon;
             return (
-              <button
-                key={item.id}
-            className={cx("nav-button", activeView === item.id && "is-active")}
-                type="button"
-                onClick={() => {
-                  actions.setActiveView(item.id);
-                  setMobileNavOpen(false);
-                }}
-              >
-                <Icon size={18} />
-                {item.label}
-              </button>
+              <div key={item.id} className="nav-group">
+                <button
+                  className={cx("nav-button", activeView === item.id && "is-active")}
+                  type="button"
+                  onClick={() => {
+                    actions.setActiveView(item.id);
+                    setMobileNavOpen(false);
+                  }}
+                >
+                  <Icon size={18} />
+                  {item.label}
+                </button>
+                {item.id === "history" && (
+                  <RecentChatList
+                    chats={state.recentConversations}
+                    onDelete={actions.deleteRecentConversation}
+                    onOpen={(id) => {
+                      actions.loadRecentConversation(id);
+                      setMobileNavOpen(false);
+                    }}
+                  />
+                )}
+              </div>
             );
           })}
         </nav>
@@ -328,6 +339,33 @@ function EmptyPrompt() {
       <p className="eyebrow">veilchat</p>
       <h1>What are we making today?</h1>
       <p className="empty-copy">Begin anywhere.</p>
+    </div>
+  );
+}
+
+function RecentChatList({
+  chats,
+  onDelete,
+  onOpen,
+}: {
+  chats: RecentConversationSummary[];
+  onDelete: (id: string) => void;
+  onOpen: (id: string) => void;
+}) {
+  if (!chats.length) return null;
+  return (
+    <div className="recent-chat-list" aria-label="Recent chats">
+      {chats.map((chat) => (
+        <div className="recent-chat-item" key={chat.id}>
+          <button className="recent-chat-open" type="button" onClick={() => onOpen(chat.id)} title={chat.title}>
+            <span>{chat.title}</span>
+            <small>{chat.subtitle}</small>
+          </button>
+          <button className="recent-chat-delete" type="button" aria-label={`Delete ${chat.title}`} title="Delete chat" onClick={() => onDelete(chat.id)}>
+            <X size={13} />
+          </button>
+        </div>
+      ))}
     </div>
   );
 }

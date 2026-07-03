@@ -24,6 +24,135 @@ interface ConversationFile {
   documentContext?: unknown;
 }
 
+export interface RecentConversationSummary {
+  id: string;
+  title: string;
+  subtitle: string;
+  updatedAt: string;
+  messageCount: number;
+}
+
+interface RecentConversationRecord extends RecentConversationSummary {
+  personaPrompt?: string | null;
+  llmServiceState: {
+    conversationHistory: LLMMessage[];
+    characterInitialized: boolean;
+  };
+  documentContext?: unknown;
+  messages?: ChatMessage[];
+}
+
+const RECENT_CONVERSATIONS_KEY = "veilchatRecentConversations";
+const CURRENT_CONVERSATION_ID_KEY = "veilchatCurrentConversationId";
+const MAX_RECENT_CONVERSATIONS = 12;
+
+function createConversationId() {
+  return crypto.randomUUID();
+}
+
+function getStoredConversationId() {
+  const savedId = localStorage.getItem(CURRENT_CONVERSATION_ID_KEY);
+  if (savedId) return savedId;
+  const nextId = createConversationId();
+  localStorage.setItem(CURRENT_CONVERSATION_ID_KEY, nextId);
+  return nextId;
+}
+
+function readRecentConversationRecords(): RecentConversationRecord[] {
+  try {
+    const raw = localStorage.getItem(RECENT_CONVERSATIONS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((record): record is RecentConversationRecord =>
+      Boolean(record?.id && record?.title && record?.updatedAt && Array.isArray(record?.llmServiceState?.conversationHistory))
+    );
+  } catch {
+    return [];
+  }
+}
+
+function writeRecentConversationRecords(records: RecentConversationRecord[]) {
+  const limited = records.slice(0, MAX_RECENT_CONVERSATIONS);
+  try {
+    localStorage.setItem(RECENT_CONVERSATIONS_KEY, JSON.stringify(limited));
+  } catch {
+    const withoutDocuments = limited.map((record) => ({ ...record, documentContext: null }));
+    localStorage.setItem(RECENT_CONVERSATIONS_KEY, JSON.stringify(withoutDocuments));
+  }
+}
+
+function summarizeRecentConversations(records: RecentConversationRecord[]): RecentConversationSummary[] {
+  return records.map(({ id, title, subtitle, updatedAt, messageCount }) => ({ id, title, subtitle, updatedAt, messageCount }));
+}
+
+function createConversationTitle(history: LLMMessage[], visibleMessages: ChatMessage[], personaPrompt: string) {
+  const firstUserMessage = history.find((message) => message.role === "user" && message.content.trim())?.content
+    ?? visibleMessages.find((message) => message.role === "user" && message.content.trim())?.content
+    ?? personaPrompt
+    ?? "";
+  const cleaned = firstUserMessage
+    .replace(/^xx\b/i, "")
+    .replace(/\bshow me\b/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!cleaned) return "New chat";
+  return cleaned.length > 38 ? `${cleaned.slice(0, 35).trim()}...` : cleaned;
+}
+
+function formatRecentConversationDate(date: Date) {
+  const today = new Date();
+  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+  const startOfDate = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+  const dayDiff = Math.round((startOfToday - startOfDate) / 86400000);
+  if (dayDiff === 0) return "Today";
+  if (dayDiff === 1) return "Yesterday";
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function createConversationFingerprint(history: LLMMessage[], visibleMessages: ChatMessage[], documents: AttachedDocument[] = []) {
+  return JSON.stringify({
+    history: history.map((message) => [message.role, message.content, Boolean(message.hidden)]),
+    visible: visibleMessages.map((message) => [message.role, message.kind, message.content, message.imageUrl ?? ""]),
+    documents: documents.map((document) => [document.id, document.name, document.size, document.addedAt]),
+  });
+}
+
+function preserveStoredConversationAsRecent(conversationId: string) {
+  try {
+    const savedData = localStorage.getItem("llmConversationHistory");
+    if (!savedData) return summarizeRecentConversations(readRecentConversationRecords());
+    const parsed = JSON.parse(savedData) as { conversationHistory?: LLMMessage[]; characterInitialized?: boolean; timestamp?: number };
+    const history = Array.isArray(parsed.conversationHistory) ? parsed.conversationHistory : [];
+    const visibleMessages = historyToMessages(history);
+    if (!visibleMessages.length) return summarizeRecentConversations(readRecentConversationRecords());
+
+    const records = readRecentConversationRecords();
+    if (records.some((record) => record.id === conversationId)) return summarizeRecentConversations(records);
+
+    const updatedAt = parsed.timestamp ? new Date(parsed.timestamp).toISOString() : new Date().toISOString();
+    const record: RecentConversationRecord = {
+      id: conversationId,
+      title: createConversationTitle(history, visibleMessages, localStorage.getItem("currentPersonaPrompt") ?? ""),
+      subtitle: formatRecentConversationDate(new Date(updatedAt)),
+      updatedAt,
+      messageCount: visibleMessages.length,
+      personaPrompt: localStorage.getItem("currentPersonaPrompt"),
+      llmServiceState: {
+        conversationHistory: history,
+        characterInitialized: Boolean(parsed.characterInitialized),
+      },
+      documentContext: null,
+      messages: visibleMessages,
+    };
+    const nextRecords = [record, ...records];
+    writeRecentConversationRecords(nextRecords);
+    return summarizeRecentConversations(nextRecords);
+  } catch {
+    return summarizeRecentConversations(readRecentConversationRecords());
+  }
+}
+
 function detectSearchKeywords(message: string) {
   const lower = message.toLowerCase();
   return ["search for ", "search the web for ", "look up ", "lookup ", "find me ", "web search "].some((keyword) => lower.includes(keyword));
@@ -58,6 +187,7 @@ export function useVeilChat() {
   const [isListening, setIsListening] = useState(false);
   const [personaPrompt, setPersonaPrompt] = useState(() => localStorage.getItem("currentPersonaPrompt") ?? "");
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
+  const [recentConversations, setRecentConversations] = useState<RecentConversationSummary[]>(() => summarizeRecentConversations(readRecentConversationRecords()));
 
   const securityRef = useRef(new SecurityValidator());
   const llmRef = useRef<LLMService | null>(null);
@@ -66,6 +196,7 @@ export function useVeilChat() {
   const contextRef = useRef<DocumentContextService | null>(null);
   const searchRef = useRef<SearchService | null>(null);
   const settingsRef = useRef(settings);
+  const currentConversationIdRef = useRef(getStoredConversationId());
 
   const addMessage = useCallback((message: ChatMessage, speak = false) => {
     setMessages((current) => [...current, message]);
@@ -79,6 +210,13 @@ export function useVeilChat() {
   const refreshDocs = useCallback(() => {
     setDocuments(contextRef.current?.getAttachedDocuments() ?? []);
     setImageReferencesCount(imageRef.current?.getReferenceImageCount() ?? 0);
+  }, []);
+
+  const startNewConversationId = useCallback(() => {
+    const nextId = createConversationId();
+    currentConversationIdRef.current = nextId;
+    localStorage.setItem(CURRENT_CONVERSATION_ID_KEY, nextId);
+    return nextId;
   }, []);
 
   const rebuildServices = useCallback(
@@ -118,7 +256,12 @@ export function useVeilChat() {
     let cancelled = false;
     rebuildServices(settings);
     if (!cancelled) {
-      setMessages(historyToMessages(llmRef.current?.conversationHistory ?? []));
+      setRecentConversations(preserveStoredConversationAsRecent(currentConversationIdRef.current));
+      llmRef.current?.clearConversationHistory();
+      localStorage.removeItem("currentPersonaPrompt");
+      setPersonaPrompt("");
+      startNewConversationId();
+      setMessages([]);
       refreshDocs();
     }
 
@@ -171,6 +314,37 @@ export function useVeilChat() {
     persistSettings(settings);
     rebuildServices(settings);
   }, [settings, rebuildServices]);
+
+  useEffect(() => {
+    const llm = llmRef.current;
+    if (!llm || !messages.length) return;
+
+    const history = llm.conversationHistory;
+    const records = readRecentConversationRecords();
+    const existing = records.find((record) => record.id === currentConversationIdRef.current);
+    const existingMessages = existing?.messages ?? historyToMessages(existing?.llmServiceState.conversationHistory ?? []);
+    const existingFingerprint = existing ? createConversationFingerprint(existing.llmServiceState.conversationHistory, existingMessages, documents) : "";
+    const currentFingerprint = createConversationFingerprint(history, messages, documents);
+    const updatedAt = existing && existingFingerprint === currentFingerprint ? existing.updatedAt : new Date().toISOString();
+    const updatedDate = new Date(updatedAt);
+    const record: RecentConversationRecord = {
+      id: currentConversationIdRef.current,
+      title: createConversationTitle(history, messages, personaPrompt),
+      subtitle: formatRecentConversationDate(updatedDate),
+      updatedAt,
+      messageCount: messages.length,
+      personaPrompt: personaPrompt || null,
+      llmServiceState: {
+        conversationHistory: history,
+        characterInitialized: llm.characterInitialized,
+      },
+      documentContext: contextRef.current?.exportContext() ?? null,
+      messages,
+    };
+    const nextRecords = [record, ...records.filter((item) => item.id !== record.id)];
+    writeRecentConversationRecords(nextRecords);
+    setRecentConversations(summarizeRecentConversations(nextRecords));
+  }, [documents, messages, personaPrompt]);
 
   const updateAppSetting = useCallback(<K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
     setSettings((current) => updateSetting(current, key, value));
@@ -341,6 +515,7 @@ export function useVeilChat() {
   }, []);
 
   const newConversation = useCallback(() => {
+    startNewConversationId();
     llmRef.current?.clearConversationHistory();
     contextRef.current?.clearAllDocuments();
     imageRef.current?.clearReferenceImages();
@@ -351,7 +526,7 @@ export function useVeilChat() {
     setImageReferencesCount(0);
     refreshDocs();
     setActiveView("chat");
-  }, [refreshDocs]);
+  }, [refreshDocs, startNewConversationId]);
 
   const createPersona = useCallback(
     async (prompt?: string) => {
@@ -364,6 +539,7 @@ export function useVeilChat() {
       }
 
       setBusy("persona");
+      startNewConversationId();
       setMessages([]);
       setActiveView("chat");
       try {
@@ -407,7 +583,7 @@ export function useVeilChat() {
         setBusy("idle");
       }
     },
-    [addMessage, busy, refreshDocs, validateInput]
+    [addMessage, busy, refreshDocs, startNewConversationId, validateInput]
   );
 
   const saveConversation = useCallback(() => {
@@ -439,6 +615,7 @@ export function useVeilChat() {
           return validation.isValid ? { ...message, content: validation.sanitizedInput } : { ...message, content: "[Message blocked by safety validation]" };
         });
 
+        startNewConversationId();
         if (!llmRef.current) llmRef.current = new LLMService(settingsRef.current, securityRef.current);
         llmRef.current.conversationHistory = sanitized;
         llmRef.current.characterInitialized = Boolean(payload.llmServiceState?.characterInitialized);
@@ -460,7 +637,66 @@ export function useVeilChat() {
         setNotice(`Could not load conversation: ${error instanceof Error ? error.message : String(error)}`);
       }
     },
-    [refreshDocs, validateInput]
+    [refreshDocs, startNewConversationId, validateInput]
+  );
+
+  const loadRecentConversation = useCallback(
+    (id: string) => {
+      try {
+        const record = readRecentConversationRecords().find((item) => item.id === id);
+        if (!record) {
+          setNotice("That chat is no longer available.");
+          setRecentConversations(summarizeRecentConversations(readRecentConversationRecords()));
+          return;
+        }
+
+        currentConversationIdRef.current = record.id;
+        localStorage.setItem(CURRENT_CONVERSATION_ID_KEY, record.id);
+        if (!llmRef.current) llmRef.current = new LLMService(settingsRef.current, securityRef.current);
+        llmRef.current.conversationHistory = record.llmServiceState.conversationHistory;
+        llmRef.current.characterInitialized = Boolean(record.llmServiceState.characterInitialized);
+        llmRef.current.saveConversationHistory();
+
+        contextRef.current?.clearAllDocuments();
+        if (record.documentContext) contextRef.current?.importContext(record.documentContext);
+        imageRef.current?.clearReferenceImages();
+        setImageReferencesCount(0);
+        refreshDocs();
+
+        const prompt = record.personaPrompt ?? "";
+        if (prompt) localStorage.setItem("currentPersonaPrompt", prompt);
+        else localStorage.removeItem("currentPersonaPrompt");
+        setPersonaPrompt(prompt);
+        setMessages(record.messages?.length ? record.messages : historyToMessages(record.llmServiceState.conversationHistory));
+        setInput("");
+        setActiveView("chat");
+      } catch (error) {
+        setNotice(`Could not load chat: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    },
+    [refreshDocs]
+  );
+
+  const deleteRecentConversation = useCallback(
+    (id: string) => {
+      const nextRecords = readRecentConversationRecords().filter((record) => record.id !== id);
+      writeRecentConversationRecords(nextRecords);
+      setRecentConversations(summarizeRecentConversations(nextRecords));
+
+      if (id !== currentConversationIdRef.current) return;
+      startNewConversationId();
+      llmRef.current?.clearConversationHistory();
+      contextRef.current?.clearAllDocuments();
+      imageRef.current?.clearReferenceImages();
+      localStorage.removeItem("currentPersonaPrompt");
+      setPersonaPrompt("");
+      setMessages([]);
+      setInput("");
+      setImageReferencesCount(0);
+      refreshDocs();
+      setActiveView("chat");
+    },
+    [refreshDocs, startNewConversationId]
   );
 
   const state = useMemo(
@@ -475,10 +711,11 @@ export function useVeilChat() {
       messages,
       notice,
       personaPrompt,
+      recentConversations,
       settings,
       voiceAvailable: Boolean(voiceRef.current?.isRecognitionSupported()),
     }),
-    [activeView, busy, documents, imageReferencesCount, input, isListening, lastSavedAt, messages, notice, personaPrompt, settings]
+    [activeView, busy, documents, imageReferencesCount, input, isListening, lastSavedAt, messages, notice, personaPrompt, recentConversations, settings]
   );
 
   return {
@@ -487,7 +724,9 @@ export function useVeilChat() {
       attachFiles,
       clearDocuments,
       createPersona,
+      deleteRecentConversation,
       loadConversation,
+      loadRecentConversation,
       newConversation,
       removeDocument,
       saveConversation,
