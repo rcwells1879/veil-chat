@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from "motion/react";
 import {
+  ArrowUp,
   Brain,
   ChevronDown,
   FileText,
@@ -23,6 +24,7 @@ import {
   Volume2,
   Waves,
   X,
+  Zap,
 } from "lucide-react";
 import { type ChangeEvent, type FormEvent, type ReactNode, useLayoutEffect, useRef, useState } from "react";
 
@@ -269,7 +271,9 @@ function ChatView(props: {
       documentsCount={props.documentsCount}
       imageReferencesCount={props.imageReferencesCount}
       input={props.input}
+      initial={empty}
       isListening={props.isListening}
+      settings={props.settings}
       showBackdrop={props.settings.chatBackdropEnabled}
       voiceAvailable={props.voiceAvailable}
       onAttach={props.onAttach}
@@ -334,7 +338,9 @@ function Composer(props: {
   documentsCount: number;
   imageReferencesCount: number;
   input: string;
+  initial: boolean;
   isListening: boolean;
+  settings: AppSettings;
   showBackdrop: boolean;
   voiceAvailable: boolean;
   onAttach: () => void;
@@ -357,6 +363,56 @@ function Composer(props: {
     event.preventDefault();
     props.onSend();
   };
+
+  const modelLabel = getComposerModelLabel(props.settings);
+  const stateLabel = getComposerStateLabel(props);
+  const statusTitle = [modelLabel, stateLabel, getComposerAttachmentLabel(props.documentsCount, props.imageReferencesCount)].filter(Boolean).join(" - ");
+
+  if (props.initial) {
+    return (
+      <form className="composer composer-initial" onSubmit={submit}>
+        <div className="composer-box">
+          <textarea
+            ref={textareaRef}
+            id="user-input"
+            value={props.input}
+            placeholder="Ask VeilChat"
+            rows={1}
+            onChange={(event) => props.onInput(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                props.onSend();
+              }
+            }}
+          />
+          <div className="initial-composer-toolbar">
+            <div className="initial-composer-tools">
+              <button className="initial-composer-tool" type="button" aria-label="Attach documents" title="Attach documents" onClick={props.onAttach}>
+                <Plus size={32} />
+              </button>
+              <button className={cx("initial-composer-tool initial-composer-accent", props.showBackdrop && "is-active")} type="button" aria-label="Toggle chat background" title="Toggle chat background" onClick={props.onToggleBackdrop}>
+                <ImageIcon size={24} />
+              </button>
+            </div>
+            <div className="initial-composer-status" title={statusTitle} aria-live="polite">
+              <Zap size={24} />
+              <span>{modelLabel}</span>
+              <span>{stateLabel}</span>
+            </div>
+            <div className="initial-composer-actions">
+              <button className={cx("initial-composer-tool", props.isListening && "is-live")} type="button" aria-label="Voice input" title="Voice input" onClick={props.onToggleVoice} disabled={!props.voiceAvailable}>
+                <Mic size={31} />
+              </button>
+              <button className="initial-send-button" type="submit" disabled={!props.input.trim() || props.busy !== "idle"} aria-label="Send message" title="Send message">
+                <ArrowUp size={34} />
+              </button>
+            </div>
+          </div>
+        </div>
+      </form>
+    );
+  }
 
   return (
     <form className="composer" onSubmit={submit}>
@@ -397,6 +453,57 @@ function Composer(props: {
       </div>
     </form>
   );
+}
+
+function getComposerModelLabel(settings: AppSettings) {
+  const raw =
+    settings.customLlmProvider === "openai-direct"
+      ? settings.openaiModelIdentifier
+      : settings.customLlmProvider === "anthropic-direct"
+        ? settings.anthropicModelIdentifier
+        : settings.customLlmProvider === "google-direct"
+          ? settings.googleModelIdentifier
+          : settings.customLlmProvider === "kie-direct"
+            ? settings.kieModelIdentifier
+            : settings.customLlmModelIdentifier;
+
+  const compact = (raw || "Model").split("/").pop() ?? raw;
+  return compact
+    .replace(/-/g, " ")
+    .replace(/\bgpt\b/gi, "GPT")
+    .replace(/\bai\b/gi, "AI")
+    .replace(/\bclaude\b/gi, "Claude")
+    .replace(/\bgemini\b/gi, "Gemini")
+    .replace(/\bflash\b/gi, "Flash")
+    .replace(/\bsonnet\b/gi, "Sonnet")
+    .replace(/\bopus\b/gi, "Opus")
+    .trim();
+}
+
+function getComposerStateLabel(props: {
+  busy: string;
+  documentsCount: number;
+  imageReferencesCount: number;
+  settings: AppSettings;
+}) {
+  const attachmentLabel = getComposerAttachmentLabel(props.documentsCount, props.imageReferencesCount);
+  if (props.busy !== "idle") return props.busy;
+  if (attachmentLabel) return attachmentLabel;
+  if (props.settings.customLlmProvider === "kie-direct") {
+    return props.settings.kieReasoningLevel === "off" ? "Reasoning off" : `${capitalizeLabel(props.settings.kieReasoningLevel)} reasoning`;
+  }
+  return "Ready";
+}
+
+function getComposerAttachmentLabel(documentsCount: number, imageReferencesCount: number) {
+  const parts = [];
+  if (documentsCount > 0) parts.push(`${documentsCount} file${documentsCount === 1 ? "" : "s"}`);
+  if (imageReferencesCount > 0) parts.push(`${imageReferencesCount} image ref${imageReferencesCount === 1 ? "" : "s"}`);
+  return parts.join(" + ");
+}
+
+function capitalizeLabel(value: string) {
+  return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
 function MessageItem({ message, onImagePreview }: { message: ChatMessage; onImagePreview: (url: string) => void }) {

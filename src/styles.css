@@ -544,6 +544,158 @@ button {
   border-color: transparent;
 }
 
+.chat-layout.is-empty .composer.composer-initial {
+  width: min(980px, 100%);
+}
+
+.composer-initial .composer-box {
+  min-height: 208px;
+  display: grid;
+  grid-template-rows: minmax(92px, auto) auto;
+  align-items: stretch;
+  gap: 20px;
+  padding: 30px 34px 24px;
+  border-radius: 48px;
+  border-color: rgba(239, 244, 236, 0.14);
+  background:
+    linear-gradient(180deg, rgba(28, 30, 29, 0.92), rgba(19, 22, 20, 0.96)),
+    rgba(255, 255, 255, 0.035);
+  box-shadow:
+    0 28px 76px rgba(0, 0, 0, 0.38),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.composer-initial .composer-box:focus-within {
+  border-color: rgba(239, 244, 236, 0.24);
+  box-shadow:
+    0 30px 82px rgba(0, 0, 0, 0.44),
+    0 0 0 1px rgba(184, 217, 204, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+
+.composer-initial .composer-box textarea {
+  width: 100%;
+  min-height: 92px;
+  max-height: 210px;
+  padding: 6px 12px 0;
+  font-size: 36px;
+  font-weight: 760;
+  line-height: 1.18;
+  color: var(--text);
+  overflow-y: auto;
+}
+
+.composer-initial .composer-box textarea::placeholder {
+  color: rgba(239, 244, 236, 0.22);
+}
+
+.initial-composer-toolbar {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+}
+
+.initial-composer-tools,
+.initial-composer-actions {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 14px;
+}
+
+.initial-composer-actions {
+  justify-content: flex-end;
+}
+
+.initial-composer-tool,
+.initial-send-button {
+  width: 62px;
+  height: 62px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  color: rgba(239, 244, 236, 0.92);
+  cursor: pointer;
+  flex: 0 0 auto;
+  transition:
+    transform 180ms ease,
+    background 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease,
+    opacity 180ms ease;
+}
+
+.initial-composer-tool:hover,
+.initial-send-button:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.initial-composer-tool:disabled,
+.initial-send-button:disabled {
+  opacity: 0.34;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.initial-composer-accent {
+  color: rgba(255, 172, 126, 0.92);
+}
+
+.initial-composer-accent.is-active {
+  border-color: rgba(255, 172, 126, 0.42);
+  background: rgba(255, 127, 84, 0.1);
+}
+
+.initial-composer-tool.is-live {
+  color: var(--danger);
+  border-color: rgba(217, 120, 109, 0.46);
+  background: rgba(217, 120, 109, 0.08);
+}
+
+.initial-send-button {
+  width: 74px;
+  height: 74px;
+  background: rgba(239, 244, 236, 0.18);
+  color: rgba(8, 13, 11, 0.9);
+}
+
+.initial-send-button:not(:disabled) {
+  background: rgba(239, 244, 236, 0.84);
+}
+
+.initial-send-button:not(:disabled):hover {
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.initial-composer-status {
+  min-width: 0;
+  max-width: min(420px, 44vw);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: rgba(239, 244, 236, 0.92);
+  font-size: 22px;
+  font-weight: 740;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.initial-composer-status span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.initial-composer-status span:last-child {
+  color: rgba(239, 244, 236, 0.56);
+}
+
 .message-item {
   display: grid;
   grid-template-columns: 36px minmax(0, 1fr);
@@ -1281,6 +1433,84 @@ button {
   .section-title-row {
     align-items: flex-start;
     flex-direction: column;
+  }
+}
+
+@media (max-width: 980px) {
+  .composer-initial .composer-box {
+    grid-template-columns: none;
+    grid-template-rows: minmax(76px, auto) auto;
+    min-height: 176px;
+    padding: 24px 24px 20px;
+    border-radius: 38px;
+    gap: 16px;
+  }
+
+  .composer-initial .composer-box textarea {
+    min-height: 76px;
+    font-size: 30px;
+  }
+
+  .initial-composer-toolbar {
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  }
+
+  .initial-composer-status {
+    max-width: 330px;
+    font-size: 18px;
+    gap: 9px;
+  }
+
+  .initial-composer-tool {
+    width: 52px;
+    height: 52px;
+  }
+
+  .initial-send-button {
+    width: 62px;
+    height: 62px;
+  }
+}
+
+@media (max-width: 560px) {
+  .composer-initial .composer-box {
+    min-height: 138px;
+    grid-template-rows: minmax(52px, auto) auto;
+    padding: 16px;
+    border-radius: 28px;
+    gap: 12px;
+  }
+
+  .composer-initial .composer-box textarea {
+    min-height: 52px;
+    max-height: 130px;
+    padding: 2px 6px 0;
+    font-size: 22px;
+  }
+
+  .initial-composer-toolbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+  }
+
+  .initial-composer-status {
+    display: none;
+  }
+
+  .initial-composer-tools,
+  .initial-composer-actions {
+    gap: 7px;
+  }
+
+  .initial-composer-tool,
+  .initial-send-button {
+    width: 42px;
+    height: 42px;
+  }
+
+  .initial-send-button svg {
+    width: 24px;
+    height: 24px;
   }
 }
 
