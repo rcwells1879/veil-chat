@@ -204,7 +204,7 @@ export default function App() {
 
           {activeView === "settings" && (
             <motion.section key="settings" className="view panel-view" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.28 }}>
-              <SettingsView settings={state.settings} onChange={actions.updateAppSetting} />
+              <SettingsView settings={state.settings} onChange={actions.updateAppSetting} onClose={() => actions.setActiveView("chat")} />
             </motion.section>
           )}
 
@@ -561,10 +561,27 @@ function PersonaView({ busy, currentPrompt, onCreate }: { busy: string; currentP
   );
 }
 
-function SettingsView({ settings, onChange }: { settings: AppSettings; onChange: <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => void }) {
+function SettingsView({
+  settings,
+  onChange,
+  onClose,
+}: {
+  settings: AppSettings;
+  onChange: <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => void;
+  onClose: () => void;
+}) {
   return (
     <div className="panel-content settings-content">
-      <PanelHeader icon={<Settings size={20} />} kicker="settings" title="Control room" />
+      <PanelHeader
+        icon={<Settings size={20} />}
+        kicker="settings"
+        title="Control room"
+        action={
+          <button className="panel-close-button" type="button" aria-label="Close settings" title="Close settings" onClick={onClose}>
+            <X size={18} />
+          </button>
+        }
+      />
 
       <SettingsSection icon={<Brain size={19} />} title="LLM Provider">
         <Field label="Provider">
@@ -933,14 +950,17 @@ function HistoryView(props: {
   );
 }
 
-function PanelHeader({ icon, kicker, title }: { icon: ReactNode; kicker: string; title: string }) {
+function PanelHeader({ action, icon, kicker, title }: { action?: ReactNode; icon: ReactNode; kicker: string; title: string }) {
   return (
     <header className="panel-header">
-      <div className="panel-icon">{icon}</div>
-      <div>
-        <p className="eyebrow">{kicker}</p>
-        <h2>{title}</h2>
+      <div className="panel-heading">
+        <div className="panel-icon">{icon}</div>
+        <div>
+          <p className="eyebrow">{kicker}</p>
+          <h2>{title}</h2>
+        </div>
       </div>
+      {action}
     </header>
   );
 }

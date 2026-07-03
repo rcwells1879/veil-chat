@@ -823,8 +823,16 @@ button {
 .panel-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 14px;
   margin-bottom: 26px;
+}
+
+.panel-heading {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
 }
 
 .panel-header h2 {
@@ -833,6 +841,31 @@ button {
   line-height: 1;
   font-weight: 640;
   letter-spacing: 0;
+}
+
+.panel-close-button {
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.035);
+  color: rgba(239, 244, 236, 0.78);
+  cursor: pointer;
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    background 180ms ease,
+    color 180ms ease;
+}
+
+.panel-close-button:hover {
+  transform: translateY(-1px);
+  border-color: var(--line-strong);
+  background: rgba(239, 244, 236, 0.1);
+  color: var(--text);
 }
 
 .persona-grid {
